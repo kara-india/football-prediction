@@ -4,26 +4,27 @@
 **Author**: Gemini 3.8 Flash High (Principal Planning & Architecture Agent)  
 **Target Execution Agent**: Claude Sonnet 4.6 Thinking  
 **Repository**: `https://github.com/kara-india/football-prediction.git`  
-**Current Baseline Git SHA**: `3914ef35b1ac89051f14b1c5e0f8b44bd4525cf3`  
+**Current Baseline Git SHA**: `361a466`  
 **Date**: September 23, 2026  
-**Status**: SPECIFICATION COMPLETE — READY FOR EXECUTION (`START DEVELOPMENT`)
+**Status**: SPECIFICATION COMPLETE — READY FOR EXECUTION (`START DEVELOPMENT`)  
+**Approved Design Reference**: **Sofascore football UX/information architecture, adapted into a premium football analytics terminal.**
 
 ---
 
 ## 1. Executive Summary
 
-This Master Development Plan establishes the complete engineering, statistical, and operational roadmap for the **Football Prediction Intelligence Platform**.
+This Master Development Plan establishes the complete engineering, statistical, operational, and UX roadmap for the **Football Prediction Intelligence Platform**.
 
 ### 1.1 Core Mission
 The platform is a personal, quantitative betting-intelligence system. It is **NOT** an LLM tipster or a heuristic sentiment aggregator. The numerical prediction engine is grounded strictly in mathematical and statistical modeling (bivariate Poisson/Dixon-Coles, dynamic Elo ratings, multi-dimensional EWMA form, negative binomial event counts, and path-dependent Monte Carlo simulation). The platform continuously evaluates competitive football fixtures, ingests market-clearing odds from target bookmaker **1xBet**, evaluates out-of-sample expected value ($\text{EV} = p \cdot o - 1$), computes standard errors and probability confidence intervals, enforces a rigorous **NO-BET / ABSTAIN** gate, logs all predictions immutably to a ledger, tracks paper bets, settles outcomes against closing odds, and continually learns from prediction errors via automated walk-forward validation and safe challenger promotion.
 
-### 1.2 Non-Negotiable Operational Constraints
+### 1.2 Non-Negotiable Operational & Design Constraints
 1. **₹0.00 External Data Cost**: The platform must operate indefinitely within free tiers (API-Football free tier capped at 100 requests/day, open research datasets, historical football-data.co.uk archives, and Supabase free tier).
 2. **Deterministic Anti-Fabrication Rule**: The system must never fabricate odds, fake health checks, generate synthetic probabilities, or simulate non-converged Monte Carlo paths. If data is absent or stale, the engine surfaces `NO_BET` with standard failure taxonomy (`ODDS_STALE`, `LINEUP_UNCONFIRMED`, `INSUFFICIENT_SAMPLE`).
 3. **No Lookahead Invariant**: For any evaluation or backtest as-of timestamp $T$, all features, rosters, injuries, and odds must satisfy:
    $$\text{available\_at} \le T$$
-4. **Stealth Executive Presentation**: The user interface (Next.js 14, Dark Slate Mixpanel design language) presents clean probabilities, expected value, fair odds, and match state. It completely conceals internal model architectures, provider names, vendor endpoints, scraping infrastructure, and mathematical heuristics.
-5. **Authoritative Central State**: Supabase (PostgreSQL 17) is the single source of truth for all quotas, match fixtures, odds snapshots, features, predictions, settlements, and engine settings. Local filesystem caches (`.cache`, `request_budget.json`) are forbidden from holding authoritative state.
+4. **Approved Design Reference**: **Sofascore football UX/information architecture, adapted into a premium football analytics terminal**. The interface combines Sofascore's match-centric hierarchy and high information density with an institutional dark slate aesthetic (`#0B0F17`), clean SaaS typography, and transparent mathematical provenance. Sportsbook neon styling, gambling gamification, and decorative non-analytical charts are strictly forbidden.
+5. **Authoritative Central State**: Supabase (PostgreSQL 17) is the single source of truth for all quotas, match fixtures, odds snapshots, features, predictions, settlements, and engine settings. Local filesystem caches (`.cache`, `request_budget.json`) are forbidden from holding authoritative state. The browser reads persisted backend state; zero browser polling loops are permitted.
 
 ---
 
@@ -67,12 +68,12 @@ An exhaustive inspection of Git commit `ffcc8ac76294e57b24666306707941a935c51034
 | Contradiction Identified | Source of Contradiction | Resolution & Single Source of Truth |
 | :--- | :--- | :--- |
 | **API Key Hardcoding vs Env Security** | `README.md` & Next.js routes contain raw key `073534...` | Rotate key immediately. Enforce `process.env.API_FOOTBALL_KEY` server-side only. Zero fallback. Fail loudly with 500 if unset. |
-| **Worker Automation vs Empty Stubs** | Docs state workers run every 15m; code has `pass` | Acknowledge workers are unbuilt. Build concrete CLI commands and orchestrators in Phase 8. |
+| **Worker Automation vs Empty Stubs** | Docs state workers run every 15m; code has `pass` | Acknowledge workers are unbuilt. Build concrete CLI commands and orchestrators in Phase 9. |
 | **1xBet Support vs Stub Adapter** | UI claims 1xBet verified; adapter returns `[]` | Never return synthetic odds. Surface `1XBET ODDS UNAVAILABLE` and trigger `NO_BET` until a verified zero-cost feed is connected. |
 | **Quota State Fragmentation** | `.cache/api_quota.json` vs Python memory vs Supabase | Supabase `provider_usage` table is the sole source of truth. Implement atomic quota reservation via PostgreSQL function `reserve_api_quota()`. |
 | **Backtester Reality vs Fake Metrics** | `walk_forward.py` hardcodes `brier: 0.1` | Completely excise fake metrics. Build real temporal cross-validation with true out-of-sample Brier, Log Loss, and CLV. |
 | **Lookahead Leakage vs Player Stats** | `player_model.py` uses season aggregate stats | Enforce temporal point-in-time snapshotting. Player stats must be computed strictly as of kickoff timestamp $T$. |
-| **UI Vendor Leaks vs Stealth Mandate** | Some debug cards show "API-Football" or "Dixon-Coles" | Remove all vendor, adapter, and algorithm names from UI. Show only "Probability", "Fair Odds", "Value Edge", "Consensus". |
+| **Sportsbook UI vs Institutional Terminal** | Traditional green "Bet" buttons & gambling jargon | Transition to Sofascore-style quantitative terminal: show Model vs Market delta, EV, 95% CI, and NO-BET reasons. |
 
 ---
 
@@ -83,7 +84,7 @@ The platform must be implemented strictly following this criticality hierarchy. 
 ```mermaid
 graph TD
     P0["P0: Security, Dependencies, Quota, Data Contracts & Anti-Fabrication"] --> P1["P1: Core Ingestion, Replay, Statistical Models, Calibration & NO-BET"]
-    P1 --> P2["P2: Production Workers, Evaluation, Champion/Challenger & Executive UI"]
+    P1 --> P2["P2: Production Workers, Evaluation, Sofascore Terminal UI & Champion/Challenger"]
     P2 --> P3["P3: Reinforcement Learning, Contextual Bandits & Advanced Research"]
 ```
 
@@ -104,13 +105,13 @@ graph TD
 - **Rigorous Calibration**: Out-of-sample Isotonic and Platt scaling; ECE calculation; reliability diagrams.
 - **Standardized NO-BET Gate**: 10-point standard taxonomy (`NEGATIVE_EV`, `LINEUP_UNCONFIRMED`, `ODDS_STALE`, etc.).
 
-### P2 — Production Intelligence & Operations
+### P2 — Production Intelligence, Workers & Sofascore UI
 - **Live Path-Dependent Monte Carlo**: Vectorized competing event hazards; true convergence with standard error tracking; in-play score-state transitions.
 - **Player & Specialist Markets**: Anytime goalscorer; assist models; cards and corners distributions with shrinkage for sparse data.
 - **Background Worker Automation**: Discovery, live state updater, odds collector, prediction runner, evaluator, and learner workers.
 - **Prediction Ledger & Settlement**: Immutable prediction storage; automated settlement upon FT; CLV tracking; error taxonomy classification.
 - **Champion / Challenger Framework**: Supabase model registry; out-of-sample promotion gates based on Brier, ECE, and CLV.
-- **Executive Stealth UI**: Complete match detail screen; dynamic competition registry chips; real-time match state; zero algorithm exposure.
+- **Sofascore-Inspired Terminal UI**: Full match-centric architecture, Tri-Column Match Detail, momentum timeline, pitch lineup grid, and complete mathematical transparency.
 
 ### P3 — Adaptive Learning & Advanced Research
 - **Contextual Bandit / RL Policy**: Off-policy evaluation on settled predictions; reward based on realized paper P&L and CLV; strict guardrails against exploration instability.
@@ -122,9 +123,9 @@ graph TD
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           NEXT.JS 14 WEB CLIENT                         │
-│   (Mixpanel Dark Slate Theme • IST Timings • Scrubbed Algorithmic IP)   │
-│   • Live Match Center  • Upcoming Intelligence  • Portfolio Performance │
+│                   NEXT.JS 14 QUANTITATIVE TERMINAL                      │
+│   (Sofascore Architecture • Dark Slate Palette • IST Timings • No-Bet)  │
+│   • Watchlist / Dashboard  • Match Detail (Tri-Column)  • Model Ledger  │
 └────────────────────────────────────┬────────────────────────────────────┘
                                      │ HTTPS / Server Actions
                                      ▼
@@ -180,61 +181,69 @@ gantt
     Phase 06: Core Statistical & Monte Carlo :p6, after p5, 3d
     Phase 07: Market Settlement & Edge Engine:p7, after p6, 2d
     Phase 08: Walk-Forward Validation        :p8, after p7, 2d
-    section P2 Operations & UI
+    section P2 Operations & Sofascore UI
     Phase 09: Background Worker Automation   :p9, after p8, 2d
     Phase 10: Production Hardening & Observ. :p10, after p9, 2d
-    Phase 11: Stealth Executive UI           :p11, after p10, 2d
+    Phase 11: Sofascore-Inspired Terminal UI :p11, after p10, 2d
     section P3 Active Learning
     Phase 12: RL & Contextual Bandit Policy  :p12, after p11, 3d
 ```
 
-### Phase Summary Table
-
-| Phase | Title | Primary Objective | Criticality |
-| :--- | :--- | :--- | :--- |
-| **Phase 0** | **Repository & Security Hardening** | Scrub leaked secrets, pin Python environment, fix CI failure swallowing. | **P0** |
-| **Phase 1** | **Database & Migration Hardening** | Reconcile Supabase baseline, enforce strict RLS, add foreign-key indexes. | **P0** |
-| **Phase 2** | **Quota Governance & Cost Safety** | Build atomic PostgreSQL quota reservation; enforce 95 daily limit & 50 user reserve. | **P0** |
-| **Phase 3** | **Zero-Cost Data Ingestion** | Ingest 5-year historical data from football-data.co.uk; normalize to canonical models. | **P1** |
-| **Phase 4** | **Target Odds (1xBet) Engine** | Verified 1xBet integration; odds snapshotting; devigging; anti-mocking. | **P1** |
-| **Phase 5** | **Lineup & Runtime Gatekeeper** | T-60m lineup polling; competition allowlist gate; anti-fabrication locks. | **P1** |
-| **Phase 6** | **Core Statistical & Monte Carlo** | Dixon-Coles overhaul, Elo, EWMA form, vectorized path simulation, convergence. | **P1** |
-| **Phase 7** | **Market Settlement & Edge Engine** | Mathematical EV, Kelly, Out-of-sample Calibration, 10-point NO-BET gate. | **P1** |
-| **Phase 8** | **Walk-Forward Validation & Backtester**| Point-in-time replay; temporal cross-validation; zero lookahead verification. | **P1** |
-| **Phase 9** | **Background Worker Automation** | Resilient CLI workers (Collector, Updater, Predictor, Evaluator, Learner). | **P2** |
-| **Phase 10**| **Production Hardening & Monitoring** | Idempotency locks, error alerting, performance logging, snapshot retention. | **P2** |
-| **Phase 11**| **Stealth Executive UI & Match Center**| Complete Next.js match center; IST timestamps; complete IP scrubbing. | **P2** |
-| **Phase 12**| **RL & Contextual Bandit Policy** | Off-policy policy learning; paper bet return reward; safety exploration bounds. | **P3** |
-
 ---
 
-## 7. Database Roadmap & Schema Evolution
+## 7. Frontend Information Architecture & Terminal UX Reference (Sofascore Integration)
 
-### 7.1 Authoritative PostgreSQL 17 Baseline
-The database schema must strictly support the canonical contracts defined in `docs/DATA_CONTRACTS.md`:
-1. `competitions`: Registry of enabled leagues with API IDs and flags.
-2. `matches`: Canonical fixtures with scheduled kickoffs, venues, referee, and status.
-3. `lineups`: Verified starting XIs and formations, keyed by `(match_id, team_id, player_id)`.
-4. `match_events`: In-play atomic events (goals, cards, substitutions, VAR).
-5. `odds_snapshots`: Point-in-time prices for 1xBet markets with suspended status and margins.
-6. `feature_snapshots`: Complete feature vector snapshot as-of prediction timestamp.
-7. `model_predictions`: Immutable prediction records with raw prob, calibrated prob, EV, and NO-BET codes.
-8. `paper_bets`: Record of paper stakes placed on positive-EV bets meeting edge criteria.
-9. `paper_bet_settlements`: Settled P&L, closing odds, CLV, and error classifications.
-10. `provider_usage`: Atomic tracking of daily API usage, budget reservations, and resets.
-11. `worker_runs`: Execution logs, duration, matches analyzed, and error diagnostics.
+> **Approved Design Reference Directive**:  
+> **"Approved design reference: Sofascore football UX/information architecture, adapted into a premium football analytics terminal."**
 
-### 7.2 RLS Boundary Matrix
-```sql
--- Anonymous / Browser Client (Public Role)
-GRANT SELECT ON public.matches, public.competitions, public.odds_snapshots TO anon, authenticated;
--- Restricted Engine Tables (Server-Only via Service Role)
-REVOKE ALL ON public.model_predictions FROM anon, authenticated;
-REVOKE ALL ON public.paper_bets FROM anon, authenticated;
-REVOKE ALL ON public.learning_runs FROM anon, authenticated;
-REVOKE ALL ON public.engine_settings FROM anon, authenticated;
-REVOKE ALL ON public.provider_usage FROM anon, authenticated;
+### 7.1 Target Navigation Hierarchy
 ```
+FOOTBALL ANALYTICS TERMINAL
+├── Dashboard (Watchlist • Live Matches • Upcoming Matches • Model Signals)
+├── Calendar & Fixtures (Historical Exploration • Next 7 Days • Registry Filter)
+├── Match Detail (Primary Product Experience):
+│   ├── Match Header (Teams, score, elapsed minute, IST kickoff, venue, referee)
+│   ├── Model Consensus Probability (Home / Draw / Away calibrated win curves)
+│   ├── Tri-Column Intelligence Matrix (Model vs. 1xBet Market vs. In-Play State)
+│   ├── Probability & Momentum Timeline (Time-series drift 0' to 90')
+│   └── Tabular Drill-Downs:
+│       ├── Overview (H2H, Form EWMA, league context)
+│       ├── Model (Poisson marginals, Dixon-Coles parameters, identifiability)
+│       ├── Live State (Possession, xG, shot intensity, card hazard)
+│       ├── Odds History (1xBet price ticks, margin evolution, CLV)
+│       ├── Lineups (Confirmed starting XIs, tactical pitch grid, substitutes)
+│       ├── Simulation (Monte Carlo path distributions, standard error convergence)
+│       └── Settlement (Post-match settlement, closing line, error classification)
+├── Models & Calibration (Registry • Isotonic / Platt Curves • ECE Reliability)
+├── Backtesting & Replay (Walk-Forward Temporal Matrix • Brier • ROI • Drawdown)
+├── Prediction & Paper Ledger (Settled Predictions • Open Paper Positions)
+└── System Health (API Quota Meter: 50 User / 45 Worker / 5 Buffer • Feeds)
+```
+
+### 7.2 Two-Tier Information Density
+- **Level 1 — Rapid Scanning (5-Second Scan)**: Matchday surveillance answering: What matches matter? Which are live? What does the model estimate? What markets diverge from 1xBet prices? Which matches have unconfirmed lineups or stale odds?
+- **Level 2 — Deep Analytical Drill-Down (Progressive Disclosure)**: Comprehensive model decomposition exposing raw simulation counts, calibration versions, credible intervals, standard errors, tactical pitch formations, and source timestamps.
+
+### 7.3 Model Transparency Card (Mandatory Specification)
+Every prediction card must expose its mathematical derivation without inventing numbers:
+```
+OVER 2.5 GOALS
+• Model Calibrated Prob:     54.8% [95% CI: 53.2% — 56.4%]
+• Market Implied (1xBet):    47.2% (Decimal: 2.12)
+• Devigged Fair Market:      49.1% (Shin Method, Overround 4.2%)
+• Model-Market Divergence:   +5.7 percentage points
+• Expected Value (EV):       +16.18%
+• Calibration Version:       Isotonic Regression v2.1
+• Simulation Paths:          35,000 (Standard Error: ±0.003)
+• Data Freshness:            State: 14s ago | Odds: 32s ago
+• Decision:                  CANDIDATE (Min Edge: 3.0% | Lineups Confirmed)
+```
+
+### 7.4 Real-Time State Integrity & Staleness Rules
+- If odds are missing $\to$ Display `1xBet Odds Unavailable` (Never fabricate numbers).
+- If provider is unverified $\to$ Display `Provider Offline` (Never claim "Verified Feed").
+- If live match has no heartbeat for $> 120\text{s}$ $\to$ Display `Live Data Stale (Last update 3m 42s ago)`.
+- If lineup is unannounced $\to$ Display `Lineups Pending • Expected ~T-60m` and attach `NO_BET: LINEUP_UNCONFIRMED`.
 
 ---
 
@@ -288,7 +297,7 @@ Once the vertical slice is validated, the same architecture expands to:
 
 When the user enters **`START DEVELOPMENT`**, the executing agent (Claude Sonnet 4.6 Thinking) must execute the following deterministic protocol:
 
-1. **Load State**: Read `docs/MASTER_DEVELOPMENT_PLAN.md` and `docs/PHASE_STATUS.md`.
+1. **Load State**: Read `docs/MASTER_DEVELOPMENT_PLAN.md`, `docs/FRONTEND_DESIGN_DIRECTION.md`, and `docs/PHASE_STATUS.md`.
 2. **Verify Environment**: Inspect git status and Supabase connectivity. Verify current git commit against `LAST_VERIFIED_GIT_SHA`.
 3. **Target Earliest Incomplete Phase**: Identify the first phase with status `PENDING` or `IN_PROGRESS` (Phase 0).
 4. **Inspect Phase Document**: Read `docs/phases/phase_XX_...md`.

@@ -18,7 +18,8 @@ This document is the authoritative runtime state contract for development sessio
   - Historical Matches: 13,403 rows present in `historical_matches`
   - Migration Status: Migration drift detected; baseline reconciliation required in Phase 1
   - RLS Status: Enabled, but multiple tables have permissive `FOR ALL USING (true)` policies
-- **CURRENT DEPLOYMENT**: Local Next.js 14 development server running on `http://localhost:3000` (Dark Slate Mixpanel theme active)
+- **CURRENT DEPLOYMENT**: Local Next.js 14 development server running on `http://localhost:3000` (Dark Slate theme active)
+- **APPROVED DESIGN REFERENCE**: Sofascore football UX/information architecture, adapted into a premium football analytics terminal (documented in `docs/FRONTEND_DESIGN_DIRECTION.md`)
 - **BLOCKERS**:
   1. Leaked API-Football credential (`073534f7111a37868a403c5cd51d83fa`) in `README.md` and server routes requires rotation by user.
   2. Python runtime dependencies unpinned (`python/requirements.txt` missing).
@@ -46,7 +47,7 @@ This document is the authoritative runtime state contract for development sessio
 | **Phase 8** | Walk-Forward Validation | **P1** | `PENDING` | — | — | — |
 | **Phase 9** | Background Worker Automation | **P2** | `PENDING` | — | — | — |
 | **Phase 10** | Production Hardening & Observability | **P2** | `PENDING` | — | — | — |
-| **Phase 11** | Stealth Executive UI & Match Center | **P2** | `PENDING` | — | — | — |
+| **Phase 11** | Sofascore-Inspired Terminal UI & Match Intelligence | **P2** | `PENDING` | — | — | — |
 | **Phase 12** | RL & Contextual Bandit Policy | **P3** | `PENDING` | — | — | — |
 
 ---
