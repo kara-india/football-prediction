@@ -1,0 +1,21 @@
+INSERT INTO competitions (league_id, name, type, is_international) VALUES 
+(39, 'England Premier League', 'league', false),
+(71, 'Brazil Serie A', 'league', false),
+(135, 'Italy Serie A', 'league', false),
+(140, 'Spain La Liga', 'league', false),
+(78, 'Germany Bundesliga', 'league', false),
+(61, 'France Ligue 1', 'league', false),
+(94, 'Portugal Primeira Liga', 'league', false),
+(88, 'Netherlands Eredivisie', 'league', false),
+(128, 'Argentina Liga Profesional', 'league', false),
+(144, 'Belgium First Division A', 'league', false),
+(2, 'UEFA Champions League', 'cup', false),
+(3, 'UEFA Europa League', 'cup', false),
+(1, 'FIFA World Cup', 'cup', true),
+(4, 'UEFA Euro', 'cup', true),
+(5, 'UEFA Nations League', 'cup', true),
+(9, 'Copa America', 'cup', true),
+(6, 'AFCON', 'cup', true),
+(7, 'AFC Asian Cup', 'cup', true),
+(10, 'International Friendlies', 'international', true)
+ON CONFLICT (league_id) DO NOTHING;

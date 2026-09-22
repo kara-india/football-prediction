@@ -1,0 +1,23 @@
+name: Weekly Learner
+on:
+  schedule:
+    - cron: '0 4 * * 1'  # Monday 4 AM UTC
+  workflow_dispatch:
+
+jobs:
+  learn:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r python/requirements.txt
+      - name: Run learner
+        run: python -m python.workers.learner_worker
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          LEARNING_ENABLED_OVERRIDE: ${{ secrets.LEARNING_ENABLED }}

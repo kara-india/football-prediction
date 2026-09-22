@@ -1,0 +1,26 @@
+[
+  {
+    "home_id": 1,
+    "away_id": 2,
+    "home_goals": 2,
+    "away_goals": 1,
+    "date": "2023-01-01",
+    "weight": 1.0
+  },
+  {
+    "home_id": 2,
+    "away_id": 1,
+    "home_goals": 0,
+    "away_goals": 0,
+    "date": "2023-01-08",
+    "weight": 1.0
+  },
+  {
+    "home_id": 1,
+    "away_id": 3,
+    "home_goals": 3,
+    "away_goals": 0,
+    "date": "2023-01-15",
+    "weight": 1.0
+  }
+]
