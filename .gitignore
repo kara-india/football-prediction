@@ -53,8 +53,13 @@ htmlcov/
 .vscode/
 .idea/
 *.swp
-*.swo
+# Misc
 .DS_Store
+*.pem
+tsconfig.tsbuildinfo
+requests.log
+scripts/mobbin_screens/
+bs.db
 Thumbs.db
 
 # Model artifacts & caches
