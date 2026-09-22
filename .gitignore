@@ -63,3 +63,6 @@ requests.log
 worker.log
 .cache/
 python/data_pipeline/.cache/
+
+cache/
+.cache/

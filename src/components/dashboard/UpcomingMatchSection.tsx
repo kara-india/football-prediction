@@ -98,6 +98,9 @@ export default function UpcomingMatchSection() {
             <span className="text-[11px] font-mono text-amber-300 bg-amber-950/50 border border-amber-800/70 px-2 py-0.5 rounded font-semibold">
               IST (UTC+5:30)
             </span>
+            <span className="text-[11px] font-mono text-emerald-400/90 bg-emerald-950/40 border border-emerald-900/60 px-2 py-0.5 rounded">
+              Manual Sync Only (0 Auto-Polling)
+            </span>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
             Strict statistical predictions unlock once official starting lineups are confirmed (~60m before kickoff)
