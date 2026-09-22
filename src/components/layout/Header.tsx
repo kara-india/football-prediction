@@ -34,9 +34,9 @@ export default function Header() {
       case '/predictions':
         return { section: 'Audit Ledger', title: 'Paper Bet Performance Ledger' }
       case '/analytics':
-        return { section: 'Calibration', title: 'Model Calibration & Verification' }
+        return { section: 'Analytics', title: 'Performance Analytics' }
       case '/providers':
-        return { section: 'Infrastructure', title: 'Telemetry & Quota Protection' }
+        return { section: 'System', title: 'System Status & Quota Protection' }
       default:
         return { section: 'Intelligence', title: 'Match Analysis' }
     }

@@ -157,8 +157,7 @@ export default function Predictions() {
           Paper Bet Performance Ledger
         </h1>
         <p className="text-xs sm:text-sm text-[#8a99ad] max-w-2xl leading-relaxed">
-          Historical record of all qualifying predictions executed against live 1xBet closing prices.
-          Every settled prediction is graded for Brier calibration score and Closing Line Value (CLV).
+          Historical record of all qualifying selections evaluated against live 1xBet closing prices.
         </p>
       </div>
 
@@ -203,15 +202,15 @@ export default function Predictions() {
         </div>
 
         <div className="bg-[#0e131b] border border-[#1e2638] rounded-xl p-4">
-          <div className="text-[10px] text-[#56657a] uppercase tracking-wider">Avg CLV</div>
+          <div className="text-[10px] text-[#56657a] uppercase tracking-wider">Price Edge</div>
           <div className="text-xl font-bold text-[#d4af37] mt-1">+{avgCLV.toFixed(1)}%</div>
-          <div className="text-[10px] text-[#8a99ad]">vs closing line</div>
+          <div className="text-[10px] text-[#8a99ad]">vs market price</div>
         </div>
 
         <div className="bg-[#0e131b] border border-[#1e2638] rounded-xl p-4">
           <div className="text-[10px] text-[#56657a] uppercase tracking-wider">Bookmaker</div>
           <div className="text-xl font-bold text-[#d4af37] mt-1">1xBet Fixed</div>
-          <div className="text-[10px] text-[#8a99ad]">Zero substitute</div>
+          <div className="text-[10px] text-[#8a99ad]">Direct feed</div>
         </div>
       </div>
 
@@ -259,8 +258,8 @@ export default function Predictions() {
               <th className="py-3 px-3">Date (IST)</th>
               <th className="py-3 px-3">Selection</th>
               <th className="py-3 px-3 text-right">1xBet Odds</th>
-              <th className="py-3 px-3 text-right">Calibrated</th>
-              <th className="py-3 px-3 text-right">EV Edge</th>
+              <th className="py-3 px-3 text-right">Win Prob</th>
+              <th className="py-3 px-3 text-right">Value Edge</th>
               <th className="py-3 px-3 text-center">Status</th>
               <th className="py-3 px-3 text-right">P&L</th>
               <th className="py-3 px-4">Settlement Note</th>

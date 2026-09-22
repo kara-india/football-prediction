@@ -102,7 +102,7 @@ export default function LiveMatchSection() {
             No live matches currently in play across allowlisted competitions.
           </p>
           <p className="text-[11px] text-[#8a99ad] mt-1 max-w-lg mx-auto font-normal">
-            Real-time score-state hazard rates and in-play next-goal models activate automatically at kickoff.
+            Live match tracking and in-play market signals activate automatically at kickoff.
           </p>
         </div>
       ) : (

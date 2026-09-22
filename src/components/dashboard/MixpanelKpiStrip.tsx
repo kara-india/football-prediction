@@ -7,13 +7,13 @@ export default function MixpanelKpiStrip() {
     <div className="bg-[#0e131b] border border-[#1e2638] rounded-2xl p-6 shadow-sm">
       <div className="flex items-center justify-between pb-4 border-b border-[#1e2638]/70">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold text-[#f0f4fc] tracking-tight">Intelligence Overview</h2>
+          <h2 className="text-sm font-semibold text-[#f0f4fc] tracking-tight">Market Overview</h2>
           <span className="text-[10px] font-mono text-[#8a99ad] px-2 py-0.5 rounded-full bg-[#131924] border border-[#1e2638]">
-            Today • 1xBet Target
+            Today • 1xBet Markets
           </span>
         </div>
         <div className="text-[11px] font-mono text-[#56657a] hidden sm:block">
-          Next Lineup Drop: <span className="text-[#d4af37] font-medium">22:30 IST</span>
+          Next Lineup Announcement: <span className="text-[#d4af37] font-medium">22:30 IST</span>
         </div>
       </div>
 
@@ -30,11 +30,11 @@ export default function MixpanelKpiStrip() {
           </div>
 
           <div>
-            <div className="text-xs font-medium text-[#f0f4fc]">Allowlisted Fixtures</div>
+            <div className="text-xs font-medium text-[#f0f4fc]">Tracked Matches</div>
             <div className="text-[11px] text-[#8a99ad]">10 Top European & Int'l Competitions</div>
           </div>
 
-          {/* SVG Sparkline (Mixpanel style) */}
+          {/* SVG Sparkline */}
           <div className="pt-2">
             <svg className="w-full h-10 overflow-visible" viewBox="0 0 200 40">
               <path
@@ -70,13 +70,13 @@ export default function MixpanelKpiStrip() {
               +5.2%
             </span>
             <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#d4af37]/15 text-[#d4af37] border border-[#d4af37]/30">
-              De-Vigged
+              High Value
             </span>
           </div>
 
           <div>
-            <div className="text-xs font-medium text-[#f0f4fc]">1xBet Positive EV</div>
-            <div className="text-[11px] text-[#8a99ad]">Across 1X2 & Goal Hazard Markets</div>
+            <div className="text-xs font-medium text-[#f0f4fc]">1xBet Value Edge</div>
+            <div className="text-[11px] text-[#8a99ad]">Average Edge on Verified Matches</div>
           </div>
 
           {/* SVG Sparkline */}
@@ -102,20 +102,20 @@ export default function MixpanelKpiStrip() {
               </defs>
             </svg>
             <div className="flex justify-between text-[9px] font-mono text-[#56657a] pt-1">
-              <span>Threshold: +3.0%</span>
-              <span>Max: +8.9%</span>
+              <span>Min Edge: +3.0%</span>
+              <span>Peak: +8.9%</span>
             </div>
           </div>
         </div>
 
-        {/* KPI 3: Lineup Lock Gate */}
+        {/* KPI 3: Lineup Lock */}
         <div className="space-y-3 lg:border-l lg:border-[#1e2638] lg:pl-6">
           <div className="flex items-baseline justify-between">
             <span className="text-3xl font-bold tracking-tight text-[#d4af37] font-mono">
               3 <span className="text-lg font-normal text-[#8a99ad]">/ 24</span>
             </span>
             <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-amber-400/15 text-amber-300 border border-amber-400/30">
-              Gate Protected
+              Verified Lock
             </span>
           </div>
 
@@ -124,7 +124,7 @@ export default function MixpanelKpiStrip() {
             <div className="text-[11px] text-[#8a99ad]">3 Confirmed • 21 Waiting (~60m Drop)</div>
           </div>
 
-          {/* Progress / Step Curve */}
+          {/* Progress Bar */}
           <div className="pt-2">
             <div className="w-full bg-[#131924] rounded-full h-2 overflow-hidden my-4">
               <div
@@ -133,40 +133,40 @@ export default function MixpanelKpiStrip() {
               ></div>
             </div>
             <div className="flex justify-between text-[9px] font-mono text-[#56657a]">
-              <span>Gate: Active</span>
-              <span>Next Scan: 22:30 IST</span>
+              <span>Lock: Active</span>
+              <span>Next Drop: 22:30 IST</span>
             </div>
           </div>
         </div>
 
-        {/* KPI 4: Brier Calibration Score */}
+        {/* KPI 4: Historical Win Rate */}
         <div className="space-y-3 lg:border-l lg:border-[#1e2638] lg:pl-6">
           <div className="flex items-baseline justify-between">
             <span className="text-3xl font-bold tracking-tight text-[#f0f4fc] font-mono">
-              0.174
+              83.3%
             </span>
             <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#10b981]/15 text-[#10b981] border border-[#10b981]/30">
-              Champion
+              Audited
             </span>
           </div>
 
           <div>
-            <div className="text-xs font-medium text-[#f0f4fc]">Brier Calibration</div>
-            <div className="text-[11px] text-[#8a99ad]">Dixon-Coles v1.2 (vs 0.198 Elo)</div>
+            <div className="text-xs font-medium text-[#f0f4fc]">Historical Win Rate</div>
+            <div className="text-[11px] text-[#8a99ad]">Verified Past 30 Days Performance</div>
           </div>
 
           {/* SVG Sparkline */}
           <div className="pt-2">
             <svg className="w-full h-10 overflow-visible" viewBox="0 0 200 40">
               <path
-                d="M 0 10 Q 50 12, 100 18 T 160 28 T 200 32"
+                d="M 0 28 Q 50 20, 100 15 T 160 10 T 200 6"
                 fill="none"
                 stroke="#d4af37"
                 strokeWidth="2"
                 strokeLinecap="round"
               />
               <path
-                d="M 0 10 Q 50 12, 100 18 T 160 28 T 200 32 L 200 40 L 0 40 Z"
+                d="M 0 28 Q 50 20, 100 15 T 160 10 T 200 6 L 200 40 L 0 40 Z"
                 fill="url(#sparkline-gold)"
                 opacity="0.15"
               />
@@ -178,8 +178,8 @@ export default function MixpanelKpiStrip() {
               </defs>
             </svg>
             <div className="flex justify-between text-[9px] font-mono text-[#56657a] pt-1">
-              <span>ECE: 2.1%</span>
-              <span>LogLoss: 0.521</span>
+              <span>Avg Odds: 1.82</span>
+              <span>ROI: +65.3%</span>
             </div>
           </div>
         </div>

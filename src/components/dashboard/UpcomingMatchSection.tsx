@@ -97,7 +97,7 @@ export default function UpcomingMatchSection() {
       setAnalyzingMatchId(null)
       setAnalyzedFeedback((prev) => ({
         ...prev,
-        [matchId]: '1xBet Fair Odds Computed: EV +4.6% on Draw (Lineup Lock verified)'
+        [matchId]: '1xBet Market Edge: +4.6% on Draw (Verified Value)'
       }))
     }, 800)
   }
@@ -320,21 +320,21 @@ export default function UpcomingMatchSection() {
                     )}
                   </div>
 
-                  {/* Lineup Lock Notice / Analysis Gate */}
+                  {/* Lineup Status Notice */}
                   <div className="bg-[#090c10] border border-[#1e2638] rounded-xl p-3.5 space-y-1.5">
                     <div className="flex items-center justify-between text-[11px] font-mono">
                       <span className="text-[#f0f4fc] font-semibold flex items-center gap-1.5">
                         <svg className="w-3.5 h-3.5 text-[#d4af37]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
-                        Starting Lineup Verification
+                        Official Starting Lineup
                       </span>
                       <span className="text-[#d4af37] font-semibold">
                         Expected: {formatLineupTimeIST(m.lineupExpectedAt)}
                       </span>
                     </div>
                     <p className="text-[11px] text-[#8a99ad] leading-relaxed font-normal">
-                      Full Monte Carlo simulation and 1xBet EV evaluation activate ~60 minutes before kickoff upon official manager announcement.
+                      Starting lineup announcement expected ~60 minutes before kickoff. Detailed match intelligence and value signals activate once official team sheets are confirmed.
                     </p>
                   </div>
 
@@ -347,13 +347,13 @@ export default function UpcomingMatchSection() {
                   )}
                 </div>
 
-                {/* Card Footer: Gate Status & On-Demand Action */}
+                {/* Card Footer: Lineup Status & On-Demand Action */}
                 <div className="mt-5 pt-3 border-t border-[#1e2638] flex items-center justify-between text-[11px] font-mono">
                   <div className="flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                    <span className="text-[#8a99ad]">Gate:</span>
+                    <span className={`w-1.5 h-1.5 rounded-full ${m.lineupConfirmed ? 'bg-[#10b981]' : 'bg-amber-400'}`}></span>
+                    <span className="text-[#8a99ad]">Lineup:</span>
                     <span className="text-[#f0f4fc] font-semibold">
-                      {m.lineupConfirmed ? 'LINEUP_CONFIRMED' : 'LINEUP_UNCONFIRMED'}
+                      {m.lineupConfirmed ? 'Confirmed' : 'Pending Announcement'}
                     </span>
                   </div>
 
@@ -376,7 +376,7 @@ export default function UpcomingMatchSection() {
                         d="M13 10V3L4 14h7v7l9-11h-7z"
                       />
                     </svg>
-                    <span>{analyzingMatchId === m.id ? 'Computing...' : 'Analyze 1xBet EV'}</span>
+                    <span>{analyzingMatchId === m.id ? 'Analyzing...' : 'Analyze Match'}</span>
                   </button>
                 </div>
               </div>
