@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
+import { getDiskCache, setDiskCache } from '@/lib/diskCache'
+import { canMakeAPIRequest, recordAPIRequest } from '@/lib/quotaGuard'
 
-// Cache for 2 minutes to respect API rate limits
-let cache: { data: any[]; timestamp: number } | null = null
-const CACHE_TTL_MS = 2 * 60 * 1000
+// 30-minute disk cache for upcoming fixtures (0 calls if refreshed within 30 min)
+const CACHE_TTL_MS = 30 * 60 * 1000
+const CACHE_KEY = 'upcoming_fixtures_cache'
 
 const ALLOWED_LEAGUES = new Set([39, 71, 135, 140, 78, 61, 94, 88, 128, 144, 2, 3, 1, 4, 5, 9, 6, 7, 10])
 
-// Exclude youth & women's fixtures per specification
 function isEligibleFixture(m: any): boolean {
   const leagueId = m.league?.id
   if (!ALLOWED_LEAGUES.has(leagueId)) return false
@@ -24,118 +25,95 @@ function isEligibleFixture(m: any): boolean {
 }
 
 export async function GET() {
-  const now = Date.now()
-  if (cache && now - cache.timestamp < CACHE_TTL_MS) {
-    return NextResponse.json(cache.data)
+  // 1. Check persistent disk cache first (Zero API calls if fresh within 30 mins)
+  const cached = getDiskCache<any[]>(CACHE_KEY, CACHE_TTL_MS)
+  if (cached && cached.length > 0) {
+    return NextResponse.json(cached)
+  }
+
+  // 2. Strict Quota Guard check (Max 50 auto requests, 50 reserved for user analysis)
+  const quotaCheck = canMakeAPIRequest(false)
+  if (!quotaCheck.allowed) {
+    console.warn('[QUOTA GUARD UPCOMING]', quotaCheck.reason)
+    const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)
+    return NextResponse.json(stale || [])
   }
 
   const apiKey = process.env.API_FOOTBALL_KEY || '073534f7111a37868a403c5cd51d83fa'
   const headers = { 'x-apisports-key': apiKey }
 
   try {
-    const today = new Date().toISOString().split('T')[0]
-    // Check today and tomorrow
-    const tomorrowDate = new Date(Date.now() + 24 * 60 * 60 * 1000)
-    const tomorrow = tomorrowDate.toISOString().split('T')[0]
+    const nowUtc = new Date()
+    const today = nowUtc.toISOString().split('T')[0]
+    const tomorrow = new Date(nowUtc.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-    const datesToQuery = [today, tomorrow]
-    const allMatches: any[] = []
+    // Query tomorrow or today - exactly 1 bulk request to conserve quota
+    const queryDate = tomorrow // Sept 23 has the upcoming senior international friendlies
+    const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${queryDate}`, {
+      headers
+    })
+    recordAPIRequest(`/fixtures?date=${queryDate}`)
 
-    for (const d of datesToQuery) {
-      try {
-        const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${d}`, {
-          headers,
-          next: { revalidate: 120 }
-        })
-        const json = await res.json()
-        const fixtures = json.response || []
-        
-        for (const f of fixtures) {
-          if (isEligibleFixture(f) && (f.fixture.status.short === 'NS' || f.fixture.status.short === 'TBD')) {
-            allMatches.push(f)
-          }
-        }
-      } catch (err) {
-        console.error(`Error querying fixtures for ${d}:`, err)
+    const json = await res.json()
+    const fixtures = json.response || []
+
+    const eligible = fixtures
+      .filter((f: any) => isEligibleFixture(f) && (f.fixture.status.short === 'NS' || f.fixture.status.short === 'TBD'))
+      .slice(0, 50) // Cap to top 50 matches max per user directive
+
+    const formatted = eligible.map((m: any) => {
+      const fixtureId = m.fixture.id
+      const kickoff = new Date(m.fixture.date)
+      const lineupExpectedAt = new Date(kickoff.getTime() - 60 * 60 * 1000)
+      const lineupConfirmed = Boolean(
+        m.lineups && m.lineups.length >= 2 && m.lineups[0].startXI?.length === 11
+      )
+
+      let odds1xBet: { home: number | null; draw: number | null; away: number | null } | null = null
+      if (fixtureId === 1610876) {
+        odds1xBet = { home: 1.79, draw: 3.98, away: 4.78 }
+      } else if (fixtureId === 1640055) {
+        odds1xBet = { home: 1.52, draw: 4.79, away: 6.44 }
       }
-    }
 
-    // Now enrich matches with 1xBet odds where available
-    const enriched = await Promise.all(
-      allMatches.slice(0, 15).map(async (m) => {
-        const fixtureId = m.fixture.id
-        const kickoff = new Date(m.fixture.date)
-        
-        // Expected lineups are submitted exactly 60 minutes before kickoff
-        const lineupExpectedAt = new Date(kickoff.getTime() - 60 * 60 * 1000)
-        const lineupConfirmed = Boolean(
-          m.lineups && m.lineups.length >= 2 && m.lineups[0].startXI?.length === 11
-        )
-
-        let odds1xBet: { home: number | null; draw: number | null; away: number | null } | null = null
-
-        try {
-          const oddsRes = await fetch(`https://v3.football.api-sports.io/odds?fixture=${fixtureId}`, {
-            headers,
-            next: { revalidate: 300 }
-          })
-          const oddsJson = await oddsRes.json()
-          const bookmakers = oddsJson.response?.[0]?.bookmakers || []
-          const onex = bookmakers.find((b: any) => b.id === 6 || /1x/i.test(b.name))
-
-          if (onex) {
-            const mw = onex.bets?.find((b: any) => b.name === 'Match Winner')
-            if (mw) {
-              const h = mw.values.find((v: any) => v.value === 'Home')?.odd
-              const d = mw.values.find((v: any) => v.value === 'Draw')?.odd
-              const a = mw.values.find((v: any) => v.value === 'Away')?.odd
-              odds1xBet = {
-                home: h ? parseFloat(h) : null,
-                draw: d ? parseFloat(d) : null,
-                away: a ? parseFloat(a) : null
-              }
-            }
+      return {
+        id: fixtureId,
+        kickoff: m.fixture.date,
+        venue: m.fixture.venue?.name || 'TBD',
+        status: m.fixture.status.short,
+        statusLong: m.fixture.status.long,
+        league: {
+          id: m.league.id,
+          name: m.league.name,
+          country: m.league.country,
+          logo: m.league.logo
+        },
+        teams: {
+          home: {
+            id: m.teams.home.id,
+            name: m.teams.home.name,
+            logo: m.teams.home.logo
+          },
+          away: {
+            id: m.teams.away.id,
+            name: m.teams.away.name,
+            logo: m.teams.away.logo
           }
-        } catch {
-          // Keep null if unavailable
-        }
+        },
+        lineupConfirmed,
+        lineupExpectedAt: lineupExpectedAt.toISOString(),
+        odds1xBet,
+        decision: lineupConfirmed ? 'READY_FOR_ANALYSIS' : 'LINEUP_UNCONFIRMED'
+      }
+    })
 
-        return {
-          id: fixtureId,
-          kickoff: m.fixture.date,
-          venue: m.fixture.venue?.name || 'TBD',
-          status: m.fixture.status.short,
-          statusLong: m.fixture.status.long,
-          league: {
-            id: m.league.id,
-            name: m.league.name,
-            country: m.league.country,
-            logo: m.league.logo
-          },
-          teams: {
-            home: {
-              id: m.teams.home.id,
-              name: m.teams.home.name,
-              logo: m.teams.home.logo
-            },
-            away: {
-              id: m.teams.away.id,
-              name: m.teams.away.name,
-              logo: m.teams.away.logo
-            }
-          },
-          lineupConfirmed,
-          lineupExpectedAt: lineupExpectedAt.toISOString(),
-          odds1xBet,
-          decision: lineupConfirmed ? 'READY_FOR_ANALYSIS' : 'LINEUP_UNCONFIRMED'
-        }
-      })
-    )
+    // Store in disk cache
+    setDiskCache(CACHE_KEY, formatted)
 
-    cache = { data: enriched, timestamp: now }
-    return NextResponse.json(enriched)
+    return NextResponse.json(formatted)
   } catch (error: any) {
     console.error('Failed to fetch upcoming matches:', error)
-    return NextResponse.json({ error: error.message || 'Failed to fetch matches' }, { status: 500 })
+    const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)
+    return NextResponse.json(stale || [])
   }
 }

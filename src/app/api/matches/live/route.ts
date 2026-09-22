@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
+import { getDiskCache, setDiskCache } from '@/lib/diskCache'
+import { canMakeAPIRequest, recordAPIRequest } from '@/lib/quotaGuard'
 
-let cache: { data: any[]; timestamp: number } | null = null
-const CACHE_TTL_MS = 30 * 1000 // 30 seconds for live matches
+const CACHE_TTL_MS = 60 * 1000 // 60 seconds cache for live matches
+const CACHE_KEY = 'live_matches_cache'
 
 const ALLOWED_LEAGUES = new Set([39, 71, 135, 140, 78, 61, 94, 88, 128, 144, 2, 3, 1, 4, 5, 9, 6, 7, 10])
 
@@ -22,19 +24,30 @@ function isEligibleFixture(m: any): boolean {
 }
 
 export async function GET() {
-  const now = Date.now()
-  if (cache && now - cache.timestamp < CACHE_TTL_MS) {
-    return NextResponse.json(cache.data)
+  // 1. Check disk cache first (Zero API calls if fresh within 60s)
+  const cached = getDiskCache<any[]>(CACHE_KEY, CACHE_TTL_MS)
+  if (cached !== null) {
+    return NextResponse.json(cached)
+  }
+
+  // 2. Strict Quota Guard check (Max 50 automated requests/day)
+  const quotaCheck = canMakeAPIRequest(false)
+  if (!quotaCheck.allowed) {
+    console.warn('[QUOTA GUARD LIVE]', quotaCheck.reason)
+    const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)
+    return NextResponse.json(stale || [])
   }
 
   const apiKey = process.env.API_FOOTBALL_KEY || '073534f7111a37868a403c5cd51d83fa'
   const headers = { 'x-apisports-key': apiKey }
 
   try {
+    // 3. Exactly 1 request to fetch all global live matches
     const res = await fetch('https://v3.football.api-sports.io/fixtures?live=all', {
-      headers,
-      next: { revalidate: 30 }
+      headers
     })
+    recordAPIRequest('/fixtures?live=all')
+
     const json = await res.json()
     const fixtures = json.response || []
 
@@ -70,10 +83,11 @@ export async function GET() {
         events: m.events || []
       }))
 
-    cache = { data: eligible, timestamp: now }
+    setDiskCache(CACHE_KEY, eligible)
     return NextResponse.json(eligible)
   } catch (error: any) {
     console.error('Failed to fetch live matches:', error)
-    return NextResponse.json([])
+    const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)
+    return NextResponse.json(stale || [])
   }
 }
