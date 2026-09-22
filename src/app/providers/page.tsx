@@ -24,64 +24,52 @@ export default function Providers() {
 
   const PROVIDERS = [
     {
-      name: '1xBet Odds Feed (Primary Target)',
+      name: '1xBet Odds Feed',
       slug: '1xbet-feed',
       status: 'OPERATIONAL',
-      statusColor: 'bg-emerald-950/80 text-emerald-300 border-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.2)]',
       is1xBetConfirmed: true,
-      authStatus: 'Verified (Bookmaker ID: 6)',
-      liveSupported: true,
-      prematchSupported: true,
-      dailyQuota: '100 / day (Shared via API-Football)',
-      remaining: '71 requests remaining (50 reserved for user)',
+      authStatus: 'Bookmaker ID: 6 (Verified)',
       latency: '245 ms',
-      markets: ['1X2', 'Double Chance', 'Over/Under 1.5–4.5', 'BTTS', 'Next Goal', 'Total Cards', 'Anytime Goalscorer'],
-      notes: 'Target execution price source. System strictly prohibits substituting any other bookmaker odds.'
+      quota: '100 / day (Shared API-Football)',
+      remaining: '71 remaining (50 reserved for user)',
+      markets: ['1X2', 'Double Chance', 'Over/Under 1.5–4.5', 'BTTS', 'Next Goal', 'Cards', 'Goalscorer'],
+      notes: 'Target execution price source. Model strictly prohibits substituting any other bookmaker odds.'
     },
     {
-      name: 'API-Football v3 (api-sports.io)',
+      name: 'API-Football v3',
       slug: 'api-football',
       status: 'ACTIVE',
-      statusColor: 'bg-emerald-950/80 text-emerald-300 border-emerald-600',
       is1xBetConfirmed: true,
-      authStatus: 'Authenticated (Key: 0735...83fa)',
-      liveSupported: true,
-      prematchSupported: true,
-      dailyQuota: '100 requests / day',
-      remaining: '71 requests remaining',
+      authStatus: 'Key: 0735...83fa',
       latency: '190 ms',
-      markets: ['Fixtures', 'Lineups', 'Live Events', 'Player Stats', 'Odds'],
-      notes: 'Account: Karan Jha. Primary source for fixtures, starting XIs, and match events.'
+      quota: '100 requests / day',
+      remaining: '71 remaining',
+      markets: ['Fixtures', 'Starting XIs', 'Match Events', 'Player Projections', 'Market Odds'],
+      notes: 'Primary feed for upcoming fixtures, confirmed starting lineups, and match stats.'
     },
     {
       name: 'football-data.co.uk (Historical)',
       slug: 'football-data-uk',
-      status: 'CONNECTED & READY',
-      statusColor: 'bg-emerald-950/80 text-emerald-300 border-emerald-600 shadow-[0_0_10px_rgba(16,185,129,0.2)]',
+      status: 'CONNECTED',
       is1xBetConfirmed: false,
-      authStatus: 'Connected (380+ Matches Cached Locally)',
-      liveSupported: false,
-      prematchSupported: true,
-      dailyQuota: 'Zero-Cost Free Bulk Data',
-      remaining: 'Uncapped (Local Disk Cache)',
+      authStatus: '380+ Matches Cached Locally',
       latency: '1 ms (Local)',
+      quota: 'Zero Cost (Free Bulk CSVs)',
+      remaining: 'Uncapped',
       markets: ['Premier League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'Eredivisie'],
-      notes: 'Live & connected! Holds full historical CSVs locally in cache for offline Elo calibration and Dixon-Coles parameters with zero API request cost.'
+      notes: 'Historical match and odds dataset for past 5 seasons. Used for offline model fitting with zero API calls.'
     },
     {
-      name: 'Supabase Cloud (PostgreSQL DB)',
+      name: 'Supabase Cloud Database',
       slug: 'supabase-db',
       status: 'CONNECTED',
-      statusColor: 'bg-emerald-950/80 text-emerald-300 border-emerald-600',
       is1xBetConfirmed: false,
-      authStatus: 'Connected (27 Tables Initialized)',
-      liveSupported: true,
-      prematchSupported: true,
-      dailyQuota: 'Unlimited (PostgreSQL)',
-      remaining: '27 Tables Active',
+      authStatus: 'Host: qqcxjjkgvqknesrtnwal.supabase.co',
       latency: '82 ms',
-      markets: ['Competitions', 'Snapshots', 'Predictions', 'Paper Bets', 'Settings'],
-      notes: 'Host: qqcxjjkgvqknesrtnwal.supabase.co. Holds real-time snapshots, feature store, and ledger.'
+      quota: 'PostgreSQL Cloud',
+      remaining: '27 Tables Active',
+      markets: ['Competitions', 'Feature Snapshots', 'Predictions', 'Paper Ledger', 'Settings'],
+      notes: 'Holds persistent prediction logs, live feature stores, and safety engine configurations.'
     }
   ]
 
@@ -89,106 +77,100 @@ export default function Providers() {
     {
       priority: 'P0',
       label: 'Critical Live State',
-      endpoints: '1xBet live odds, current scores, match clock, red cards',
+      endpoints: '1xBet live odds, current match score, red card ejections',
       cost: '1 req / 60s (cached)',
-      policy: 'Guaranteed unthrottled allocation during live matches'
+      policy: 'Unthrottled allocation during live matches'
     },
     {
       priority: 'P1',
-      label: 'Selected Match Enrichment',
-      endpoints: 'Confirmed lineups, starting formations, player injury feeds',
-      cost: '1 req per user selection',
-      policy: 'Draws strictly from the 50 reserved user requests'
+      label: 'User Match Selection',
+      endpoints: 'Confirmed starting lineups, formations, player stats',
+      cost: '1 req per user click',
+      policy: 'Drawn strictly from the 50 reserved user requests'
     },
     {
       priority: 'P2',
-      label: 'High-Value Candidate Screening',
-      endpoints: 'Pre-match odds shifts, sharp money movements, lineup drops',
+      label: 'Scheduled Candidate Sync',
+      endpoints: 'Daily match schedule, opening 1xBet market lines',
       cost: '1 bulk call / day',
       policy: 'Filtered to top 50 matches max (Quota Guardian enforced)'
     },
     {
       priority: 'P3',
-      label: 'Historical Data Training',
-      endpoints: 'Team season statistics, match results, standings',
-      cost: '0 API requests',
-      policy: 'Handled 100% offline via football-data.co.uk free CSVs'
+      label: 'Historical Data Fitting',
+      endpoints: 'Historical seasons, shot volume, closing prices',
+      cost: '0 API calls',
+      policy: 'Handled 100% offline via football-data.co.uk CSVs'
     }
   ]
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-12">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold tracking-wide bg-gradient-to-r from-amber-500/20 to-emerald-500/20 text-amber-300 border border-amber-500/40 font-mono">
-              QUANT INFRASTRUCTURE
-            </span>
-            <span className="text-xs text-emerald-400 font-mono">Zero External Data Cost Policy</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-1.5 tracking-tight flex items-center gap-2">
-            Providers & Quota Budget Manager
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 border-b border-white/[0.08] pb-8">
+        <div className="space-y-2">
+          <h1 className="text-3xl sm:text-4xl font-semibold tracking-[-0.03em] text-white">
+            Data Providers & Quota.
           </h1>
-          <p className="text-sm text-slate-400 mt-1 max-w-2xl">
-            Live diagnostic health, latency telemetry, and priority-budget allocators across all connected feeds.
+          <p className="text-[14px] text-neutral-400 max-w-2xl font-normal leading-relaxed">
+            Infrastructure telemetry, latency monitoring, and zero-cost quota allocation rules.
           </p>
         </div>
 
         <button
           onClick={refreshStatus}
           disabled={refreshing}
-          className="inline-flex items-center gap-1.5 self-start sm:self-auto px-3.5 py-2 text-xs font-semibold text-emerald-300 bg-[#0c1618] hover:bg-[#122023] active:bg-black border border-emerald-800/80 rounded-xl transition disabled:opacity-50 font-mono shadow-md"
+          className="inline-flex items-center gap-2 self-start sm:self-auto px-4 py-2 text-[12px] font-medium text-neutral-300 bg-[#0e0e11] hover:bg-[#16161a] hover:text-white border border-white/[0.08] rounded-xl transition-colors disabled:opacity-50 font-mono shadow-sm"
         >
           <svg className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
-          {refreshing ? 'Checking...' : `Check Health (${lastCheck})`}
+          {refreshing ? 'Checking' : `Check Health (${lastCheck})`}
         </button>
       </div>
 
-      {/* Provider Status Cards */}
+      {/* Provider Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {PROVIDERS.map((p) => (
           <div
             key={p.slug}
-            className="bg-gradient-to-b from-[#0c1417] to-[#090f11] border border-emerald-950/90 hover:border-amber-500/40 rounded-2xl p-5 shadow-xl flex flex-col justify-between transition group"
+            className="bg-[#0c0c0e] border border-white/[0.08] hover:border-white/[0.14] rounded-2xl p-6 transition-all duration-200 flex flex-col justify-between"
           >
-            <div>
-              <div className="flex items-center justify-between border-b border-emerald-950/80 pb-3 mb-4">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
                 <div>
-                  <h2 className="text-base font-bold text-white tracking-wide">{p.name}</h2>
-                  <span className="text-[11px] font-mono text-slate-400">{p.authStatus}</span>
+                  <h2 className="text-base font-semibold text-white tracking-tight">{p.name}</h2>
+                  <span className="text-[11px] font-mono text-neutral-500">{p.authStatus}</span>
                 </div>
-                <span className={`px-2.5 py-0.5 rounded-lg text-[10px] font-mono font-extrabold border ${p.statusColor}`}>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800/60">
                   {p.status}
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs font-mono mb-4">
-                <div className="bg-[#070b0c] border border-amber-500/20 rounded-xl p-2.5">
-                  <div className="text-[10px] text-amber-400/80 uppercase font-semibold">1xBet Confirmed</div>
-                  <div className={`text-xs font-bold mt-0.5 ${p.is1xBetConfirmed ? 'text-amber-300' : 'text-slate-400'}`}>
-                    {p.is1xBetConfirmed ? '● YES (Verified)' : 'N/A'}
+              <div className="grid grid-cols-3 gap-2 text-xs font-mono">
+                <div className="bg-[#070709] border border-white/[0.04] rounded-lg p-2.5">
+                  <div className="text-[10px] text-neutral-500">1xBet Confirmed</div>
+                  <div className={`text-xs font-semibold mt-0.5 ${p.is1xBetConfirmed ? 'text-[#d4af37]' : 'text-neutral-400'}`}>
+                    {p.is1xBetConfirmed ? 'Yes' : 'N/A'}
                   </div>
                 </div>
 
-                <div className="bg-[#070b0c] border border-emerald-950 rounded-xl p-2.5">
-                  <div className="text-[10px] text-slate-500 uppercase font-semibold">Latency</div>
-                  <div className="text-xs font-bold text-emerald-400 mt-0.5">{p.latency}</div>
+                <div className="bg-[#070709] border border-white/[0.04] rounded-lg p-2.5">
+                  <div className="text-[10px] text-neutral-500">Latency</div>
+                  <div className="text-xs font-semibold text-white mt-0.5">{p.latency}</div>
                 </div>
 
-                <div className="bg-[#070b0c] border border-emerald-950 rounded-xl p-2.5 col-span-2 sm:col-span-1">
-                  <div className="text-[10px] text-slate-500 uppercase font-semibold">Quota Remaining</div>
-                  <div className="text-xs font-bold text-white mt-0.5">{p.remaining}</div>
+                <div className="bg-[#070709] border border-white/[0.04] rounded-lg p-2.5">
+                  <div className="text-[10px] text-neutral-500">Available</div>
+                  <div className="text-xs font-semibold text-emerald-400 mt-0.5">{p.remaining}</div>
                 </div>
               </div>
 
-              <div className="space-y-1.5 text-xs">
-                <div className="text-[11px] font-semibold text-slate-400">Supported Markets & Coverage:</div>
+              <div className="space-y-1 text-xs">
+                <div className="text-[11px] text-neutral-500">Supported Markets:</div>
                 <div className="flex flex-wrap gap-1">
                   {p.markets.map((m) => (
-                    <span key={m} className="px-2 py-0.5 rounded bg-[#10191c] border border-emerald-950 text-[10px] text-slate-300 font-mono">
+                    <span key={m} className="px-2 py-0.5 rounded bg-white/[0.03] text-[10px] text-neutral-300 font-mono">
                       {m}
                     </span>
                   ))}
@@ -196,53 +178,43 @@ export default function Providers() {
               </div>
             </div>
 
-            <p className="mt-4 pt-3 border-t border-emerald-950/80 text-[11px] text-slate-400 leading-relaxed italic font-sans">
+            <p className="mt-5 pt-3 border-t border-white/[0.06] text-[11px] text-neutral-500 leading-relaxed font-sans">
               {p.notes}
             </p>
           </div>
         ))}
       </div>
 
-      {/* Priority Budget Manager Table */}
-      <div className="bg-gradient-to-b from-[#0c1417] to-[#090f11] border border-emerald-950/90 rounded-2xl p-6 shadow-xl space-y-4">
-        <div className="border-b border-emerald-950/80 pb-3">
-          <h2 className="text-lg font-bold text-white tracking-wide flex items-center gap-2">
-            <span className="text-amber-400">❖</span> Request-Budget Allocator (P0 – P3 Priority Queue)
+      {/* Request Budget Allocator Table */}
+      <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-2xl p-6 space-y-4">
+        <div className="border-b border-white/[0.06] pb-4">
+          <h2 className="text-lg font-medium text-white tracking-tight">
+            Request Budget Allocator (P0 – P3 Priority Queue)
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Strict 50/50 quota guard: 50 requests allocated for automated sync, 50 requests strictly reserved for user on-demand analysis.
+          <p className="text-xs text-neutral-400 mt-0.5">
+            Strict 50/50 quota partition: 50 requests allocated for automated sync, 50 requests reserved for user analysis.
           </p>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-emerald-950/80">
+        <div className="overflow-x-auto rounded-xl border border-white/[0.06]">
           <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-[#060a0b] text-slate-400 uppercase text-[10px] font-semibold border-b border-emerald-950">
+            <thead className="bg-[#050507] text-neutral-500 uppercase text-[10px] tracking-wider border-b border-white/[0.06]">
               <tr>
-                <th className="py-3 px-4">Priority Level</th>
+                <th className="py-3 px-4">Priority</th>
                 <th className="py-3 px-3">Classification</th>
-                <th className="py-3 px-4">Target Endpoints & Feeds</th>
+                <th className="py-3 px-4">Endpoints</th>
                 <th className="py-3 px-3">Standard Cost</th>
-                <th className="py-3 px-4">Quota Allocation Policy</th>
+                <th className="py-3 px-4">Allocation Policy</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-emerald-950/60 text-slate-200">
+            <tbody className="divide-y divide-white/[0.04] text-neutral-300">
               {BUDGET_ALLOCATOR.map((b) => (
-                <tr key={b.priority} className="hover:bg-[#10191c]/60 transition">
-                  <td className="py-3.5 px-4 font-bold text-amber-400 text-sm">
-                    {b.priority}
-                  </td>
-                  <td className="py-3.5 px-3 font-semibold text-white whitespace-nowrap">
-                    {b.label}
-                  </td>
-                  <td className="py-3.5 px-4 text-slate-300">
-                    {b.endpoints}
-                  </td>
-                  <td className="py-3.5 px-3 text-emerald-400 whitespace-nowrap font-bold">
-                    {b.cost}
-                  </td>
-                  <td className="py-3.5 px-4 text-[11px] text-slate-400 font-sans">
-                    {b.policy}
-                  </td>
+                <tr key={b.priority} className="hover:bg-white/[0.02] transition-colors">
+                  <td className="py-3.5 px-4 font-semibold text-[#d4af37] text-sm">{b.priority}</td>
+                  <td className="py-3.5 px-3 font-medium text-white">{b.label}</td>
+                  <td className="py-3.5 px-4 text-neutral-400">{b.endpoints}</td>
+                  <td className="py-3.5 px-3 text-emerald-400 font-medium whitespace-nowrap">{b.cost}</td>
+                  <td className="py-3.5 px-4 text-[11px] text-neutral-500 font-sans">{b.policy}</td>
                 </tr>
               ))}
             </tbody>

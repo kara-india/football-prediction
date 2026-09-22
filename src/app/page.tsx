@@ -3,56 +3,52 @@ import UpcomingMatchSection from '../components/dashboard/UpcomingMatchSection'
 
 export default function Dashboard() {
   return (
-    <div className="space-y-10">
-      {/* Platform Info Banner - Gold & Green Money Terminal */}
-      <div className="bg-gradient-to-r from-emerald-950/40 via-[#0b1416]/90 to-amber-950/20 border border-emerald-900/50 rounded-2xl p-6 sm:p-7 shadow-2xl relative overflow-hidden backdrop-blur-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black tracking-wider bg-gradient-to-r from-amber-500/20 to-yellow-500/10 text-amber-300 border border-amber-500/40 shadow-sm font-mono">
-                QUANTITATIVE EDGE INTELLIGENCE
-              </span>
-              <span className="text-[11px] text-emerald-400/90 font-mono flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                1xBet Market Normalized
-              </span>
+    <div className="space-y-12">
+      {/* Hero Section: Apple/Nike Clean Editorial */}
+      <section className="border-b border-white/[0.08] pb-10">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="max-w-2xl space-y-2">
+            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-[11px] font-mono font-medium text-neutral-400 bg-white/[0.04] border border-white/[0.08]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#d4af37]"></span>
+              <span>1xBet Target Execution</span>
+              <span className="text-neutral-600">·</span>
+              <span className="text-neutral-400">Zero Cost Ingestion</span>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-2.5 tracking-tight flex items-center gap-2">
-              Match Intelligence Terminal
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-semibold tracking-[-0.03em] text-white">
+              Football Intelligence.
             </h1>
 
-            <p className="text-sm text-slate-300/90 mt-1.5 max-w-2xl leading-relaxed">
-              Real-time match states, 1xBet target odds de-vigging, and path-dependent Monte Carlo simulation.
-              Upcoming match predictions activate automatically upon official starting lineup announcement.
+            <p className="text-[15px] sm:text-base text-neutral-400 leading-relaxed font-normal">
+              Continuous hazard modeling, 1xBet market de-vigging, and path-dependent Monte Carlo simulations.
+              Pre-match probabilities unlock automatically once official starting XIs are verified.
             </p>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 self-start md:self-auto text-xs font-mono">
-            <div className="bg-[#080e10]/90 border border-amber-500/30 rounded-xl p-3 text-center shadow-md">
-              <div className="text-[10px] text-amber-400/80 uppercase font-semibold">Target Bookmaker</div>
-              <div className="text-base font-extrabold text-amber-300 mt-0.5 flex items-center justify-center gap-1">
-                <span className="text-xs">⚡</span> 1xBet
-              </div>
+          {/* Micro Telemetry Bar */}
+          <div className="flex items-center gap-3 font-mono text-xs">
+            <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-xl px-4 py-3 min-w-[120px]">
+              <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Bookmaker</div>
+              <div className="text-sm font-semibold text-[#d4af37] mt-0.5">1xBet Fixed</div>
             </div>
 
-            <div className="bg-[#080e10]/90 border border-emerald-500/30 rounded-xl p-3 text-center shadow-md">
-              <div className="text-[10px] text-emerald-400/80 uppercase font-semibold">NO-BET Filter</div>
-              <div className="text-base font-extrabold text-emerald-300 mt-0.5">15 Gates</div>
+            <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-xl px-4 py-3 min-w-[120px]">
+              <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Filter Gates</div>
+              <div className="text-sm font-semibold text-emerald-400 mt-0.5">15 Enforced</div>
             </div>
 
-            <div className="col-span-2 sm:col-span-1 bg-[#080e10]/90 border border-teal-500/30 rounded-xl p-3 text-center shadow-md">
-              <div className="text-[10px] text-teal-400/80 uppercase font-semibold">Simulation Paths</div>
-              <div className="text-base font-extrabold text-teal-300 mt-0.5">10k – 500k</div>
+            <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-xl px-4 py-3 min-w-[120px]">
+              <div className="text-[10px] text-neutral-500 uppercase tracking-wider">Simulations</div>
+              <div className="text-sm font-semibold text-white mt-0.5">50,000 / Match</div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* 1. Live Matches Section */}
+      {/* Live Matches Section */}
       <LiveMatchSection />
 
-      {/* 2. Upcoming Matches Section */}
+      {/* Upcoming Matches Section */}
       <UpcomingMatchSection />
     </div>
   )

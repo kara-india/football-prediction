@@ -36,7 +36,7 @@ const SAMPLE_BETS: PaperBet[] = [
     status: 'WON',
     pl: 1.21,
     clv: 0.034,
-    notes: 'Final: 2-1. Pre-match lineup confirmed 4-2-3-1.'
+    notes: 'Final: 2-1. Confirmed starting XIs (4-2-3-1).'
   },
   {
     id: 'PB-1048',
@@ -70,7 +70,7 @@ const SAMPLE_BETS: PaperBet[] = [
     status: 'LOST',
     pl: -1.00,
     clv: 0.015,
-    notes: 'Final: 2-0. Expected goals were 2.85 (Variance).'
+    notes: 'Final: 2-0. Expected goals 2.85.'
   },
   {
     id: 'PB-1046',
@@ -87,7 +87,7 @@ const SAMPLE_BETS: PaperBet[] = [
     status: 'WON',
     pl: 0.58,
     clv: 0.042,
-    notes: 'Final: 2-0. Starters confirmed with Mbappe debut.'
+    notes: 'Final: 2-0. Confirmed starters with Mbappe debut.'
   },
   {
     id: 'PB-1045',
@@ -144,98 +144,88 @@ export default function Predictions() {
   const avgCLV = (SAMPLE_BETS.reduce((acc, b) => acc + b.clv, 0) / SAMPLE_BETS.length) * 100
 
   return (
-    <div className="space-y-8">
-      {/* Page Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold tracking-wide bg-gradient-to-r from-amber-500/20 to-emerald-500/20 text-amber-300 border border-amber-500/40 font-mono">
-            AUDITABLE PAPER RECORD
-          </span>
-          <span className="text-xs text-emerald-400 font-mono">1xBet Fixed Execution Prices</span>
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-1.5 tracking-tight flex items-center gap-2">
-          Paper Bet Ledger & Settlement History
+    <div className="space-y-10">
+      {/* Header */}
+      <div className="border-b border-white/[0.08] pb-8 space-y-2">
+        <h1 className="text-3xl sm:text-4xl font-semibold tracking-[-0.03em] text-white">
+          Paper Bet Ledger.
         </h1>
-        <p className="text-sm text-slate-400 mt-1 max-w-3xl">
-          Every qualifying bet recommendation is automatically logged at the exact 1xBet price available at prediction time.
-          All predictions are strictly graded post-match with Brier score, log-loss contribution, and Closing Line Value (CLV).
+        <p className="text-[14px] text-neutral-400 max-w-2xl font-normal leading-relaxed">
+          Historical record of all qualifying predictions executed against live 1xBet closing prices.
+          Every settled prediction is graded for Brier score and Closing Line Value (CLV).
         </p>
       </div>
 
-      {/* Metrics Summary Strip - Gold & Green */}
+      {/* Minimalist Key Metric Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono">
-        <div className="bg-[#0b1315] border border-emerald-950/90 rounded-2xl p-4 text-center shadow-lg">
-          <div className="text-[11px] text-slate-400 uppercase font-medium">Logged Bets</div>
-          <div className="text-2xl font-black text-white mt-1">{SAMPLE_BETS.length}</div>
-          <div className="text-[10px] text-slate-500 mt-0.5">{settled.length} settled</div>
+        <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-xl p-4">
+          <div className="text-[11px] text-neutral-500 uppercase">Logged Bets</div>
+          <div className="text-xl font-semibold text-white mt-1">{SAMPLE_BETS.length}</div>
+          <div className="text-[10px] text-neutral-500">{settled.length} settled</div>
         </div>
 
-        <div className="bg-[#0b1315] border border-emerald-500/30 rounded-2xl p-4 text-center shadow-lg">
-          <div className="text-[11px] text-emerald-400 uppercase font-semibold">Win Rate</div>
-          <div className="text-2xl font-black text-emerald-300 mt-1">{winRate.toFixed(1)}%</div>
-          <div className="text-[10px] text-emerald-500/80 mt-0.5">{won} W / {settled.length - won} L</div>
+        <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-xl p-4">
+          <div className="text-[11px] text-neutral-500 uppercase">Win Rate</div>
+          <div className="text-xl font-semibold text-emerald-400 mt-1">{winRate.toFixed(1)}%</div>
+          <div className="text-[10px] text-neutral-500">{won}W · {settled.length - won}L</div>
         </div>
 
-        <div className="bg-[#0b1315] border border-amber-500/30 rounded-2xl p-4 text-center shadow-lg">
-          <div className="text-[11px] text-amber-400 uppercase font-semibold">Total P&L</div>
-          <div className={`text-2xl font-black mt-1 ${totalPL >= 0 ? 'text-amber-300' : 'text-rose-400'}`}>
+        <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-xl p-4">
+          <div className="text-[11px] text-neutral-500 uppercase">Net Yield</div>
+          <div className={`text-xl font-semibold mt-1 ${totalPL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
             {totalPL >= 0 ? `+${totalPL.toFixed(2)}` : totalPL.toFixed(2)} U
           </div>
-          <div className="text-[10px] text-amber-500/70 mt-0.5">1.0 U flat stake</div>
+          <div className="text-[10px] text-neutral-500">1.0 U stake</div>
         </div>
 
-        <div className="bg-[#0b1315] border border-emerald-500/30 rounded-2xl p-4 text-center shadow-lg">
-          <div className="text-[11px] text-emerald-400 uppercase font-semibold">Realized ROI</div>
-          <div className={`text-2xl font-black mt-1 ${roi >= 0 ? 'text-emerald-300' : 'text-rose-400'}`}>
+        <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-xl p-4">
+          <div className="text-[11px] text-neutral-500 uppercase">Realized ROI</div>
+          <div className={`text-xl font-semibold mt-1 ${roi >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
             {roi >= 0 ? `+${roi.toFixed(1)}%` : `${roi.toFixed(1)}%`}
           </div>
-          <div className="text-[10px] text-emerald-500/80 mt-0.5">yield / stake</div>
+          <div className="text-[10px] text-neutral-500">yield / stake</div>
         </div>
 
-        <div className="bg-[#0b1315] border border-emerald-950/90 rounded-2xl p-4 text-center shadow-lg">
-          <div className="text-[11px] text-slate-400 uppercase font-medium">Avg CLV</div>
-          <div className="text-2xl font-black text-teal-300 mt-1">+{avgCLV.toFixed(1)}%</div>
-          <div className="text-[10px] text-slate-500 mt-0.5">beat closing line</div>
+        <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-xl p-4">
+          <div className="text-[11px] text-neutral-500 uppercase">Avg CLV</div>
+          <div className="text-xl font-semibold text-[#d4af37] mt-1">+{avgCLV.toFixed(1)}%</div>
+          <div className="text-[10px] text-neutral-500">beat closing line</div>
         </div>
 
-        <div className="bg-[#0b1315] border border-amber-500/30 rounded-2xl p-4 text-center shadow-lg">
-          <div className="text-[11px] text-amber-400 uppercase font-semibold">Target Bookie</div>
-          <div className="text-2xl font-black text-amber-300 mt-1 flex items-center justify-center gap-1">
-            <span className="text-sm">⚡</span> 1xBet
-          </div>
-          <div className="text-[10px] text-emerald-400 mt-0.5">● verified feed</div>
+        <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-xl p-4">
+          <div className="text-[11px] text-neutral-500 uppercase">Bookmaker</div>
+          <div className="text-xl font-semibold text-[#d4af37] mt-1">1xBet</div>
+          <div className="text-[10px] text-neutral-500">Fixed target</div>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-950/80 pb-3 text-xs font-mono">
-        <div className="flex items-center gap-1.5">
-          <span className="text-slate-400 font-medium mr-1">Market:</span>
+      <div className="flex flex-wrap items-center justify-between gap-3 text-xs font-mono border-b border-white/[0.06] pb-3">
+        <div className="flex items-center gap-1">
           {['ALL', '1X2', 'Over', 'BTTS'].map((m) => (
             <button
               key={m}
               onClick={() => setFilterMarket(m)}
-              className={`px-3 py-1 rounded-lg transition font-bold ${
+              className={`px-3 py-1 rounded-md transition-colors ${
                 filterMarket === m
-                  ? 'bg-gradient-to-r from-amber-500 to-yellow-600 text-slate-950 shadow-sm'
-                  : 'bg-[#10191c] text-slate-300 hover:text-white border border-emerald-950'
+                  ? 'bg-white text-black font-semibold'
+                  : 'text-neutral-400 hover:text-white'
               }`}
             >
-              {m === 'ALL' ? 'All Markets' : m}
+              {m === 'ALL' ? 'All' : m}
             </button>
           ))}
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <span className="text-slate-400 font-medium mr-1">Outcome:</span>
-          {['ALL', 'WON', 'LOST', 'OPEN'].map((s) => (
+        <div className="flex items-center gap-1">
+          {['ALL', 'WON', 'LOST'].map((s) => (
             <button
               key={s}
               onClick={() => setFilterStatus(s)}
-              className={`px-3 py-1 rounded-lg transition font-bold ${
+              className={`px-3 py-1 rounded-md transition-colors ${
                 filterStatus === s
-                  ? 'bg-emerald-950 text-emerald-300 border border-emerald-600'
-                  : 'bg-[#10191c] text-slate-300 hover:text-white border border-emerald-950'
+                  ? 'bg-neutral-800 text-white font-medium'
+                  : 'text-neutral-500 hover:text-neutral-300'
               }`}
             >
               {s}
@@ -244,75 +234,65 @@ export default function Predictions() {
         </div>
       </div>
 
-      {/* Table Container */}
-      <div className="overflow-x-auto rounded-2xl border border-emerald-950/90 bg-[#090f11] shadow-2xl">
+      {/* Table */}
+      <div className="overflow-x-auto rounded-2xl border border-white/[0.08] bg-[#09090b]">
         <table className="w-full text-left text-xs font-mono">
-          <thead className="bg-[#050809] text-slate-400 uppercase text-[10px] font-semibold border-b border-emerald-950">
+          <thead className="bg-[#050507] text-neutral-500 uppercase text-[10px] tracking-wider border-b border-white/[0.06]">
             <tr>
-              <th className="py-3 px-4">Bet ID & Match</th>
-              <th className="py-3 px-3">Predicted (IST)</th>
-              <th className="py-3 px-3">Market & Pick</th>
-              <th className="py-3 px-3 text-right">1xBet Odds</th>
-              <th className="py-3 px-3 text-right">Model %</th>
-              <th className="py-3 px-3 text-right">Calib %</th>
-              <th className="py-3 px-3 text-right">EV %</th>
+              <th className="py-3 px-4">Match</th>
+              <th className="py-3 px-3">Date (IST)</th>
+              <th className="py-3 px-3">Selection</th>
+              <th className="py-3 px-3 text-right">Odds</th>
+              <th className="py-3 px-3 text-right">Calibrated</th>
+              <th className="py-3 px-3 text-right">EV</th>
               <th className="py-3 px-3 text-center">Status</th>
-              <th className="py-3 px-3 text-right">P&L (U)</th>
-              <th className="py-3 px-4">Settlement Audit</th>
+              <th className="py-3 px-3 text-right">P&L</th>
+              <th className="py-3 px-4">Settlement Note</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-emerald-950/60 text-slate-200">
+          <tbody className="divide-y divide-white/[0.04] text-neutral-300">
             {filtered.map((b) => (
-              <tr key={b.id} className="hover:bg-[#0e171a]/80 transition">
+              <tr key={b.id} className="hover:bg-white/[0.02] transition-colors">
                 <td className="py-3.5 px-4 font-sans">
-                  <div className="font-mono text-[10px] text-amber-400/80 font-bold">{b.id}</div>
-                  <div className="font-bold text-white text-sm">{b.match}</div>
-                  <div className="text-[11px] text-slate-400">{b.league}</div>
+                  <div className="font-semibold text-white text-[13px]">{b.match}</div>
+                  <div className="text-[11px] text-neutral-500">{b.league}</div>
                 </td>
-                <td className="py-3.5 px-3 whitespace-nowrap text-[11px] text-slate-300">
+                <td className="py-3.5 px-3 text-[11px] text-neutral-400 whitespace-nowrap">
                   {b.predictedAtIST}
                 </td>
-                <td className="py-3.5 px-3 font-sans">
-                  <span className="font-medium text-slate-300">{b.market}</span>
-                  <div className="text-[11px] font-extrabold text-amber-300 font-mono">{b.selection}</div>
+                <td className="py-3.5 px-3">
+                  <div className="text-white font-medium">{b.selection}</div>
+                  <div className="text-[10px] text-neutral-500">{b.market}</div>
                 </td>
-                <td className="py-3.5 px-3 text-right font-black text-amber-300 text-sm">
+                <td className="py-3.5 px-3 text-right font-medium text-[#d4af37]">
                   {b.odds.toFixed(2)}
                 </td>
-                <td className="py-3.5 px-3 text-right text-slate-300">
-                  {(b.modelProb * 100).toFixed(1)}%
-                </td>
-                <td className="py-3.5 px-3 text-right font-bold text-slate-100">
+                <td className="py-3.5 px-3 text-right text-neutral-300">
                   {(b.calibProb * 100).toFixed(1)}%
                 </td>
-                <td className="py-3.5 px-3 text-right font-black text-emerald-400">
+                <td className="py-3.5 px-3 text-right text-emerald-400 font-medium">
                   +{(b.ev * 100).toFixed(1)}%
                 </td>
                 <td className="py-3.5 px-3 text-center whitespace-nowrap">
                   <span
-                    className={`inline-block px-2.5 py-0.5 rounded-lg text-[10px] font-black tracking-wider border ${
+                    className={`inline-block px-2 py-0.5 rounded text-[10px] font-medium tracking-wide ${
                       b.status === 'WON'
-                        ? 'bg-emerald-950 text-emerald-300 border-emerald-600 shadow-[0_0_8px_rgba(16,185,129,0.25)]'
-                        : b.status === 'LOST'
-                        ? 'bg-rose-950 text-rose-300 border-rose-800'
-                        : 'bg-blue-950 text-blue-300 border-blue-800'
+                        ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/60'
+                        : 'bg-rose-950/80 text-rose-400 border border-rose-800/60'
                     }`}
                   >
                     {b.status}
                   </span>
                 </td>
                 <td
-                  className={`py-3.5 px-3 text-right font-black whitespace-nowrap text-sm ${
-                    (b.pl || 0) > 0 ? 'text-emerald-400' : (b.pl || 0) < 0 ? 'text-rose-400' : 'text-slate-400'
+                  className={`py-3.5 px-3 text-right font-semibold whitespace-nowrap ${
+                    (b.pl || 0) > 0 ? 'text-emerald-400' : 'text-rose-400'
                   }`}
                 >
-                  {b.pl !== null ? (b.pl > 0 ? `+${b.pl.toFixed(2)}` : b.pl.toFixed(2)) : '-'}
+                  {b.pl !== null ? (b.pl > 0 ? `+${b.pl.toFixed(2)}` : b.pl.toFixed(2)) : '—'}
                 </td>
-                <td className="py-3.5 px-4 text-[11px] text-slate-400 max-w-xs font-sans">
+                <td className="py-3.5 px-4 text-[11px] text-neutral-500 font-sans max-w-xs">
                   {b.notes}
-                  <div className="text-[10px] font-mono text-teal-400 mt-0.5 font-bold">
-                    CLV: +{(b.clv * 100).toFixed(1)}%
-                  </div>
                 </td>
               </tr>
             ))}

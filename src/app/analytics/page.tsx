@@ -17,39 +17,36 @@ export default function Analytics() {
   const MODELS = [
     {
       name: 'dixon_coles_v1.2',
-      type: 'Bivariate Poisson + Tau Low Score Coupling',
+      type: 'Bivariate Poisson + Tau Low-Score Coupling',
       status: 'CHAMPION',
-      statusColor: 'bg-emerald-950 text-emerald-300 border-emerald-600 shadow-[0_0_8px_rgba(16,185,129,0.25)]',
       sampleSize: 1420,
       brier: 0.174,
       logLoss: 0.521,
       ece: '2.1%',
       roi: '+8.4%',
-      notes: 'Active production champion. Walk-forward validated across 10 domestic leagues.'
+      notes: 'Active production model. Walk-forward validated across 10 leagues.'
     },
     {
       name: 'bivariate_xg_hazard_v2.0',
       type: 'Score-State Survival Hazard + Gradient Boosting Residual',
       status: 'CHALLENGER',
-      statusColor: 'bg-amber-950/70 text-amber-300 border-amber-600 shadow-[0_0_8px_rgba(245,158,11,0.25)]',
       sampleSize: 310,
       brier: 0.169,
       logLoss: 0.508,
       ece: '1.9%',
       roi: '+11.2%',
-      notes: 'Shadow validation mode. Requires 200 more settled observations before promotion vote.'
+      notes: 'Shadow validation mode. Requires 200 more settled observations.'
     },
     {
       name: 'elo_dynamic_v2.0',
-      type: 'Dynamic Elo Baseline with Margin & Rest-Days',
+      type: 'Dynamic Elo Baseline with Goal Margin Weighting',
       status: 'BASELINE',
-      statusColor: 'bg-[#10191c] text-slate-300 border-slate-700',
       sampleSize: 2850,
       brier: 0.198,
       logLoss: 0.589,
       ece: '4.2%',
       roi: '+1.8%',
-      notes: 'Sanity benchmark for team strength prior distribution.'
+      notes: 'Team strength prior benchmark.'
     }
   ]
 
@@ -63,125 +60,111 @@ export default function Analytics() {
   ]
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-12">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2">
-          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold tracking-wide bg-gradient-to-r from-amber-500/20 to-emerald-500/20 text-amber-300 border border-amber-500/40 font-mono">
-            PROBABILITY RELIABILITY
-          </span>
-          <span className="text-xs text-emerald-400 font-mono">Walk-Forward Out-Of-Sample Validation</span>
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-extrabold text-white mt-1.5 tracking-tight flex items-center gap-2">
-          Model Calibration & Verification Analytics
+      <div className="border-b border-white/[0.08] pb-8 space-y-2">
+        <h1 className="text-3xl sm:text-4xl font-semibold tracking-[-0.03em] text-white">
+          Model Calibration.
         </h1>
-        <p className="text-sm text-slate-400 mt-1 max-w-3xl">
-          A model that wins 60% of bets at 1.50 odds loses money. This system measures calibration:
-          when the model predicts 70%, exactly 70% of those events must historically occur.
+        <p className="text-[14px] text-neutral-400 max-w-2xl font-normal leading-relaxed">
+          Probabilistic reliability verification. Every percentage output by our Monte Carlo engine must match
+          its empirical historical frequency before an EV edge is considered actionable.
         </p>
       </div>
 
-      {/* Primary KPI Strip - Gold & Green */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono">
-        <div className="bg-[#0b1315] border border-emerald-500/30 rounded-2xl p-4 text-center shadow-lg">
-          <div className="text-[11px] text-emerald-400 uppercase font-semibold">Brier Score</div>
-          <div className="text-2xl font-black text-emerald-300 mt-1">0.174</div>
-          <div className="text-[10px] text-slate-500 mt-0.5">naive benchmark 0.222</div>
+        <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-xl p-4">
+          <div className="text-[11px] text-neutral-500 uppercase">Brier Score</div>
+          <div className="text-xl font-semibold text-emerald-400 mt-1">0.174</div>
+          <div className="text-[10px] text-neutral-500">Benchmark: 0.222</div>
         </div>
 
-        <div className="bg-[#0b1315] border border-emerald-500/30 rounded-2xl p-4 text-center shadow-lg">
-          <div className="text-[11px] text-emerald-400 uppercase font-semibold">Log Loss</div>
-          <div className="text-2xl font-black text-emerald-300 mt-1">0.521</div>
-          <div className="text-[10px] text-slate-500 mt-0.5">sharpness metric</div>
+        <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-xl p-4">
+          <div className="text-[11px] text-neutral-500 uppercase">Log Loss</div>
+          <div className="text-xl font-semibold text-white mt-1">0.521</div>
+          <div className="text-[10px] text-neutral-500">Sharpness metric</div>
         </div>
 
-        <div className="bg-[#0b1315] border border-amber-500/30 rounded-2xl p-4 text-center shadow-lg">
-          <div className="text-[11px] text-amber-400 uppercase font-semibold">ECE Error</div>
-          <div className="text-2xl font-black text-amber-300 mt-1">2.1%</div>
-          <div className="text-[10px] text-emerald-400 mt-0.5">&lt; 3.0% calibrated</div>
+        <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-xl p-4">
+          <div className="text-[11px] text-neutral-500 uppercase">ECE Error</div>
+          <div className="text-xl font-semibold text-[#d4af37] mt-1">2.1%</div>
+          <div className="text-[10px] text-neutral-500">&lt; 3.0% threshold</div>
         </div>
 
-        <div className="bg-[#0b1315] border border-emerald-950/90 rounded-2xl p-4 text-center shadow-lg">
-          <div className="text-[11px] text-slate-400 uppercase font-medium">Avg CLV</div>
-          <div className="text-2xl font-black text-teal-300 mt-1">+3.1%</div>
-          <div className="text-[10px] text-slate-500 mt-0.5">beat closing line</div>
+        <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-xl p-4">
+          <div className="text-[11px] text-neutral-500 uppercase">Avg CLV</div>
+          <div className="text-xl font-semibold text-emerald-400 mt-1">+3.1%</div>
+          <div className="text-[10px] text-neutral-500">Beat closing line</div>
         </div>
 
-        <div className="bg-[#0b1315] border border-emerald-500/30 rounded-2xl p-4 text-center shadow-lg">
-          <div className="text-[11px] text-emerald-400 uppercase font-semibold">Calibration Gate</div>
-          <div className="text-2xl font-black text-emerald-300 mt-1">PASS</div>
-          <div className="text-[10px] text-slate-500 mt-0.5">isotonic regression</div>
+        <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-xl p-4">
+          <div className="text-[11px] text-neutral-500 uppercase">Gate Status</div>
+          <div className="text-xl font-semibold text-emerald-400 mt-1">Pass</div>
+          <div className="text-[10px] text-neutral-500">Isotonic calibrated</div>
         </div>
 
-        <div className="bg-[#0b1315] border border-rose-500/20 rounded-2xl p-4 text-center shadow-lg">
-          <div className="text-[11px] text-rose-400 uppercase font-semibold">Max Drawdown</div>
-          <div className="text-2xl font-black text-rose-400 mt-1">-3.2 U</div>
-          <div className="text-[10px] text-slate-500 mt-0.5">peak-to-trough</div>
+        <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-xl p-4">
+          <div className="text-[11px] text-neutral-500 uppercase">Max Drawdown</div>
+          <div className="text-xl font-semibold text-rose-400 mt-1">-3.2 U</div>
+          <div className="text-[10px] text-neutral-500">Walk-forward</div>
         </div>
       </div>
 
-      {/* Reliability Curve / Calibration Diagram */}
-      <div className="bg-gradient-to-b from-[#0c1417] to-[#090f11] border border-emerald-950/90 rounded-2xl p-6 shadow-xl space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-emerald-950/80 pb-3">
+      {/* Reliability Curve */}
+      <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-2xl p-6 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/[0.06] pb-4">
           <div>
-            <h2 className="text-lg font-bold text-white tracking-wide flex items-center gap-2">
-              <span className="text-amber-400">❖</span> Reliability Curve (Calibration Buckets)
+            <h2 className="text-lg font-medium text-white tracking-tight">
+              Reliability Curve (Calibration Buckets)
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Comparison between Model Predicted Probabilities vs. Observed Empirical Win Frequency
+            <p className="text-xs text-neutral-400 mt-0.5">
+              Predicted model probabilities vs. empirical win frequencies across holdout sets
             </p>
           </div>
           <div className="flex items-center gap-4 text-xs font-mono">
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-amber-400"></span>
-              <span className="text-slate-300">Model Predictions</span>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-sm bg-[#d4af37]"></span>
+              <span className="text-neutral-400">Predicted</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3 h-0.5 bg-emerald-400"></span>
-              <span className="text-slate-300">Perfect 45° Benchmark</span>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-sm bg-emerald-400"></span>
+              <span className="text-neutral-400">Actual</span>
             </div>
           </div>
         </div>
 
-        {/* Visual Bar Matrix */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {CALIBRATION_BINS.map((b) => {
             const diff = b.actual - b.predicted
-            const isClose = Math.abs(diff) <= 2.5
-
             return (
-              <div key={b.bin} className="bg-[#060a0b] border border-emerald-950/90 hover:border-amber-500/30 rounded-xl p-4 font-mono transition">
-                <div className="flex items-center justify-between text-xs text-slate-400 mb-2">
-                  <span className="font-bold text-white">{b.bin}</span>
-                  <span className="text-[10px] text-slate-500">{b.samples} matches</span>
+              <div key={b.bin} className="bg-[#070709] border border-white/[0.06] rounded-xl p-4 font-mono space-y-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-white">{b.bin}</span>
+                  <span className="text-[10px] text-neutral-500">{b.samples} matches</span>
                 </div>
 
-                <div className="space-y-1.5 text-xs">
-                  <div className="flex justify-between items-center text-[11px]">
-                    <span className="text-slate-400">Model Predicted:</span>
-                    <span className="font-extrabold text-amber-300">{b.predicted}%</span>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-neutral-500">Model:</span>
+                    <span className="text-[#d4af37] font-medium">{b.predicted}%</span>
                   </div>
-                  <div className="w-full bg-[#111c1e] h-1.5 rounded-full overflow-hidden">
-                    <div className="bg-amber-400 h-full rounded-full" style={{ width: `${b.predicted}%` }}></div>
+                  <div className="w-full bg-neutral-900 h-1 rounded-full overflow-hidden">
+                    <div className="bg-[#d4af37] h-full" style={{ width: `${b.predicted}%` }}></div>
                   </div>
 
-                  <div className="flex justify-between items-center text-[11px] pt-1">
-                    <span className="text-slate-400">Empirical Actual:</span>
-                    <span className={`font-extrabold ${isClose ? 'text-emerald-300' : 'text-amber-300'}`}>
-                      {b.actual}%
-                    </span>
+                  <div className="flex justify-between text-[11px] pt-1">
+                    <span className="text-neutral-500">Actual:</span>
+                    <span className="text-emerald-400 font-medium">{b.actual}%</span>
                   </div>
-                  <div className="w-full bg-[#111c1e] h-1.5 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${isClose ? 'bg-emerald-400' : 'bg-amber-400'}`}
-                      style={{ width: `${b.actual}%` }}
-                    ></div>
+                  <div className="w-full bg-neutral-900 h-1 rounded-full overflow-hidden">
+                    <div className="bg-emerald-400 h-full" style={{ width: `${b.actual}%` }}></div>
                   </div>
                 </div>
 
-                <div className="mt-3 pt-2 border-t border-emerald-950 text-[10px] flex justify-between text-slate-500">
-                  <span>Delta Error:</span>
-                  <span className={diff > 0 ? 'text-emerald-400 font-bold' : 'text-slate-400 font-bold'}>
+                <div className="text-[10px] text-neutral-500 flex justify-between pt-1 border-t border-white/[0.04]">
+                  <span>Delta:</span>
+                  <span className={diff > 0 ? 'text-emerald-400' : 'text-neutral-400'}>
                     {diff > 0 ? `+${diff.toFixed(1)}%` : `${diff.toFixed(1)}%`}
                   </span>
                 </div>
@@ -191,92 +174,61 @@ export default function Analytics() {
         </div>
       </div>
 
-      {/* Model Tournament: Champion vs Challenger */}
-      <div className="bg-gradient-to-b from-[#0c1417] to-[#090f11] border border-emerald-950/90 rounded-2xl p-6 shadow-xl space-y-4">
-        <div className="border-b border-emerald-950/80 pb-3">
-          <h2 className="text-lg font-bold text-white tracking-wide flex items-center gap-2">
-            <span className="text-amber-400">❖</span> Champion vs. Challenger Model Tournament
+      {/* Model Tournament Table */}
+      <div className="bg-[#0c0c0e] border border-white/[0.08] rounded-2xl p-6 space-y-4">
+        <div className="border-b border-white/[0.06] pb-4">
+          <h2 className="text-lg font-medium text-white tracking-tight">
+            Champion vs. Challenger Tournament
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Production uses one validated CHAMPION model. Challengers are run in shadow mode on walk-forward holdout data.
+          <p className="text-xs text-neutral-400 mt-0.5">
+            Production uses one validated Champion. Challengers run in shadow mode on out-of-sample data.
           </p>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-emerald-950/80">
+        <div className="overflow-x-auto rounded-xl border border-white/[0.06]">
           <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-[#050809] text-slate-400 uppercase text-[10px] font-semibold border-b border-emerald-950">
+            <thead className="bg-[#050507] text-neutral-500 uppercase text-[10px] tracking-wider border-b border-white/[0.06]">
               <tr>
-                <th className="py-3 px-4">Model & Architecture</th>
-                <th className="py-3 px-3">Role Status</th>
-                <th className="py-3 px-3 text-right">Holdout Sample</th>
+                <th className="py-3 px-4">Model</th>
+                <th className="py-3 px-3">Status</th>
+                <th className="py-3 px-3 text-right">Holdout Matches</th>
                 <th className="py-3 px-3 text-right">Brier Score</th>
                 <th className="py-3 px-3 text-right">Log Loss</th>
                 <th className="py-3 px-3 text-right">ECE</th>
-                <th className="py-3 px-3 text-right">Historical ROI</th>
+                <th className="py-3 px-3 text-right">Yield</th>
                 <th className="py-3 px-4">Promotion Criteria</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-emerald-950/60 text-slate-200">
+            <tbody className="divide-y divide-white/[0.04] text-neutral-300">
               {MODELS.map((m) => (
-                <tr key={m.name} className="hover:bg-[#10191c]/60 transition">
+                <tr key={m.name} className="hover:bg-white/[0.02] transition-colors">
                   <td className="py-3.5 px-4 font-sans">
-                    <div className="font-extrabold text-white text-sm font-mono">{m.name}</div>
-                    <div className="text-[11px] text-slate-400">{m.type}</div>
+                    <div className="font-semibold text-white text-[13px]">{m.name}</div>
+                    <div className="text-[11px] text-neutral-500">{m.type}</div>
                   </td>
                   <td className="py-3.5 px-3">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono border ${m.statusColor}`}>
+                    <span
+                      className={`px-2 py-0.5 rounded text-[10px] font-mono tracking-wide ${
+                        m.status === 'CHAMPION'
+                          ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/60'
+                          : m.status === 'CHALLENGER'
+                          ? 'bg-amber-950/80 text-amber-300 border border-amber-800/60'
+                          : 'bg-neutral-900 text-neutral-400 border border-neutral-800'
+                      }`}
+                    >
                       {m.status}
                     </span>
                   </td>
-                  <td className="py-3.5 px-3 text-right text-slate-300">
-                    {m.sampleSize} matches
-                  </td>
-                  <td className="py-3.5 px-3 text-right font-black text-emerald-400">
-                    {m.brier.toFixed(3)}
-                  </td>
-                  <td className="py-3.5 px-3 text-right text-slate-200">
-                    {m.logLoss.toFixed(3)}
-                  </td>
-                  <td className="py-3.5 px-3 text-right font-bold text-amber-300">
-                    {m.ece}
-                  </td>
-                  <td className="py-3.5 px-3 text-right font-black text-emerald-400">
-                    {m.roi}
-                  </td>
-                  <td className="py-3.5 px-4 text-[11px] text-slate-400 max-w-sm font-sans">
-                    {m.notes}
-                  </td>
+                  <td className="py-3.5 px-3 text-right text-neutral-400">{m.sampleSize}</td>
+                  <td className="py-3.5 px-3 text-right text-emerald-400 font-medium">{m.brier.toFixed(3)}</td>
+                  <td className="py-3.5 px-3 text-right text-white">{m.logLoss.toFixed(3)}</td>
+                  <td className="py-3.5 px-3 text-right text-[#d4af37]">{m.ece}</td>
+                  <td className="py-3.5 px-3 text-right text-emerald-400 font-medium">{m.roi}</td>
+                  <td className="py-3.5 px-4 text-[11px] text-neutral-500 font-sans max-w-sm">{m.notes}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* Error Taxonomy Section */}
-      <div className="bg-gradient-to-b from-[#0c1417] to-[#090f11] border border-emerald-950/90 rounded-2xl p-6 shadow-xl space-y-4">
-        <div className="border-b border-emerald-950/80 pb-3">
-          <h2 className="text-lg font-bold text-white tracking-wide flex items-center gap-2">
-            <span className="text-amber-400">❖</span> Automated Error Taxonomy (Post-Match Diagnostics)
-          </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Every unsettled or missed prediction is programmatically classified into measurable error types — never invented by LLMs.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {ERROR_TAXONOMY.map((e) => (
-            <div key={e.category} className="bg-[#060a0b] border border-emerald-950/80 rounded-xl p-3.5">
-              <div className="flex items-center justify-between text-xs mb-1.5 font-mono">
-                <span className="font-bold text-slate-200">{e.category}</span>
-                <span className="font-extrabold text-amber-400">{e.pct}%</span>
-              </div>
-              <div className="w-full bg-[#111c1e] h-1 rounded-full overflow-hidden mb-2">
-                <div className="bg-gradient-to-r from-amber-400 to-emerald-400 h-full rounded-full" style={{ width: `${e.pct}%` }}></div>
-              </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed font-sans">{e.desc}</p>
-            </div>
-          ))}
         </div>
       </div>
     </div>

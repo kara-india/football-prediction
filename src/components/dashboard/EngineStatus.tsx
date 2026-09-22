@@ -16,7 +16,6 @@ export default function EngineStatus() {
         setEngineEnabled(target)
       }
     } catch {
-      // Fallback local toggle
       setEngineEnabled(target)
     } finally {
       setLoading(false)
@@ -24,27 +23,23 @@ export default function EngineStatus() {
   }
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#0d1618] border border-emerald-950/80 text-xs font-mono shadow-md">
-        <span className="text-slate-400 font-medium">Engine:</span>
-        <button
-          onClick={toggleEngine}
-          disabled={loading}
-          className={`flex items-center gap-1.5 font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg text-[10px] transition ${
-            engineEnabled
-              ? 'bg-emerald-950 text-emerald-300 border border-emerald-600 shadow-[0_0_12px_rgba(16,185,129,0.3)]'
-              : 'bg-[#182326] text-slate-300 hover:text-white border border-slate-700/60'
+    <div className="flex items-center gap-2">
+      <button
+        onClick={toggleEngine}
+        disabled={loading}
+        className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] text-[11px] font-mono transition-colors disabled:opacity-50"
+      >
+        <span
+          className={`w-1.5 h-1.5 rounded-full transition-colors ${
+            engineEnabled ? 'bg-emerald-400' : 'bg-neutral-600'
           }`}
-        >
-          <span className={`w-1.5 h-1.5 rounded-full ${engineEnabled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`}></span>
-          {engineEnabled ? 'ACTIVE (ON)' : 'STANDBY (OFF)'}
-        </button>
-      </div>
-
-      <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/30 text-[11px] text-amber-300 font-mono shadow-sm">
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-        <span>Target: <strong className="text-amber-200 font-bold">1xBet</strong></span>
-      </div>
+        ></span>
+        <span className="text-neutral-400">
+          Engine: <strong className={engineEnabled ? 'text-emerald-400' : 'text-neutral-300'}>
+            {engineEnabled ? 'Active' : 'Standby'}
+          </strong>
+        </span>
+      </button>
     </div>
   )
 }
