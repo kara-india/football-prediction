@@ -1,3 +1,45 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --color-gold-400: #fbbf24;
+  --color-gold-500: #f59e0b;
+  --color-emerald-400: #34d399;
+  --color-emerald-500: #10b981;
+}
+
+body {
+  background-color: #080d0e;
+  color: #e2e8f0;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+/* Subtle quant terminal glow effects */
+.glow-emerald {
+  box-shadow: 0 0 15px -3px rgba(16, 185, 129, 0.25);
+}
+
+.glow-gold {
+  box-shadow: 0 0 15px -3px rgba(245, 158, 11, 0.25);
+}
+
+.glow-gold-sm {
+  box-shadow: 0 0 8px -1px rgba(245, 158, 11, 0.35);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #080d0e;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e2c2f;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #2b4146;
+}
