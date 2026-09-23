@@ -244,15 +244,21 @@ class ModelComparator:
         champ_clv = 0.0
         chal_clv = 0.0
         if odds_prediction is not None and odds_closing is not None:
+            # CLV is an auxiliary market-quality metric. The comparison cannot
+            # claim challenger-vs-champion CLV improvement when both models are
+            # evaluated against the same price series.
             chal_clv = self.metrics.closing_line_value(odds_prediction, odds_closing)
-            champ_clv = chal_clv  # when evaluating on same market lines
-
-        if chal_clv >= 0.0 or chal_clv >= champ_clv - 0.005:
-            criteria_met["clv_non_negative"] = True
+            champ_clv = chal_clv
+            criteria_met["clv_non_negative"] = chal_clv >= 0.0
+            if not criteria_met["clv_non_negative"]:
+                reasons.append(
+                    f"REJECT: Observed Closing Line Value ({chal_clv:.4f}) is negative."
+                )
         else:
-            reasons.append(
-                f"REJECT: Challenger Closing Line Value ({chal_clv:.4f}) is negative and degraded."
-            )
+            # No contemporaneous closing price means CLV is unobserved; never
+            # manufacture zero or infer it from another model.
+            criteria_met["clv_non_negative"] = True
+            reasons.append("INFO: CLV not evaluated because prediction/closing odds were unavailable.")
 
         # Final Promotion Gate Decision
         all_passed = (
