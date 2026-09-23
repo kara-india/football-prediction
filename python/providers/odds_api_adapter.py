@@ -48,5 +48,5 @@ class OddsAPIAdapter(OddsProvider):
             last_success=datetime.datetime.now(datetime.timezone.utc),
             last_error=None,
             supported_markets=["1x2"],
-            is_1xbet_confirmed=True
+            is_1xbet_confirmed=bool(os.environ.get("CONFIRM_1XBET_FEED", False))
         )
