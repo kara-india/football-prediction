@@ -236,26 +236,51 @@ class WalkForwardValidator:
                 cal_test_probs = np.clip(np.asarray(raw_test_probs, dtype=float), 0.001, 0.999)
 
             y_test = test_df[target_col].values
-            odds_test = test_df[odds_col].values if (odds_col and odds_col in test_df.columns) else np.full(len(y_test), 2.0)
-            close_odds_test = test_df[closing_odds_col].values if (closing_odds_col and closing_odds_col in test_df.columns) else odds_test
 
-            # 4. Settle test predictions
+            # Betting/CLV metrics require observed odds. Never substitute a
+            # synthetic price (for example 2.0) when odds are missing.
+            odds_available = bool(odds_col and odds_col in test_df.columns)
+            if odds_available:
+                odds_series = pd.to_numeric(test_df[odds_col], errors="coerce")
+                valid_odds_mask = odds_series.notna() & (odds_series > 1.0)
+                odds_test = odds_series.to_numpy(dtype=float)
+            else:
+                valid_odds_mask = np.zeros(len(test_df), dtype=bool)
+                odds_test = np.full(len(y_test), np.nan)
+
+            if closing_odds_col and closing_odds_col in test_df.columns:
+                close_series = pd.to_numeric(test_df[closing_odds_col], errors="coerce")
+                close_odds_test = close_series.to_numpy(dtype=float)
+            else:
+                close_odds_test = np.full(len(y_test), np.nan)
+
             pnl_fold = []
-            for y_val, prob, o_val in zip(y_test, cal_test_probs, odds_test):
-                # Flat 1.0 unit stake if EV > 0 or model predicts positive class
+            valid_close_pred = []
+            valid_close_odds = []
+            for idx, (y_val, prob, o_val) in enumerate(zip(y_test, cal_test_probs, odds_test)):
+                if not valid_odds_mask[idx]:
+                    continue
                 ev = (prob * o_val) - 1.0
-                if prob >= 0.5 or ev > 0.0:
+                if ev > 0.0:
                     won = (y_val == 1) or (y_val is True)
                     pnl_fold.append((o_val - 1.0) if won else -1.0)
-                else:
-                    pnl_fold.append(0.0)
+                    if np.isfinite(close_odds_test[idx]) and close_odds_test[idx] > 1.0:
+                        valid_close_pred.append(o_val)
+                        valid_close_odds.append(close_odds_test[idx])
 
             # Compute empirical metrics on this test fold
             bs = self.metrics_engine.brier_score(y_test, cal_test_probs)
             ll = self.metrics_engine.log_loss(y_test, cal_test_probs)
             ece = self.metrics_engine.expected_calibration_error(y_test, cal_test_probs)
-            roi = self.metrics_engine.flat_staking_roi(pnl_fold)
-            clv = self.metrics_engine.closing_line_value(odds_test, close_odds_test)
+            roi = self.metrics_engine.flat_staking_roi(pnl_fold) if pnl_fold else None
+            clv = (
+                self.metrics_engine.closing_line_value(
+                    np.asarray(valid_close_pred, dtype=float),
+                    np.asarray(valid_close_odds, dtype=float),
+                )
+                if valid_close_pred
+                else None
+            )
             dd = self.metrics_engine.maximum_drawdown(pnl_fold)
 
             fold_record = {
@@ -266,8 +291,8 @@ class WalkForwardValidator:
                 "brier_score": round(bs, 6),
                 "log_loss": round(ll, 6),
                 "ece": round(ece, 6),
-                "roi": round(roi, 6),
-                "clv": round(clv, 6),
+                "roi": round(roi, 6) if roi is not None else None,
+                "clv": round(clv, 6) if clv is not None else None,
                 "max_drawdown_units": dd["max_drawdown_units"],
                 "pnl": round(float(np.sum(pnl_fold)), 4),
             }
@@ -276,7 +301,8 @@ class WalkForwardValidator:
             all_y_true.extend(y_test)
             all_y_prob.extend(cal_test_probs)
             all_pnl.extend(pnl_fold)
-            all_clv.append(clv)
+            if clv is not None:
+                all_clv.append(clv)
 
         if not fold_summaries:
             return {
@@ -310,8 +336,8 @@ class WalkForwardValidator:
             "mean_log_loss": round(float(np.mean(log_losses)), 6),
             "std_log_loss": round(float(np.std(log_losses)), 6),
             "mean_ece": round(float(np.mean(eces)), 6),
-            "overall_roi": round(float(self.metrics_engine.flat_staking_roi(arr_pnl)), 6),
-            "mean_clv": round(float(np.mean(all_clv)), 6),
+            "overall_roi": round(float(self.metrics_engine.flat_staking_roi(arr_pnl)), 6) if len(arr_pnl) > 0 else None,
+            "mean_clv": round(float(np.mean(all_clv)), 6) if all_clv else None,
             "max_drawdown_units": overall_dd["max_drawdown_units"],
             "max_drawdown_pct": overall_dd["max_drawdown_pct"],
             "total_predictions": len(arr_y_true),
@@ -403,42 +429,16 @@ class WalkForwardValidator:
                 "details": cmp_result.to_dict(),
             }
 
-        # Fallback when raw predictions are not preserved: evaluate summary metrics
-        brier_champ = champion_metrics.get("mean_brier", 0.25)
-        brier_chal = challenger_metrics.get("mean_brier", 0.25)
-        ece_champ = champion_metrics.get("mean_ece", 0.05)
-        ece_chal = challenger_metrics.get("mean_ece", 0.05)
-        clv_chal = challenger_metrics.get("mean_clv", 0.0)
-
-        sample_size = challenger_metrics.get("total_predictions", 0)
-
-        reasons = []
-        promote = True
-        if sample_size < 100:
-            promote = False
-            reasons.append(f"INSUFFICIENT_DATA: Sample size N={sample_size} < 100.")
-        if brier_chal >= brier_champ:
-            promote = False
-            reasons.append(f"REJECT: Challenger Brier ({brier_chal:.4f}) >= Champion ({brier_champ:.4f}).")
-        if ece_chal > ece_champ * 1.05:
-            promote = False
-            reasons.append(f"REJECT: Challenger ECE ({ece_chal:.4f}) exceeds threshold.")
-        if clv_chal < 0.0:
-            promote = False
-            reasons.append(f"REJECT: Challenger CLV ({clv_chal:.4f}) is negative.")
-
-        recommendation = "PROMOTE" if promote else ("INSUFFICIENT_DATA" if sample_size < 100 else "REJECT")
-        winner = "challenger" if promote else "champion"
-        p_val = 0.03 if promote else 0.50
-
+        # Without paired out-of-sample predictions, a model comparison cannot
+        # calculate a valid statistical test. Never fabricate a p-value or winner.
+        sample_size = int(challenger_metrics.get("total_predictions", 0))
         return {
-            "winner": winner,
-            "recommendation": recommendation,
-            "p_value": p_val,
+            "winner": None,
+            "recommendation": "INSUFFICIENT_DATA",
+            "p_value": None,
             "details": {
-                "champion_brier": brier_champ,
-                "challenger_brier": brier_chal,
-                "reasons": reasons,
+                "sample_size": sample_size,
+                "reason": "Paired raw out-of-sample predictions are required for objective model comparison.",
             },
         }
 
