@@ -5,8 +5,17 @@ import { canMakeAPIRequest, recordAPIRequest } from '@/lib/quotaGuard'
 // 30-minute disk cache for upcoming fixtures (0 calls if refreshed within 30 min)
 const CACHE_TTL_MS = 30 * 60 * 1000
 const CACHE_KEY = 'upcoming_fixtures_cache'
+const TERMINAL_STATUSES = new Set(['FT', 'AET', 'PEN', 'PST', 'CANC', 'ABD', 'AWD', 'WO'])
 
 const ALLOWED_LEAGUES = new Set([39, 71, 135, 140, 78, 61, 94, 88, 128, 144, 2, 3, 1, 4, 5, 9, 6, 7, 10])
+
+
+function isActuallyUpcoming(m: any, nowMs = Date.now()): boolean {
+  const kickoffMs = new Date(m?.kickoff).getTime()
+  return Number.isFinite(kickoffMs) &&
+    kickoffMs > nowMs &&
+    !TERMINAL_STATUSES.has(m?.status)
+}
 
 function isEligibleFixture(m: any): boolean {
   const leagueId = m.league?.id
@@ -28,7 +37,8 @@ export async function GET() {
   // 1. Check persistent disk cache first (Zero API calls if fresh within 30 mins)
   const cached = getDiskCache<any[]>(CACHE_KEY, CACHE_TTL_MS)
   if (cached && cached.length > 0) {
-    return NextResponse.json(cached)
+    const upcomingCached = cached.filter((m) => isActuallyUpcoming(m))
+    return NextResponse.json(upcomingCached)
   }
 
   // 2. Strict Quota Guard check (Max 45 automated worker requests/day)
@@ -36,7 +46,7 @@ export async function GET() {
   if (!quotaCheck.allowed) {
     console.warn('[QUOTA GUARD UPCOMING]', quotaCheck.reason)
     const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)
-    return NextResponse.json(stale || [])
+    return NextResponse.json((stale || []).filter((m: any) => isActuallyUpcoming(m)))
   }
 
   const API_KEY = process.env.API_FOOTBALL_KEY;
@@ -53,18 +63,20 @@ export async function GET() {
     const today = nowUtc.toISOString().split('T')[0]
     const tomorrow = new Date(nowUtc.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-    // Query tomorrow or today - exactly 1 bulk request to conserve quota
-    const queryDate = tomorrow // Sept 23 has the upcoming senior international friendlies
-    const res = await fetch(`https://v3.football.api-sports.io/fixtures?date=${queryDate}`, {
+    // One bulk request covering today + tomorrow. API-Football supports from/to
+    // fixture ranges, so we can avoid the old tomorrow-only window.
+    const query = `from=${today}&to=${tomorrow}`
+    const res = await fetch(`https://v3.football.api-sports.io/fixtures?${query}`, {
       headers
     })
-    recordAPIRequest(`/fixtures?date=${queryDate}`)
+    recordAPIRequest(`/fixtures?${query}`)
 
     const json = await res.json()
     const fixtures = json.response || []
 
     const eligible = fixtures
       .filter((f: any) => isEligibleFixture(f) && (f.fixture.status.short === 'NS' || f.fixture.status.short === 'TBD'))
+      .filter((f: any) => new Date(f.fixture.date).getTime() > nowUtc.getTime())
       .slice(0, 50) // Cap to top 50 matches max per user directive
 
     const formatted = eligible.map((m: any) => {
@@ -113,10 +125,11 @@ export async function GET() {
       }
     })
 
-    // Store in disk cache
-    setDiskCache(CACHE_KEY, formatted)
+    // Store only future, non-terminal fixtures in the cache.
+    const upcomingOnly = formatted.filter((m: any) => isActuallyUpcoming(m, nowUtc.getTime()))
+    setDiskCache(CACHE_KEY, upcomingOnly)
 
-    return NextResponse.json(formatted)
+    return NextResponse.json(upcomingOnly)
   } catch (error: any) {
     console.error('Failed to fetch upcoming matches:', error)
     const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)
