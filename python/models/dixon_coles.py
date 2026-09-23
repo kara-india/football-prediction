@@ -227,15 +227,34 @@ class DixonColesModel:
 
         best_xi = self.xi
         best_ll = float("inf")
+        best_state: Optional[Dict[str, Any]] = None
 
         for candidate_xi in xi_grid:
             self.fit(matches, xi=candidate_xi, max_iter=60)
             ll = self.metrics.get("final_neg_log_lik", float("inf"))
-            if ll < best_ll:
+            if np.isfinite(ll) && ll < best_ll:
                 best_ll = ll
                 best_xi = candidate_xi
+                best_state = {
+                    "attack_params": dict(self.attack_params),
+                    "defense_params": dict(self.defense_params),
+                    "home_advantage": float(self.home_advantage),
+                    "rho": float(self.rho),
+                    "teams": list(self.teams),
+                    "metrics": dict(self.metrics),
+                    "fitted": bool(self.fitted),
+                }
 
-        self.xi = best_xi
+        if best_state is not None:
+            self.xi = best_xi
+            self.attack_params = best_state["attack_params"]
+            self.defense_params = best_state["defense_params"]
+            self.home_advantage = best_state["home_advantage"]
+            self.rho = best_state["rho"]
+            self.teams = best_state["teams"]
+            self.metrics = best_state["metrics"]
+            self.fitted = best_state["fitted"]
+
         return best_xi
 
     def predict_score_matrix(self, home_id: Any, away_id: Any, max_goals: int = 10) -> np.ndarray:
