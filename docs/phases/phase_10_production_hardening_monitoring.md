@@ -50,9 +50,9 @@ Harden the production infrastructure against data growth, race conditions, and u
   3. Verify health endpoint returns 200 OK and contains no secret strings.
 
 ## 8. Acceptance Criteria
-- [ ] Database storage usage remains stabilized below Supabase 500 MB free quota limit.
-- [ ] Idempotency prevents duplicate predictions, bets, and settlements.
-- [ ] Health endpoint reports database status, remaining quota, and worker timestamps securely.
+- [x] Database storage usage remains stabilized below Supabase 500 MB free quota limit.
+- [x] Idempotency prevents duplicate predictions, bets, and settlements.
+- [x] Health endpoint reports database status, remaining quota, and worker timestamps securely.
 
 ## 9. Deployment Method & Automated Actions
 - **Automated by Claude**:

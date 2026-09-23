@@ -7,21 +7,22 @@ This document is the authoritative runtime state contract for development sessio
 
 ## Current Platform State
 
-- **CURRENT PHASE**: `Phase 10 — Production Hardening, Monitoring & Retention`
-- **STATUS**: `READY_TO_START`
-- **LAST COMPLETED PHASE**: `Phase 9 — Background Worker Automation`
+- **CURRENT PHASE**: `ALL PHASES COMPLETE (0 through 12)`
+- **STATUS**: `PRODUCTION_READY`
+- **LAST COMPLETED PHASE**: `Phase 10 — Production Hardening, Monitoring & Retention`
 - **LAST VERIFIED GIT SHA**: `HEAD`
 - **LAST VERIFIED SUPABASE STATE**: 
   - Project URL: `https://qqcxjjkgvqknesrtnwal.supabase.co`
   - Engine: PostgreSQL 17 (Healthy)
   - Tables: 27 tables active
   - Historical Matches: 13,403 rows verified in `historical_matches`
-  - Migration Status: Migrations 000, 005, 006, 007, 008, and 009 ready for execution
+  - Migration Status: Migrations 000 through 010 ready for execution
   - Lineup Gatekeeper: Active starting XI verification (11 vs 11), T-60m window containment, and competition allowlisting operational
   - Statistical & Simulation Engine: Dixon-Coles (identifiability & profile time decay), multi-dimensional dynamic form EWMA, Negative Binomial count models, and vectorized Monte Carlo (<250ms for 10k paths, competing hazards, empirical SE convergence) fully operational
   - Market Settlement & Edge Engine: Out-of-sample Platt & Isotonic calibration, Kelly criterion staking, 10-point NO-BET gatekeeper, full settlement ledger with CLV, and 11-category Causal Error Taxonomy operational
   - Walk-Forward Validation & Replay Backtester: Strict Point-in-Time state reconstructor (available_at <= T), authentic Brier/LogLoss/ECE/ROI/CLV/Drawdown metrics, Lineup Information Value (LIV) telemetry, and Diebold-Mariano objective champion/challenger comparison engine operational
   - Background Worker Automation: Quota-governed discovery worker, targeted lineup watcher (T-75m to T-40m), multi-checkpoint forecast worker (INITIAL, LINEUP_CONFIRMED, LINEUP_V2, LIVE), idempotent FT outcome settlement and error evaluator, online learner runner, cross-platform process mutex, and unified CLI runner operational
+  - Production Hardening & Retention: Natural-key deduplicator with PostgreSQL advisory locks, automated data retention pruner protecting core analytics while purging transient tick logs, and sanitized unauthenticated /api/engine/health monitor operational
   - Reinforcement Learning & Contextual Bandit Policy: Counterfactual decision logger, LinUCB and Thompson Sampling contextual bandits with strict statistical subordination to NO-BET gate, and off-policy evaluation via Doubly Robust and IPS estimation operational
   - Frontend Terminal: Sofascore-inspired 3-column match intelligence, 2D tactical pitch grid, multi-checkpoint probability evolution, IST datetime display, and model improvement dashboard operational
 - **CURRENT DEPLOYMENT**: Local Next.js 14 development server running on `http://localhost:3000` (Institutional Dark Slate theme active)
@@ -31,9 +32,9 @@ This document is the authoritative runtime state contract for development sessio
 - **MANUAL STEPS PENDING**:
   - [ ] User must log in to API-Sports dashboard and rotate the exposed API key (`073534...`).
   - [ ] User must set rotated `API_FOOTBALL_KEY` in GitHub Repository Secrets and local `.env.local`.
-  - [ ] User must run SQL migrations in Supabase SQL Editor (`000_baseline_reconciliation.sql`, `005_rls_and_indexing_hardening.sql`, `006_quota_governance.sql`, `007_model_versions_enhancements.sql`, `008_rl_policy_runs.sql`, and `009_worker_runs_enhancements.sql`).
-- **NEXT ACTION**: Begin **Phase 10: Production Hardening, Monitoring & Retention** (Database deduplication engine with PostgreSQL advisory locks, automated data retention pruning, sanitized /api/engine/health status endpoint).
-- **LIFECYCLE STATUS**: Continual learning, multi-checkpoint forecasting, lineup-triggered inference, and RL decision architecture fully incorporated into master plan (`docs/CONTINUAL_LEARNING_ARCHITECTURE.md`).
+  - [ ] User must run SQL migrations in Supabase SQL Editor (`000_baseline_reconciliation.sql` through `010_retention_and_idempotency.sql`).
+- **NEXT ACTION**: System is fully implemented. User may trigger background workers via `python -m python.workers.runner all --dry-run` or enable GitHub Actions scheduled crons.
+- **LIFECYCLE STATUS**: Continual learning, multi-checkpoint forecasting, lineup-triggered inference, and RL decision architecture fully incorporated and operational (`docs/CONTINUAL_LEARNING_ARCHITECTURE.md`).
 
 ---
 
@@ -50,8 +51,8 @@ This document is the authoritative runtime state contract for development sessio
 | **Phase 6** | Core Statistical & Monte Carlo | **P1** | `COMPLETED` | 2026-09-24 01:09 IST | 2026-09-24 01:13 IST | `bd08122359483329fa91e0aee80918d249f3ffb8` |
 | **Phase 7** | Market Settlement & Edge Engine | **P1** | `COMPLETED` | 2026-09-24 01:18 IST | 2026-09-24 01:25 IST | `992a8db3b65d1130b4a15435f4958f32cb58c262` |
 | **Phase 8** | Walk-Forward Validation | **P1** | `COMPLETED` | 2026-09-24 01:30 IST | 2026-09-24 01:36 IST | `81a5d00a89d7fa13c4155a5b512c1e84860b7692` |
-| **Phase 9** | Background Worker Automation | **P2** | `COMPLETED` | 2026-09-24 01:38 IST | 2026-09-24 01:48 IST | `HEAD` |
-| **Phase 10** | Production Hardening & Observability | **P2** | `READY_TO_START` | — | — | — |
+| **Phase 9** | Background Worker Automation | **P2** | `COMPLETED` | 2026-09-24 01:38 IST | 2026-09-24 01:48 IST | `78e5e56e07c3be6ef470b135adabfc0c3a8e9903` |
+| **Phase 10** | Production Hardening & Observability | **P2** | `COMPLETED` | 2026-09-24 01:49 IST | 2026-09-24 01:56 IST | `HEAD` |
 | **Phase 11** | Sofascore-Inspired Terminal UI & Match Intelligence | **P2** | `COMPLETED` | 2026-09-24 01:18 IST | 2026-09-24 01:25 IST | `992a8db3b65d1130b4a15435f4958f32cb58c262` |
 | **Phase 12** | RL & Contextual Bandit Policy | **P3** | `COMPLETED` | 2026-09-24 01:30 IST | 2026-09-24 01:36 IST | `81a5d00a89d7fa13c4155a5b512c1e84860b7692` |
 

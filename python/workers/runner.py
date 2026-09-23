@@ -30,6 +30,7 @@ from python.workers.analysis_worker import AnalysisWorker
 from python.workers.evaluator_worker import EvaluatorWorker
 from python.workers.learner_worker import LearnerWorker
 from python.workers.live_state_worker import LiveStateWorker
+from python.workers.retention_pruner import RetentionPruner
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("WorkerRunner")
@@ -116,7 +117,7 @@ class WorkerMutex:
 class WorkerRunner:
     """Unified orchestrator running background jobs with process locking and DB logging."""
 
-    VALID_JOBS = ("discovery", "lineups", "analysis", "evaluator", "learner", "live", "all")
+    VALID_JOBS = ("discovery", "lineups", "analysis", "evaluator", "learner", "live", "prune", "all")
 
     def __init__(
         self,
@@ -293,6 +294,16 @@ class WorkerRunner:
                     predictions_count = res.get("snapshots_generated", 0)
                     status = res.get("status", "success")
 
+                elif norm_job == "prune":
+                    worker = RetentionPruner(
+                        supabase_url=self.supabase_url,
+                        supabase_key=self.supabase_key,
+                    )
+                    res = worker.run(dry_run=dry_run)
+                    matches_analyzed = res.get("total_pruned", 0)
+                    matches_seen = matches_analyzed
+                    status = res.get("status", "success")
+
             except Exception as e:
                 logger.error(f"Worker '{norm_job}' encountered unhandled exception: {e}")
                 status = "failed"
@@ -329,7 +340,7 @@ def build_cli_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "job",
         choices=WorkerRunner.VALID_JOBS,
-        help="Worker job name to execute: discovery, lineups, analysis, evaluator, learner, live, all",
+        help="Worker job name to execute: discovery, lineups, analysis, evaluator, learner, live, prune, all",
     )
     parser.add_argument(
         "--dry-run",

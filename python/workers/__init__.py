@@ -8,6 +8,7 @@ from .analysis_worker import AnalysisWorker
 from .evaluator_worker import EvaluatorWorker, run_evaluator_worker
 from .learner_worker import LearnerWorker, run_learner_worker
 from .live_state_worker import LiveStateWorker, run_live_worker
+from .retention_pruner import RetentionPruner, run_retention_pruner
 from .runner import WorkerRunner, WorkerMutex, WorkerLockedError
 
 __all__ = [
@@ -22,6 +23,8 @@ __all__ = [
     "run_learner_worker",
     "LiveStateWorker",
     "run_live_worker",
+    "RetentionPruner",
+    "run_retention_pruner",
     "WorkerRunner",
     "WorkerMutex",
     "WorkerLockedError",
