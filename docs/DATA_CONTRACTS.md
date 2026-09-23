@@ -206,5 +206,118 @@ class CanonicalSettlement:
     closing_odds_1xbet: Optional[float]
     clv: Optional[float]               # (odds_at_prediction / closing_odds_1xbet) - 1.0
     profit_loss: float                 # Calculated on 1.0 unit flat stake
-    error_classification: Optional[str]# E.g., "MODEL_OVERCONFIDENCE", "RANDOM_VARIANCE"
+    error_classification: Optional[str]# One of 11 standard error taxonomy categories
+
+### 5.2 `CanonicalPredictionCheckpoint`
+Immutable prediction ledger snapshot representing a distinct forecast milestone.
+```python
+from enum import Enum
+
+class PredictionStage(str, Enum):
+    INITIAL = "INITIAL"                      # T-48h early forecast
+    LINEUP_CONFIRMED = "LINEUP_CONFIRMED"    # T-60m official XI forecast
+    LINEUP_V2 = "LINEUP_V2"                  # Late revision snapshot
+    FINAL_PREMATCH = "FINAL_PREMATCH"        # T-5m closing market snapshot
+    LIVE = "LIVE"                            # In-play continuous snapshot
+
+@dataclass(frozen=True)
+class CanonicalPredictionCheckpoint:
+    prediction_id: str
+    match_id: str
+    prediction_stage: PredictionStage
+    prediction_timestamp: datetime
+    prediction_generated_at: datetime
+    model_version: str
+    calibration_version: str
+    feature_version: str
+    dataset_version: str
+    market: str
+    selection: str
+    line: Optional[float]
+    raw_probability: float
+    calibrated_probability: float
+    prob_lower_bound: float
+    prob_upper_bound: float
+    odds_1xbet: Optional[float]
+    implied_probability: Optional[float]
+    fair_probability: Optional[float]
+    edge: Optional[float]
+    ev: Optional[float]
+    simulation_version: str
+    simulation_count: int
+    simulation_error: float
+    lineup_version: int
+    lineup_available_at: Optional[datetime]
+    lineup_quality: str                # "VERIFIED_11_VS_11", "ESTIMATED", "UNKNOWN"
+    source_freshness_seconds: int
+    source_quality_score: float
+    source_conflicts: list[str]
+    decision: str                      # "BET", "NO_BET", "ABSTAIN"
+    decision_reason: str
+    git_sha: str
+```
+
+### 5.3 `CanonicalForecastError`
+Outcome evaluation and causal error classification record generated post-settlement.
+```python
+class ErrorCategory(str, Enum):
+    TEAM_STRENGTH_MISS = "TEAM_STRENGTH_MISS"
+    LINEUP_MISASSESSMENT = "LINEUP_MISASSESSMENT"
+    PLAYER_PROJECTION_ERROR = "PLAYER_PROJECTION_ERROR"
+    TACTICAL_MISMATCH = "TACTICAL_MISMATCH"
+    LIVE_STATE_ERROR = "LIVE_STATE_ERROR"
+    ODDS_STALENESS = "ODDS_STALENESS"
+    SOURCE_CONFLICT = "SOURCE_CONFLICT"
+    DATA_MISSING = "DATA_MISSING"
+    CALIBRATION_ERROR = "CALIBRATION_ERROR"
+    PARAMETER_DRIFT = "PARAMETER_DRIFT"
+    RANDOM_VARIANCE = "RANDOM_VARIANCE"
+
+@dataclass(frozen=True)
+class CanonicalForecastError:
+    error_id: str
+    prediction_id: str
+    match_id: str
+    prediction_stage: PredictionStage
+    brier_contribution: float
+    log_loss_contribution: float
+    calibration_residual: float
+    goal_count_residual: float
+    scoreline_error: int               # Absolute goal difference error
+    ev_realization: float
+    clv: Optional[float]
+    primary_category: ErrorCategory
+    secondary_category: Optional[ErrorCategory]
+    evidence_notes: str
+```
+
+### 5.4 `CanonicalDecisionRecord` (RL & Contextual Bandit Dataset)
+Preserves every candidate decision opportunity (including ABSTAIN) for unbiased offline policy evaluation.
+```python
+@dataclass(frozen=True)
+class CanonicalDecisionRecord:
+    decision_id: str
+    match_id: str
+    timestamp: datetime
+    market: str
+    selection: str
+    line: Optional[float]
+    context_features: Dict[str, float]
+    model_probability: float
+    calibrated_probability: float
+    probability_interval: Tuple[float, float]
+    odds: float
+    fair_probability: float
+    edge: float
+    ev: float
+    data_quality_tier: str
+    lineup_state: str
+    available_actions: list[str]       # E.g. ["ABSTAIN", "BET"]
+    chosen_action: str
+    action_propensity: float           # P(chosen_action | context) for IPS/DR evaluation
+    actual_outcome: Optional[int]      # 1 (win) or 0 (loss)
+    realized_return: Optional[float]
+    counterfactual_return: Optional[float]
+    policy_version: str
+```
 ```

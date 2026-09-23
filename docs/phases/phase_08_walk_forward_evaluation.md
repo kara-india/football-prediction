@@ -23,7 +23,7 @@ Build a mathematically authentic historical replay backtester and walk-forward v
     - Advances window by step $\Delta = 1\text{ month}$.
   - Fits model on training fold, calibrates on validation fold, generates predictions on test fold.
   - Settles predictions against historical match outcomes.
-- **Task 8.3 [Authentic Metric Computation Engine]**: Create `python/backtesting/metrics_engine.py`:
+- **Task 8.3 [Authentic Metric Computation & LIV Engine]**: Create `python/backtesting/metrics_engine.py`:
   - Computes empirical out-of-sample metrics:
     - Multi-class and binary Brier Score: $\text{BS} = \frac{1}{N} \sum_{i=1}^N (p_i - y_i)^2$.
     - Logarithmic Loss: $-\frac{1}{N} \sum [y_i \ln p_i + (1-y_i) \ln(1-p_i)]$.
@@ -31,14 +31,28 @@ Build a mathematically authentic historical replay backtester and walk-forward v
     - Flat 1.0 unit staking ROI: $\frac{\text{Net Profit}}{\sum \text{Stakes}}$.
     - Closing Line Value (CLV): $\frac{o_{\text{prediction}}}{o_{\text{closing}}} - 1.0$.
     - Maximum Drawdown in units.
+  - **Lineup Information Value (LIV) Evaluation**:
+    - Pre-lineup vs post-lineup Brier score delta ($\text{LIV}_{\text{Brier}}$).
+    - Pre-lineup vs post-lineup Log-Loss delta ($\text{LIV}_{\text{LogLoss}}$).
+    - Market probability movement vs model probability movement after lineup release.
+    - Segmented by competition, market, and favorite/underdog status.
   - Zero hard-coded values permitted.
-- **Task 8.4 [Champion / Challenger Comparison]**: Create `python/backtesting/model_comparator.py`:
+- **Task 8.4 [Historical Lineup-Aware Replay & Prequential Runner]**:
+  - Replays historical match timelines using exact production feature code:
+    $\text{T-48h Initial} \to \text{T-60m Confirmed XI} \to \text{Lineup Prediction} \to \text{Kickoff} \to \text{FT Settlement} \to \text{Error Analysis}$.
+  - Strict prequential protocol: predict $(t) \to$ observe outcome $(t) \to$ update learner $\to$ predict $(t+1)$.
+  - If exact lineup publication timestamp is unverified, marks `lineup_availability_timestamp_quality = "UNKNOWN"` to prevent subtle temporal leakage.
+- **Task 8.5 [Champion / Challenger Comparison]**: Create `python/backtesting/model_comparator.py`:
   - Runs paired Diebold-Mariano and Wilcoxon signed-rank tests to assess statistical significance of Brier score improvements.
-  - Requires challenger to achieve lower Brier score and positive CLV across multiple folds before recommending promotion.
+  - Requires challenger to achieve lower Brier score, positive CLV, and stable ECE across multiple folds before recommending promotion.
 
-### Sequential Tasks (Follows 8.1 - 8.4)
-- **Task 8.5 [Strict No-Lookahead Replay Test]**: Execute an automated test asserting that injecting a future goal into match $M$ at minute 80 produces zero alteration in the model prediction generated at minute 20.
-- **Task 8.6 [3-Year Historical Replay Execution]**: Run a 36-month walk-forward backtest on the top 5 European leagues and log performance reports to Supabase `model_metrics`.
+### Sequential Tasks (Follows 8.1 - 8.5)
+- **Task 8.6 [Strict No-Lookahead Replay Test Suite]**: Execute automated tests asserting that:
+  - Lineups become visible strictly at or after verified publication timestamp.
+  - Post-match player stats are completely inaccessible to pre-match features.
+  - Final odds are inaccessible to earlier prediction checkpoints.
+  - Injected future events (e.g. 80' red card) produce 0.0000 alteration in 20' predictions.
+- **Task 8.7 [3-Year Historical Replay Execution]**: Run a 36-month walk-forward backtest on the top 5 European leagues and log performance reports and LIV metrics to Supabase `model_metrics`.
 
 ## 5. Files / Modules Affected
 - `python/backtesting/walk_forward.py`

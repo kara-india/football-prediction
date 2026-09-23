@@ -27,7 +27,8 @@ This document is the authoritative runtime state contract for development sessio
   - [ ] User must log in to API-Sports dashboard and rotate the exposed API key (`073534...`).
   - [ ] User must set rotated `API_FOOTBALL_KEY` in GitHub Repository Secrets and local `.env.local`.
   - [ ] User must run SQL migrations in Supabase SQL Editor (`000_baseline_reconciliation.sql`, `005_rls_and_indexing_hardening.sql`, `006_quota_governance.sql`, and `007_model_versions_enhancements.sql`).
-- **NEXT ACTION**: Begin **Phase 7: Market Settlement & Edge Engine** (Closing line devigging, true edge derivation, Kelly Criterion staking).
+- **NEXT ACTION**: Begin **Phase 7: Market Settlement & Edge Engine** (Closing line devigging, true edge derivation, Kelly Criterion staking, multi-checkpoint prediction ledger, outcome settlement, error taxonomy classification, and full candidate logging incorporated).
+- **LIFECYCLE STATUS**: Continual learning, multi-checkpoint forecasting, lineup-triggered inference, and RL decision architecture fully incorporated into master plan (`docs/CONTINUAL_LEARNING_ARCHITECTURE.md`).
 
 ---
 

@@ -30,23 +30,27 @@ Deliver the complete, production-grade Next.js frontend following the **Sofascor
     - *Column 3 (Live State)*: Elapsed minute, score, xG accumulation, shots on target, card intensity.
   - **Probability & Momentum Timeline**: Time-series showing in-play win probability drift ($0'$ to $90'$).
   - **Analytical Drill-Down Tabs**: Overview, Model & De-vig, Live State & Hazards, Odds History, Lineups (Pitch Grid), Simulation, and Settlement Audit.
-- **Task 11.3 [Model Transparency Card]**: Create `src/components/match/ModelTransparencyCard.tsx`:
-  - Decomposes every prediction into its exact components:
-    - Raw Simulation Probability & Path Count
-    - Model Version (`dixon_coles_v1.2`)
-    - Calibration Type (`Isotonic Regression v2.1`)
-    - Target Bookmaker Price (`1xBet 2.12`)
-    - Expected Value ($\text{EV} = p \cdot o - 1$)
-    - Standard NO-BET Failure Codes (`EDGE_BELOW_THRESHOLD`, `LINEUP_UNCONFIRMED`, `ODDS_STALE`)
-- **Task 11.4 [Dashboard & Watchlist Terminal]**: Rewrite `src/app/page.tsx`:
+- **Task 11.3 [Multi-Checkpoint & Lineup Delta Card]**: Create `src/components/match/MultiCheckpointTimeline.tsx`:
+  - Visualizes the full prediction lifecycle across milestones:
+    - *Initial Analysis* (T-48h): Base model probabilities and initial market comparison.
+    - *Lineup Confirmed* (T-60m): Post-lineup model probabilities, starting XI ratings, and probability delta ($\Delta p$).
+    - *Current Pre-Match* (T-5m): Final model probabilities, closing odds, EV, and decision.
+    - *Post-Match Settlement*: Actual score, settlement result, forecast error magnitude, and error taxonomy classification.
+  - Transparently highlights Lineup Information Value: displays whether lineup arrival shifted probability toward or away from market.
+- **Task 11.4 [Model Improvement & Learning Dashboard]**: Create `src/app/models/page.tsx`:
+  - **Champion vs Challenger Matrix**: Live comparison of active champion vs experimental challengers on rolling out-of-sample holdouts (Brier, LogLoss, ECE, CLV).
+  - **Lineup Information Value (LIV) Telemetry**: Empirical accuracy before lineups vs after lineups segmented by competition and market.
+  - **Error Taxonomy Distribution**: Breakdown of settled prediction errors across the 11 standard causal categories.
+  - **Abstention Audit**: Demonstrates value preserved by NO-BET safety gates on volatile fixtures.
+- **Task 11.5 [Dashboard & Watchlist Terminal]**: Rewrite `src/app/page.tsx`:
   - Group matches by Sofascore-style league groupings with collapsible accordion headers.
   - Prioritize fixtures into: Live Matches, Priority Watchlist, Model Candidates, and Upcoming (T-60m).
   - Dynamic competition chips populated directly from Supabase `competitions` table.
-- **Task 11.5 [User-Budgeted On-Demand Refresh]**: Wire up the "Refresh Match Intelligence" action:
+- **Task 11.6 [User-Budgeted On-Demand Refresh]**: Wire up the "Refresh Match Intelligence" action:
   - Invokes `POST /api/matches/[id]/refresh`.
   - Atomically reserves 1 credit from the 50-request user pool via `reserve_api_quota(is_user=true)`.
   - If user budget exhausted, renders informative notice: *"Daily live refresh quota reached. Resets at 00:00 UTC."*
-- **Task 11.6 [Component Replacement & Sanitization Audit]**:
+- **Task 11.7 [Component Replacement & Sanitization Audit]**:
   - Replace legacy stubbed components: `LiveStatePanel.tsx`, `OddsPanel.tsx`, `ModelPanel.tsx`, `MarketTable.tsx`, and `EngineStatus.tsx`.
   - Execute audit script `scripts/audit_ui_strings.py` to ensure zero hardcoded fake statistics or sportsbook betting cues exist.
 

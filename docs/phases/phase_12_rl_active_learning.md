@@ -13,20 +13,30 @@ Implement an advanced, safe Reinforcement Learning (Contextual Bandit) policy la
 ## 4. Exact Tasks
 
 ### Parallelizable Subtasks
-- **Task 12.1 [Counterfactual Logging Engine]**: Create `python/rl/counterfactual_logger.py`:
-  - When evaluating candidate bets, logs the context vector $X$ (market, league, team form, scoreline, odds range, Monte Carlo SE) along with the action taken ($a \in \{\text{BET}, \text{NO\_BET}\}$) and the propensities $P(a|X)$.
-  - Logs counterfactual candidate selections that were rejected by borderline thresholds to assess opportunity cost.
-- **Task 12.2 [Contextual Bandit Policy Learner]**: Create `python/rl/bandit_policy.py`:
-  - Implements a Linear or Neural Contextual Bandit (LinUCB / Thompson Sampling).
-  - Reward formulation:
-    $$R(a, y) = \begin{cases} \text{P\&L}_{\text{flat\_stake}} + \lambda \cdot \text{CLV}, & \text{if } a = \text{BET} \text{ and match settled} \\ 0.0, & \text{if } a = \text{NO\_BET} \end{cases}$$
-  - Enforces safety bounds: the policy cannot select $\text{BET}$ if $\text{EV} \le 0$ or if $\text{LineupConfirmed} = \text{False}$.
-- **Task 12.3 [Off-Policy Evaluation Engine (OPE)]**: Create `python/rl/off_policy_evaluator.py`:
-  - Implements Doubly Robust (DR) and Inverse Propensity Scoring (IPS) estimators to evaluate candidate policies without online capital risk.
-  - Measures expected policy return and policy variance relative to the baseline fixed 3% edge rule.
+- **Task 12.1 [Full Candidate Decision Dataset Logging]**: Create `python/rl/counterfactual_logger.py`:
+  - When evaluating candidate bets, logs **all eligible candidate decision opportunities** (including `ABSTAIN` and rejected candidates) to prevent selection bias in the learning dataset.
+  - For each opportunity, stores:
+    - Context vector $X$: market, competition, team form, scoreline, odds, uncertainty/SE.
+    - Probabilities: raw model probability, calibrated probability, probability interval.
+    - Market metrics: 1xBet odds, devigged fair probability, EV, value edge.
+    - Data quality tier and lineup verification state.
+    - Available actions, chosen action, and action propensity $P(a \mid X)$ (required for off-policy evaluation).
+    - Post-settlement: actual outcome, realized return, and counterfactual outcomes where valid.
+- **Task 12.2 [Contextual Bandit Decision Layer & Subordination]**: Create `python/rl/bandit_policy.py`:
+  - Implements a Contextual Bandit (LinUCB / Thompson Sampling) as a decision layer (action selection among `ABSTAIN` and market candidates), **not** as a replacement for the calibrated probability engine.
+  - **Strict Statistical Subordination**: If any data safety gate fails (`LINEUP_UNCONFIRMED`, `ODDS_STALE`, `INSUFFICIENT_DATA`, `HIGH_UNCERTAINTY`), the action space is restricted strictly to $a = \text{ABSTAIN}$.
+  - Controlled exploration: allows exploration in research/paper mode with recorded propensity scores while strictly adhering to safety gates.
+  - Multi-objective reward: $\text{P\&L}_{\text{flat\_stake}} + \lambda \cdot \text{CLV} - \gamma \cdot \text{Uncertainty}$.
+- **Task 12.3 [Offline Policy Evaluation Engine (OPE)]**: Create `python/rl/off_policy_evaluator.py`:
+  - Evaluates candidate policies strictly offline using:
+    - Doubly Robust (DR) estimation.
+    - Inverse Propensity Scoring (IPS).
+    - Temporal Replay backtesting (evaluating against unseen historical time folds).
+    - Bootstrap confidence intervals for policy return and Sharpe ratio.
+  - Rejects candidate policies unless out-of-sample improvement is statistically significant ($p < 0.05$).
 
 ### Sequential Tasks (Follows 12.1 - 12.3)
-- **Task 12.4 [Research Mode Quarantine]**: Enforce that the RL policy outputs decisions strictly to `research_predictions` table; production predictions remain driven by the validated champion statistical model.
+- **Task 12.4 [Research Mode Quarantine & Champion Gate]**: Enforce that the RL policy outputs decisions strictly to `research_predictions` table; production predictions remain driven by the validated champion statistical model until 1,000 verified paper bets have settled and OPE confirms out-of-sample superiority.
 - **Task 12.5 [Safety Boundary Automated Tests]**: Verify that under simulated adversarial conditions, the bandit policy is physically prohibited from overriding the lineup gate or betting on negative EV markets.
 
 ## 5. Files / Modules Affected

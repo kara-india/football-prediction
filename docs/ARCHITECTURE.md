@@ -96,3 +96,46 @@
    $$\text{available\_at} \le T$$
 3. **Decoupled Architecture**: The backend engine runs autonomously in Python and writes to Supabase. The Next.js frontend reads persisted state and does not run continuous polling loops.
 4. **Authoritative Quota Governance**: API-Football credits are strictly capped at 95/day via atomic PostgreSQL row locking (`reserve_api_quota`), ensuring ₹0 external data cost.
+
+---
+
+## 4. Continual Learning & Multi-Checkpoint Lifecycle
+
+The platform implements an autonomous, prequential intelligence lifecycle (predict → observe → evaluate → learn → validate → promote → future prediction). Full specification is documented in `docs/CONTINUAL_LEARNING_ARCHITECTURE.md`.
+
+### 4.1 Multi-Checkpoint Forecasting
+Every eligible match produces immutable, versioned prediction checkpoints:
+- **Checkpoint A (`INITIAL`)**: Generated at $T-48\text{h}$ from team strength, form, historical data, and early odds.
+- **Checkpoint B (`LINEUP_CONFIRMED` / `LINEUP_V1`)**: Triggered immediately upon receipt and verification of official 11 vs 11 starting lineups (~$T-60\text{m}$). Reruns full feature generation, Dixon-Coles model, recalibration, and 10,000-path Monte Carlo.
+- **Checkpoint B2 (`LINEUP_V2`)**: Versioned revision snapshot created if official starting XI changes before kickoff (e.g., warm-up injury).
+- **Checkpoint C (`FINAL_PREMATCH`)**: Generated at $T-5\text{m}$ reconciling closing odds and final line movements.
+- **Checkpoint D (`LIVE`)**: In-play state snapshots triggered by match events.
+
+### 4.2 Lineup Trigger Event Loop
+```text
+LINEUP_NOT_FOUND → LINEUP_DETECTED → LINEUP_VALIDATED → LINEUP_CHANGED
+       ↓
+LINEUP_FEATURES_REBUILT → MODEL_RECALCULATED → CALIBRATION_APPLIED
+       ↓
+SIMULATION_EXECUTED → ODDS_RECONCILED → EV_CALCULATED → NO_BET_GATE
+       ↓
+PREDICTION_SNAPSHOT_STORED
+```
+
+### 4.3 Quota-Aware Targeted Lineup Polling
+- Polling is restricted strictly to fixtures inside the prediction horizon entering the $[T-60\text{m}, T-40\text{m}]$ window.
+- Polling halts immediately once 11 vs 11 starters are confirmed, preserving the daily 45-call worker budget.
+
+---
+
+## 5. Layered Learning Hierarchy & RL Subordination
+
+Learning is strictly partitioned into 4 layers to prevent unconstrained model degradation:
+- **Layer 1: Base Statistical Models** (Dixon-Coles, Elo, Poisson/Negative Binomial): Retrained on scheduled batches or major dataset updates.
+- **Layer 2: Calibration & Uncertainty Monitoring** (Isotonic regression, Platt scaling, Brier/ECE tracking): Continuous rolling window evaluation.
+- **Layer 3: Online Residual & Drift Correction** (Recent team adjustments, lineup impacts): Regularized fast adaptation with shrinkage.
+- **Layer 4: Contextual Bandit / RL Decision Policy** (Action selection: `ABSTAIN`, `BET`): Determines staking and market participation.
+
+> [!IMPORTANT]
+> **RL Subordination Principle**: Reinforcement learning never overrides statistical safety or data quality gates. If any gate fails (`LINEUP_UNCONFIRMED`, `ODDS_STALE`, `INSUFFICIENT_DATA`), the platform strictly outputs `NO_BET` regardless of policy action propensity.
+

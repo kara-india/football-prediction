@@ -34,30 +34,47 @@ Implement the end-to-end decision engine starting with the First Vertical Slice 
     9. `PLAYER_MINUTES_UNCERTAIN`: Player not confirmed starter (for player markets).
     10. `INSUFFICIENT_SAMPLE`: Historical sample size $< 200$ matches for competition.
   - If any condition trips, sets `recommended_action = "NO_BET"` and attaches failure codes.
-- **Task 7.4 [Market Settlement Engine]**: Create `python/engine/settlement.py`:
+- **Task 7.4 [Market Settlement & Outcome Engine]**: Create `python/engine/settlement.py`:
   - Validates full-time scores and settles markets:
     - `TOTAL_GOALS_2_5`: WON if $(\text{home\_goals} + \text{away\_goals} > 2.5)$, else LOST.
     - `MATCH_1X2`: Home win, Draw, Away win.
     - `BTTS`: Yes if both $> 0$, else No.
     - `DOUBLE_CHANCE`: 1X, 12, X2.
   - Computes P&L on 1.0 unit stake and logs closing line value (CLV).
+  - Records actual observed outcomes separately (`actual_home_goals`, `actual_away_goals`, `actual_cards`, `actual_corners`).
+- **Task 7.5 [Error Taxonomy & Forecast Error Engine]**: Create `python/engine/error_evaluator.py`:
+  - Evaluates forecast errors for settled predictions:
+    - Brier score contribution: $(\hat{p} - y)^2$.
+    - Log-Loss contribution: $-(y \ln \hat{p} + (1-y) \ln(1-\hat{p}))$.
+    - Calibration residual: $\hat{p} - \bar{y}_{\text{bin}}$.
+    - Goal-count and scoreline absolute error.
+    - Realized EV vs closing line value (CLV).
+  - Classifies errors into standard 11-category taxonomy (`TEAM_STRENGTH_MISS`, `LINEUP_MISASSESSMENT`, `PLAYER_PROJECTION_ERROR`, `TACTICAL_MISMATCH`, `LIVE_STATE_ERROR`, `ODDS_STALENESS`, `SOURCE_CONFLICT`, `DATA_MISSING`, `CALIBRATION_ERROR`, `PARAMETER_DRIFT`, `RANDOM_VARIANCE`).
+- **Task 7.6 [Multi-Checkpoint & Full Candidate Logging]**:
+  - Immutably log all prediction checkpoints (`INITIAL`, `LINEUP_CONFIRMED`, `FINAL_PREMATCH`).
+  - Log *every* eligible fixture in allowlist, even when `recommended_action = "NO_BET"`, ensuring zero selection bias.
+  - Build `CanonicalDecisionRecord` logger storing decision context, model probabilities, odds, chosen action, and action propensity for offline policy evaluation.
 
-### Sequential Tasks (Follows 7.1 - 7.4)
-- **Task 7.5 [First Vertical Slice End-to-End Test]**: Execute complete pipeline on historical fixture:
-  Data $\to$ Dixon-Coles $\to$ Monte Carlo $\to$ Calibration $\to$ 1xBet EV $\to$ NO-BET Gate $\to$ Prediction Record $\to$ Settlement.
-- **Task 7.6 [Ledger Immutability Test]**: Confirm that prediction rows in Supabase cannot be altered once written except for settlement fields.
+### Sequential Tasks (Follows 7.1 - 7.6)
+- **Task 7.7 [First Vertical Slice End-to-End Test]**: Execute complete pipeline on historical fixture:
+  Data $\to$ Dixon-Coles $\to$ Lineup Detection $\to$ Monte Carlo $\to$ Calibration $\to$ 1xBet EV $\to$ NO-BET Gate $\to$ Multi-Checkpoint Prediction $\to$ Settlement $\to$ Error Classification $\to$ Candidate Dataset Logging.
+- **Task 7.8 [Ledger Immutability Test]**: Confirm that prediction rows in Supabase cannot be altered once written except for settlement fields.
 
 ## 5. Files / Modules Affected
 - `python/calibration/calibrator.py`
 - `python/engine/edge_calculator.py` [NEW]
 - `python/engine/nobet_gate.py` [NEW]
 - `python/engine/settlement.py` [NEW]
+- `python/engine/error_evaluator.py` [NEW]
 - `tests/test_calibration_and_edge.py` [NEW]
 - `tests/test_settlement.py` [NEW]
+- `tests/test_error_taxonomy.py` [NEW]
 
 ## 6. Database Changes
 - Table constraints: `model_predictions` has check constraint on `recommended_action IN ('BET', 'NO_BET')`.
+- Column: `model_predictions.prediction_stage` (`INITIAL`, `LINEUP_CONFIRMED`, `LINEUP_V2`, `FINAL_PREMATCH`, `LIVE`).
 - Table: `paper_bets` linked via foreign key to `model_predictions(id)`.
+- Table: `prediction_errors` storing Brier contributions, error categories, and evidence notes.
 
 ## 7. Tests Required
 - `tests/test_calibration_and_edge.py`:
@@ -68,6 +85,11 @@ Implement the end-to-end decision engine starting with the First Vertical Slice 
 - `tests/test_settlement.py`:
   1. Test settlement for 2-1 result: Over 2.5 WON, Home WON, BTTS WON.
   2. Test settlement for 2-0 result: Under 2.5 WON, BTTS LOST.
+- `tests/test_error_taxonomy.py`:
+  1. Test error classification for large Dixon-Coles discrepancy (`TEAM_STRENGTH_MISS`).
+  2. Test error classification for early red card match deviation (`LIVE_STATE_ERROR`).
+  3. Test Brier and Log-Loss contribution math matches analytical formula.
+  4. Verify full candidate decision logging stores propensity scores and all eligible selections.
 
 ## 8. Acceptance Criteria
 - [ ] Over/Under 2.5 vertical slice runs end-to-end with zero errors.

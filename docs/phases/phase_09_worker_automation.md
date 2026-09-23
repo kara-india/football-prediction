@@ -17,32 +17,48 @@ Transform the stubbed background workers (`collector_worker.py`, `evaluator_work
   - Discovers eligible fixtures for the next 48 hours.
   - Reserves exactly 1 API-Football credit.
   - Ingests upcoming fixtures into Supabase `matches`.
-- **Task 9.2 [Live State & Odds Worker]**: Create `python/workers/live_state_worker.py`:
-  - Runs during active match windows.
-  - Tracks live scores, elapsed minutes, and match events.
-  - Dispatches targeted deep calls only when a high-impact event (goal, red card) is detected.
-  - Snapshots live 1xBet market lines.
-- **Task 9.3 [Prediction Runner Worker]**: Create `python/workers/analysis_worker.py`:
-  - Selects eligible fixtures with verified lineups ($T-60\text{m}$ to $T-5\text{m}$).
-  - Executes feature pipeline, Dixon-Coles estimation, vectorized Monte Carlo, and calibration.
-  - Evaluates EV against 1xBet odds and executes NO-BET gate.
-  - Inserts predictions into `model_predictions` and logs candidates to `paper_bets`.
+- **Task 9.2 [Quota-Aware Targeted Lineup Watcher]**: Create `python/workers/lineup_watcher.py`:
+  - Monitors upcoming eligible fixtures approaching the $[T-60\text{m}, T-40\text{m}]$ kickoff window.
+  - Zero polling $> 75\text{m}$ before kickoff to preserve the 45-call worker budget.
+  - Upon detecting confirmed 11 vs 11 starting team sheets:
+    - Sets `lineup_confirmed = True` and records `lineup_available_at`.
+    - Halts further lineup polling for this fixture.
+    - Immediately dispatches event-triggered analysis worker to generate `LINEUP_CONFIRMED` forecast.
+  - If late starting XI changes occur, creates versioned `LINEUP_V2` snapshot.
+- **Task 9.3 [Multi-Checkpoint Prediction Runner Worker]**: Create `python/workers/analysis_worker.py`:
+  - Generates `INITIAL` forecast snapshot when fixture enters horizon ($T-48\text{h}$).
+  - Executes event-driven recalculation immediately upon lineup arrival ($T-60\text{m}$):
+    - Rebuilds starter-specific attack/defense ratings, expected minutes, and missing minutes.
+    - Reruns Dixon-Coles, recalibrates, resimulates 10k Monte Carlo paths.
+    - Reconciles 1xBet odds and evaluates NO-BET gate.
+    - Computes and logs Lineup Information Value ($\Delta p, \Delta \text{odds}, \Delta \text{EV}$).
+    - Inserts immutable `LINEUP_CONFIRMED` snapshot into `model_predictions`.
+  - Runs for *every* eligible fixture in allowlist, even when `recommended_action = "NO_BET"`.
 - **Task 9.4 [Evaluator & Error Classification Worker]**: Rewrite `python/workers/evaluator_worker.py`:
   - Runs every 30 minutes to check matches with status `FT` (Full Time).
-  - Finds all unsettled predictions for finished matches.
+  - Finds all unsettled predictions for finished matches across all stages (`INITIAL`, `LINEUP_CONFIRMED`, `LIVE`).
   - Computes settlement outcome (`WON`, `LOST`, `VOID`, `PUSH`), P&L, and Closing Line Value (CLV).
-  - Classifies errors into standard taxonomy (`MODEL_OVERCONFIDENCE`, `BAD_SCORE_STATE`, `RED_CARD_EFFECT`, `RANDOM_VARIANCE`, `ODDS_MOVEMENT`).
+  - Classifies errors into standard 11-category taxonomy (`TEAM_STRENGTH_MISS`, `LINEUP_MISASSESSMENT`, `PLAYER_PROJECTION_ERROR`, `TACTICAL_MISMATCH`, `LIVE_STATE_ERROR`, `ODDS_STALENESS`, `SOURCE_CONFLICT`, `DATA_MISSING`, `CALIBRATION_ERROR`, `PARAMETER_DRIFT`, `RANDOM_VARIANCE`).
   - Writes records to Supabase `prediction_results` and `prediction_errors`.
-- **Task 9.5 [Unified CLI Orchestrator]**: Create `python/workers/runner.py`:
+- **Task 9.5 [Online Learner & Prequential Model Worker]**: Rewrite `python/workers/learner_worker.py`:
+  - Reads settled results and error records from completed match batches.
+  - Appends observations to canonical learning dataset and RL candidate ledger.
+  - Updates Layer 3 online residuals (recent team-strength adjustments with L2 shrinkage).
+  - Updates Layer 2 calibration monitoring (Brier score, ECE, reliability curves).
+  - Trains challenger models and runs temporal out-of-sample validation vs Champion.
+  - Enforces controlled promotion gate: requires minimum 250 matches, out-of-sample Brier improvement, positive CLV, and non-degraded calibration before promotion.
+- **Task 9.6 [Unified CLI Orchestrator]**: Create `python/workers/runner.py`:
   - Dispatches CLI commands: `python -m python.workers.runner <job_name> [--dry-run]`.
   - Wraps execution in atomic database logging (`worker_runs` table: `worker_name`, `started_at`, `finished_at`, `status`, `items_processed`, `api_requests_made`, `error_message`).
   - Enforces execution mutex: prevents overlapping executions of the same worker type.
 
-### Sequential Tasks (Follows 9.1 - 9.5)
-- **Task 9.6 [GitHub Actions Scheduled Workflow]**: Create `.github/workflows/worker_cron.yml`:
-  - Triggers discovery worker daily and analysis worker hourly during weekend match windows.
+### Sequential Tasks (Follows 9.1 - 9.6)
+- **Task 9.7 [GitHub Actions Scheduled Workflow]**: Create `.github/workflows/worker_cron.yml`:
+  - Triggers discovery worker daily, lineup watcher during pre-match windows, and evaluator hourly.
   - Injects `SUPABASE_SERVICE_ROLE_KEY` and `API_FOOTBALL_KEY` securely from repository secrets.
-- **Task 9.7 [Worker Idempotency Test]**: Run evaluator worker twice consecutively on the same match results; assert that zero duplicate settlements or double payouts are recorded.
+- **Task 9.8 [Worker Idempotency & Prequential Integrity Test]**:
+  - Run evaluator worker twice consecutively on the same match results; assert zero duplicate settlements.
+  - Test prequential update invariant: assert outcome of match $t$ cannot alter prediction $t$ and only updates models for $t+1$ onwards.
 
 ## 5. Files / Modules Affected
 - `python/workers/collector_worker.py`

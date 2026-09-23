@@ -25,6 +25,26 @@ The platform is a personal, quantitative betting-intelligence system. It is **NO
    $$\text{available\_at} \le T$$
 4. **Approved Design Reference**: **Sofascore football UX/information architecture, adapted into a premium football analytics terminal**. The interface combines Sofascore's match-centric hierarchy and high information density with an institutional dark slate aesthetic (`#0B0F17`), clean SaaS typography, and transparent mathematical provenance. Sportsbook neon styling, gambling gamification, and decorative non-analytical charts are strictly forbidden.
 5. **Authoritative Central State**: Supabase (PostgreSQL 17) is the single source of truth for all quotas, match fixtures, odds snapshots, features, predictions, settlements, and engine settings. Local filesystem caches (`.cache`, `request_budget.json`) are forbidden from holding authoritative state. The browser reads persisted backend state; zero browser polling loops are permitted.
+6. **Core Learning Architecture**:
+   $$\text{predict} \longrightarrow \text{observe} \longrightarrow \text{evaluate} \longrightarrow \text{learn} \longrightarrow \text{validate} \longrightarrow \text{promote} \longrightarrow \text{future prediction}$$
+7. **Core Lineup Architecture**:
+   $$\text{detect confirmed XI} \longrightarrow \text{rebuild features} \longrightarrow \text{rerun analysis} \longrightarrow \text{recalibrate} \longrightarrow \text{simulate} \longrightarrow \text{reconcile odds} \longrightarrow \text{apply NO-BET gate} \longrightarrow \text{persist immutable snapshot}$$
+
+### 1.3 Continuous Learning & Lineup-Triggered Prediction Contract
+Full specification documented in `docs/CONTINUAL_LEARNING_ARCHITECTURE.md`.
+1. **Multi-Checkpoint Forecasting**: For every eligible match, the system creates versioned, immutable prediction checkpoints:
+   - `INITIAL` ($T-48\text{h}$): Base team strength, historical form, early odds.
+   - `LINEUP_CONFIRMED` (~$T-60\text{m}$): Triggered as a first-class system event when official 11 vs 11 team sheets arrive. Reruns model, recalibrates, resimulates, and logs Lineup Information Value ($\Delta p, \Delta \text{Brier}$).
+   - `LINEUP_V2` (Optional): Captured if late team-sheet amendments occur.
+   - `FINAL_PREMATCH` ($T-5\text{m}$): Closing line reconciliation.
+   - `LIVE`: In-play continuous hazard states.
+2. **Every Eligible Match**: Every allowlisted fixture is forecasted and stored, even when the final output is `NO_BET`, ensuring downstream learning datasets are free from selection bias.
+3. **Decoupled Autonomous Execution**: The background engine continuously discovers, monitors lineups, recalculates predictions, settles matches, and updates challengers without requiring any browser session.
+4. **Layered Learning Structure**:
+   - *Layer 1 (Base Models)*: Dixon-Coles, Elo, count models (scheduled batch retraining).
+   - *Layer 2 (Calibration)*: Brier, LogLoss, ECE tracking and temperature scaling.
+   - *Layer 3 (Online Correction)*: Team and lineup residual adaptation with L2 shrinkage.
+   - *Layer 4 (Decision Policy / RL)*: Contextual bandit selecting between `ABSTAIN` and market candidates, strictly subordinated to statistical safety gates.
 
 ---
 
