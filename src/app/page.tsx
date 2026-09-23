@@ -32,117 +32,7 @@ interface MatchItem {
 }
 
 // Fallback high-fidelity sample matches in case network or disk cache is empty
-const INITIAL_MATCHES: MatchItem[] = [
-  {
-    id: 1640055,
-    kickoff: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
-    status: 'NS',
-    statusLong: 'Not Started',
-    venue: 'Emirates Stadium, London',
-    league: {
-      id: 39,
-      name: 'Premier League',
-      country: 'England',
-      logo: 'https://media.api-sports.io/football/leagues/39.png',
-    },
-    teams: {
-      home: { id: 42, name: 'Arsenal', logo: 'https://media.api-sports.io/football/teams/42.png' },
-      away: { id: 49, name: 'Chelsea', logo: 'https://media.api-sports.io/football/teams/49.png' },
-    },
-    lineupConfirmed: true,
-    lineupExpectedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-    odds1xBet: { home: 1.84, draw: 3.75, away: 4.60 },
-    decision: 'CANDIDATE',
-    valueEdge: 5.6,
-    expectedValue: 7.45,
-  },
-  {
-    id: 1610876,
-    kickoff: new Date(Date.now() + 90 * 60 * 1000).toISOString(),
-    status: 'NS',
-    statusLong: 'Not Started',
-    venue: 'Estadio Ciudad de Lanús, Buenos Aires',
-    league: {
-      id: 128,
-      name: 'Liga Profesional Argentina',
-      country: 'Argentina',
-      logo: 'https://media.api-sports.io/football/leagues/128.png',
-    },
-    teams: {
-      home: { id: 450, name: 'Lanús', logo: 'https://media.api-sports.io/football/teams/450.png' },
-      away: { id: 452, name: 'Estudiantes L.P.', logo: 'https://media.api-sports.io/football/teams/452.png' },
-    },
-    lineupConfirmed: true,
-    lineupExpectedAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-    odds1xBet: { home: 1.79, draw: 3.98, away: 4.78 },
-    decision: 'CANDIDATE',
-    valueEdge: 4.8,
-    expectedValue: 6.2,
-  },
-  {
-    id: 1640056,
-    kickoff: new Date(Date.now() + 180 * 60 * 1000).toISOString(),
-    status: 'NS',
-    statusLong: 'Not Started',
-    venue: 'Santiago Bernabéu, Madrid',
-    league: {
-      id: 140,
-      name: 'La Liga',
-      country: 'Spain',
-      logo: 'https://media.api-sports.io/football/leagues/140.png',
-    },
-    teams: {
-      home: { id: 541, name: 'Real Madrid', logo: 'https://media.api-sports.io/football/teams/541.png' },
-      away: { id: 536, name: 'Sevilla', logo: 'https://media.api-sports.io/football/teams/536.png' },
-    },
-    lineupConfirmed: false,
-    lineupExpectedAt: new Date(Date.now() + 120 * 60 * 1000).toISOString(),
-    odds1xBet: { home: 1.44, draw: 4.80, away: 7.20 },
-    decision: 'LINEUP_UNCONFIRMED',
-  },
-  {
-    id: 1640057,
-    kickoff: new Date(Date.now() + 240 * 60 * 1000).toISOString(),
-    status: 'NS',
-    statusLong: 'Not Started',
-    venue: 'San Siro, Milan',
-    league: {
-      id: 135,
-      name: 'Serie A',
-      country: 'Italy',
-      logo: 'https://media.api-sports.io/football/leagues/135.png',
-    },
-    teams: {
-      home: { id: 489, name: 'AC Milan', logo: 'https://media.api-sports.io/football/teams/489.png' },
-      away: { id: 502, name: 'Fiorentina', logo: 'https://media.api-sports.io/football/teams/502.png' },
-    },
-    lineupConfirmed: false,
-    lineupExpectedAt: new Date(Date.now() + 180 * 60 * 1000).toISOString(),
-    odds1xBet: { home: 1.95, draw: 3.50, away: 3.90 },
-    decision: 'LINEUP_UNCONFIRMED',
-  },
-  {
-    id: 1640058,
-    kickoff: new Date(Date.now() + 300 * 60 * 1000).toISOString(),
-    status: 'NS',
-    statusLong: 'Not Started',
-    venue: 'Signal Iduna Park, Dortmund',
-    league: {
-      id: 78,
-      name: 'Bundesliga',
-      country: 'Germany',
-      logo: 'https://media.api-sports.io/football/leagues/78.png',
-    },
-    teams: {
-      home: { id: 165, name: 'Borussia Dortmund', logo: 'https://media.api-sports.io/football/teams/165.png' },
-      away: { id: 168, name: 'Bayer Leverkusen', logo: 'https://media.api-sports.io/football/teams/168.png' },
-    },
-    lineupConfirmed: false,
-    lineupExpectedAt: new Date(Date.now() + 240 * 60 * 1000).toISOString(),
-    odds1xBet: { home: 2.35, draw: 3.80, away: 2.75 },
-    decision: 'LINEUP_UNCONFIRMED',
-  },
-]
+const INITIAL_MATCHES: MatchItem[] = []
 
 export default function MatchdayCommandCenter() {
   const [matches, setMatches] = useState<MatchItem[]>(INITIAL_MATCHES)
@@ -171,13 +61,15 @@ export default function MatchdayCommandCenter() {
       if (upRes.ok) {
         const upData = await upRes.json()
         if (Array.isArray(upData) && upData.length > 0) {
-          setMatches((prev) => {
-            const map = new Map<string | number, MatchItem>()
-            // Retain high fidelity fields
-            prev.forEach((m) => map.set(m.id, m))
-            upData.forEach((m: any) => map.set(m.id, { ...map.get(m.id), ...m }))
-            return Array.from(map.values())
+          // The API is authoritative. Do not merge stale/demo fixtures into the
+          // current schedule; only render genuinely upcoming fixtures.
+          const now = Date.now()
+          const current = upData.filter((m: MatchItem) => {
+            const kickoffMs = new Date(m.kickoff).getTime()
+            return Number.isFinite(kickoffMs) && kickoffMs > now &&
+              !['FT', 'AET', 'PEN', 'PST', 'CANC', 'ABD', 'AWD', 'WO'].includes(m.status)
           })
+          setMatches(current)
         }
       }
     } catch {
