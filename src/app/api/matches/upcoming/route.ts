@@ -3,12 +3,29 @@ import { getDiskCache, setDiskCache } from '@/lib/diskCache'
 import { canMakeAPIRequest, recordAPIRequest } from '@/lib/quotaGuard'
 import { isActuallyUpcoming } from '@/lib/upcomingFixtures'
 
-// 30-minute disk cache for upcoming fixtures (0 calls if refreshed within 30 mins)
+// Route Handler GET responses must never be cached by Next/Vercel because
+// fixture state changes continuously and the upstream feed is time-sensitive.
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 const CACHE_TTL_MS = 30 * 60 * 1000
 const CACHE_KEY = 'upcoming_fixtures_cache'
+const NO_STORE_HEADERS = {
+  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+  'Pragma': 'no-cache',
+  'Expires': '0'
+}
 
-const ALLOWED_LEAGUES = new Set([39, 71, 135, 140, 78, 61, 94, 88, 128, 144, 2, 3, 1, 4, 5, 9, 6, 7, 10])
+const ALLOWED_LEAGUES = new Set([
+  39, 71, 135, 140, 78, 61, 94, 88, 128, 144, 2, 3, 1, 4, 5, 9, 6, 7, 10
+])
 
+function jsonNoStore<T>(body: T, status = 200) {
+  return NextResponse.json(body, {
+    status,
+    headers: NO_STORE_HEADERS
+  })
+}
 
 function isEligibleFixture(m: any): boolean {
   const leagueId = m.league?.id
@@ -27,50 +44,108 @@ function isEligibleFixture(m: any): boolean {
 }
 
 export async function GET() {
-  // 1. Check persistent disk cache first (Zero API calls if fresh within 30 mins)
+  // 1. Check persistent runtime cache first (zero upstream calls while fresh).
   const cached = getDiskCache<any[]>(CACHE_KEY, CACHE_TTL_MS)
   if (cached && cached.length > 0) {
     const upcomingCached = cached.filter((m) => isActuallyUpcoming(m))
-    return NextResponse.json(upcomingCached)
+    return jsonNoStore(upcomingCached)
   }
 
-  // 2. Strict Quota Guard check (Max 45 automated worker requests/day)
+  // 2. Strict quota guard check.
   const quotaCheck = await canMakeAPIRequest(false)
   if (!quotaCheck.allowed) {
     console.warn('[QUOTA GUARD UPCOMING]', quotaCheck.reason)
     const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)
-    return NextResponse.json((stale || []).filter((m: any) => isActuallyUpcoming(m)))
+    return jsonNoStore((stale || []).filter((m: any) => isActuallyUpcoming(m)))
   }
 
-  const API_KEY = process.env.API_FOOTBALL_KEY;
+  const API_KEY = process.env.API_FOOTBALL_KEY
   if (!API_KEY) {
-    return NextResponse.json(
-      { error: 'API_FOOTBALL_KEY environment variable is not configured. Set it in .env.local.' },
-      { status: 500 }
-    );
+    console.error('[API-FOOTBALL UPCOMING] API_FOOTBALL_KEY is not available at runtime')
+    return jsonNoStore(
+      { error: 'API_FOOTBALL_KEY_NOT_CONFIGURED' },
+      500
+    )
   }
-  const headers = { 'x-apisports-key': API_KEY }
 
   try {
     const nowUtc = new Date()
     const today = nowUtc.toISOString().split('T')[0]
     const tomorrow = new Date(nowUtc.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
-    // One bulk request covering today + tomorrow. API-Football supports from/to
-    // fixture ranges, so we can avoid the old tomorrow-only window.
+    // One bulk request covering today + tomorrow.
     const query = `from=${today}&to=${tomorrow}`
     const res = await fetch(`https://v3.football.api-sports.io/fixtures?${query}`, {
-      headers
+      headers: { 'x-apisports-key': API_KEY },
+      cache: 'no-store'
     })
     recordAPIRequest(`/fixtures?${query}`)
 
     const json = await res.json()
-    const fixtures = json.response || []
+    const apiErrors = json?.errors && Object.keys(json.errors).length > 0
+      ? json.errors
+      : null
+    const fixtures = Array.isArray(json?.response) ? json.response : []
+
+    // Safe operational diagnostics: no API key or credentials are logged.
+    const futureFixtureCount = fixtures.filter((f: any) => {
+      const kickoffMs = new Date(f?.fixture?.date).getTime()
+      return Number.isFinite(kickoffMs) && kickoffMs > nowUtc.getTime()
+    }).length
+    const statusEligibleCount = fixtures.filter((f: any) =>
+      f?.fixture?.status?.short === 'NS' || f?.fixture?.status?.short === 'TBD'
+    ).length
+    const leagueEligibleCount = fixtures.filter((f: any) => isEligibleFixture(f)).length
+
+    console.info('[API-FOOTBALL UPCOMING]', JSON.stringify({
+      httpStatus: res.status,
+      query,
+      upstreamErrors: apiErrors,
+      responseCount: fixtures.length,
+      leagueEligibleCount,
+      statusEligibleCount,
+      futureFixtureCount
+    }))
+
+    const japanUruguayMatches = fixtures.filter((f: any) => {
+      const home = String(f?.teams?.home?.name || '').toLowerCase()
+      const away = String(f?.teams?.away?.name || '').toLowerCase()
+      return (
+        (home.includes('japan') && away.includes('uruguay')) ||
+        (home.includes('uruguay') && away.includes('japan'))
+      )
+    })
+    if (japanUruguayMatches.length > 0) {
+      console.info('[API-FOOTBALL JAPAN-URUGUAY]', JSON.stringify(
+        japanUruguayMatches.map((f: any) => ({
+          id: f?.fixture?.id,
+          date: f?.fixture?.date,
+          status: f?.fixture?.status?.short,
+          leagueId: f?.league?.id,
+          league: f?.league?.name
+        }))
+      ))
+    }
+
+    if (!res.ok || apiErrors) {
+      return jsonNoStore(
+        { error: 'API_FOOTBALL_UPSTREAM_ERROR', status: res.status },
+        502
+      )
+    }
 
     const eligible = fixtures
-      .filter((f: any) => isEligibleFixture(f) && (f.fixture.status.short === 'NS' || f.fixture.status.short === 'TBD'))
+      .filter((f: any) =>
+        isEligibleFixture(f) &&
+        (f.fixture.status.short === 'NS' || f.fixture.status.short === 'TBD')
+      )
       .filter((f: any) => new Date(f.fixture.date).getTime() > nowUtc.getTime())
-      .slice(0, 50) // Cap to top 50 matches max per user directive
+      // API order is not a contract; sort chronologically before applying the cap
+      // so an important near-term fixture cannot be hidden by array ordering.
+      .sort((a: any, b: any) =>
+        new Date(a.fixture.date).getTime() - new Date(b.fixture.date).getTime()
+      )
+      .slice(0, 50)
 
     const formatted = eligible.map((m: any) => {
       const fixtureId = m.fixture.id
@@ -118,14 +193,15 @@ export async function GET() {
       }
     })
 
-    // Store only future, non-terminal fixtures in the cache.
-    const upcomingOnly = formatted.filter((m: any) => isActuallyUpcoming(m, nowUtc.getTime()))
-    setDiskCache(CACHE_KEY, upcomingOnly)
+    const upcomingOnly = formatted.filter((m: any) =>
+      isActuallyUpcoming(m, nowUtc.getTime())
+    )
 
-    return NextResponse.json(upcomingOnly)
+    setDiskCache(CACHE_KEY, upcomingOnly)
+    return jsonNoStore(upcomingOnly)
   } catch (error: any) {
-    console.error('Failed to fetch upcoming matches:', error)
+    console.error('[API-FOOTBALL UPCOMING] Failed to fetch fixtures:', error?.message || error)
     const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)
-    return NextResponse.json((stale || []).filter((m: any) => isActuallyUpcoming(m)))
+    return jsonNoStore((stale || []).filter((m: any) => isActuallyUpcoming(m)))
   }
 }
