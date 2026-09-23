@@ -10,6 +10,7 @@ export const revalidate = 0
 
 const CACHE_TTL_MS = 30 * 60 * 1000
 const CACHE_KEY = 'upcoming_fixtures_cache'
+const INDIA_TIME_ZONE = 'Asia/Kolkata'
 const NO_STORE_HEADERS = {
   'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
   'Pragma': 'no-cache',
@@ -25,6 +26,25 @@ function jsonNoStore<T>(body: T, status = 200) {
     status,
     headers: NO_STORE_HEADERS
   })
+}
+
+function getIndiaDate(date: Date): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: INDIA_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date)
+
+  const year = parts.find((p) => p.type === 'year')?.value
+  const month = parts.find((p) => p.type === 'month')?.value
+  const day = parts.find((p) => p.type === 'day')?.value
+
+  if (!year || !month || !day) {
+    throw new Error('Failed to calculate India calendar date')
+  }
+
+  return `${year}-${month}-${day}`
 }
 
 function isEligibleFixture(m: any): boolean {
@@ -70,11 +90,11 @@ export async function GET() {
 
   try {
     const nowUtc = new Date()
-    const today = nowUtc.toISOString().split('T')[0]
-    const tomorrow = new Date(nowUtc.getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const indiaDate = getIndiaDate(nowUtc)
 
-    // One bulk request covering today + tomorrow.
-    const query = `from=${today}&to=${tomorrow}`
+    // API-Football's global fixtures feed supports a date filter. We use
+    // India's calendar date so the dashboard's "upcoming" window aligns with IST.
+    const query = `date=${indiaDate}&timezone=${encodeURIComponent(INDIA_TIME_ZONE)}`
     const res = await fetch(`https://v3.football.api-sports.io/fixtures?${query}`, {
       headers: { 'x-apisports-key': API_KEY },
       cache: 'no-store'
