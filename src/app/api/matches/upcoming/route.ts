@@ -10,7 +10,7 @@ const TERMINAL_STATUSES = new Set(['FT', 'AET', 'PEN', 'PST', 'CANC', 'ABD', 'AW
 const ALLOWED_LEAGUES = new Set([39, 71, 135, 140, 78, 61, 94, 88, 128, 144, 2, 3, 1, 4, 5, 9, 6, 7, 10])
 
 
-function isActuallyUpcoming(m: any, nowMs = Date.now()): boolean {
+export function isActuallyUpcoming(m: any, nowMs = Date.now()): boolean {
   const kickoffMs = new Date(m?.kickoff).getTime()
   return Number.isFinite(kickoffMs) &&
     kickoffMs > nowMs &&
