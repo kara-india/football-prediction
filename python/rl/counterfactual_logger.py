@@ -90,10 +90,11 @@ class CounterfactualLogger:
         self._opportunities: Dict[str, CandidateDecisionOpportunity] = {}
 
     def log_candidate(self, opportunity: CandidateDecisionOpportunity) -> str:
-        """Log a candidate opportunity.
-        
-        Returns:
-            candidate_id
+        """Log a candidate opportunity in process memory.
+
+        Persistence is handled by the durable worker repository layer. Keeping this
+        method side-effect free preserves the in-memory logger as a deterministic
+        test/dry-run component.
         """
         self._opportunities[opportunity.candidate_id] = opportunity
         return opportunity.candidate_id
