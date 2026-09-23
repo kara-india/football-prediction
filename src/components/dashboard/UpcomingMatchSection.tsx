@@ -154,7 +154,7 @@ export default function UpcomingMatchSection() {
       ) : filteredMatches.length === 0 ? (
         <div className="bg-[#0e131b] border border-[#1e2638] rounded-2xl p-12 text-center text-[#8a99ad] text-xs font-mono space-y-2">
           <p className="text-sm font-semibold text-[#f0f4fc]">No matches found for current filter.</p>
-          <p className="text-[#56657a]">Try selecting "All Competitions" or resetting the filter tabs.</p>
+          <p className="text-[#56657a]">Try selecting &quot;All Competitions&quot; or resetting the filter tabs.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

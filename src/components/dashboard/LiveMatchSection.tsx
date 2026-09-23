@@ -115,7 +115,7 @@ export default function LiveMatchSection() {
               <div className="flex items-center justify-between text-xs text-[#8a99ad] pb-2 border-b border-[#1e2638] font-mono">
                 <span>{m.league.name}</span>
                 <span className="font-semibold text-[#10b981]">
-                  {m.minute}' ({m.status})
+                  {m.minute}&apos; ({m.status})
                 </span>
               </div>
               <div className="grid grid-cols-5 items-center py-4 text-center">

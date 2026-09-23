@@ -31,7 +31,7 @@ export default function MixpanelKpiStrip() {
 
           <div>
             <div className="text-xs font-medium text-[#f0f4fc]">Tracked Matches</div>
-            <div className="text-[11px] text-[#8a99ad]">10 Top European & Int'l Competitions</div>
+            <div className="text-[11px] text-[#8a99ad]">10 Top European & Int&apos;l Competitions</div>
           </div>
 
           {/* SVG Sparkline */}

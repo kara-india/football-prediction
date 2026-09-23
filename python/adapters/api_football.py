@@ -6,21 +6,22 @@ from functools import lru_cache
 from typing import List, Dict, Optional, Any
 from ..data_pipeline.cache import DataCache
 
-class APIError(Exception):
-    pass
+from .quota_manager import CentralQuotaManager, QuotaExceededError
 
-class QuotaExceededError(Exception):
+class APIError(Exception):
     pass
 
 class DataNotAvailableError(Exception):
     pass
 
 class APIFootballAdapter:
-    def __init__(self, api_key: str = "dummy", cache: DataCache = None):
+    def __init__(self, api_key: str = "dummy", cache: DataCache = None, quota_manager: Optional[CentralQuotaManager] = None):
         self.base_url = 'https://v3.football.api-sports.io'
         self.api_key = api_key
         self.headers = {'x-apisports-key': self.api_key}
         self.cache = cache or DataCache()
+        self.quota_manager = quota_manager or CentralQuotaManager()
+        self._quota_remaining: Optional[int] = None
         
         # Setup logging
         self.logger = logging.getLogger("APIFootball")
@@ -33,17 +34,29 @@ class APIFootballAdapter:
         self.session = requests.Session()
         retries = Retry(total=3, backoff_factor=1, status_forcelist=[429, 503])
         self.session.mount('https://', HTTPAdapter(max_retries=retries))
+
+    @property
+    def quota_remaining(self) -> int:
+        if self._quota_remaining is not None:
+            return self._quota_remaining
+        return self.quota_manager.get_status().get("remaining_worker", 45)
+
+    @quota_remaining.setter
+    def quota_remaining(self, value: int):
+        self._quota_remaining = value
         
-        self.quota_remaining = 100
-        
-    def _make_request(self, endpoint: str, params: Dict = None, ttl: int = 60) -> Any:
+    def _make_request(self, endpoint: str, params: Dict = None, ttl: int = 60, is_user: bool = False) -> Any:
         cache_key = f"{endpoint}_{params}"
         cached = self.cache.get(cache_key)
         if cached is not None:
             return cached
             
+        # Fast pre-check: Never attempt external call if quota <= 5
         if self.quota_remaining <= 5:
             raise QuotaExceededError("API quota nearly exhausted")
+
+        # Atomically reserve quota before making network call
+        self.quota_manager.reserve(is_user=is_user, cost=1)
             
         url = f"{self.base_url}/{endpoint}"
         self.logger.info(f"Request: {url} {params}")
@@ -60,8 +73,6 @@ class APIFootballAdapter:
             if isinstance(err, dict) and 'rateLimit' in err:
                 raise QuotaExceededError("Rate limit reached")
             raise APIError(f"API returned errors: {err}")
-            
-        self.quota_remaining -= 1
         
         result = data.get('response', [])
         self.cache.set(cache_key, result, ttl)

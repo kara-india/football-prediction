@@ -30,8 +30,8 @@ export async function GET() {
     return NextResponse.json(cached)
   }
 
-  // 2. Strict Quota Guard check (Max 50 automated requests/day)
-  const quotaCheck = canMakeAPIRequest(false)
+  // 2. Strict Quota Guard check (Max 45 automated worker requests/day)
+  const quotaCheck = await canMakeAPIRequest(false)
   if (!quotaCheck.allowed) {
     console.warn('[QUOTA GUARD LIVE]', quotaCheck.reason)
     const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)

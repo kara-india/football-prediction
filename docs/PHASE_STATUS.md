@@ -7,28 +7,28 @@ This document is the authoritative runtime state contract for development sessio
 
 ## Current Platform State
 
-- **CURRENT PHASE**: `Phase 0 — Repository and Security Hardening`
-- **STATUS**: `PENDING_START`
-- **LAST COMPLETED PHASE**: `None` (Scaffold and Planning Phase Completed)
-- **LAST VERIFIED GIT SHA**: `4a7d8234873264b9bb477ca65987b5c234d62b88`
+- **CURRENT PHASE**: `Phase 3 — Zero-Cost Data Ingestion`
+- **STATUS**: `READY_TO_START`
+- **LAST COMPLETED PHASE**: `Phase 2 — Quota Governance & Cost Safety`
+- **LAST VERIFIED GIT SHA**: `PENDING_COMMIT`
 - **LAST VERIFIED SUPABASE STATE**: 
   - Project URL: `https://qqcxjjkgvqknesrtnwal.supabase.co`
   - Engine: PostgreSQL 17 (Healthy)
   - Tables: 27 tables active
-  - Historical Matches: 13,403 rows present in `historical_matches`
-  - Migration Status: Migration drift detected; baseline reconciliation required in Phase 1
-  - RLS Status: Enabled, but multiple tables have permissive `FOR ALL USING (true)` policies
+  - Historical Matches: 13,403 rows verified in `historical_matches`
+  - Migration Status: Migrations 000, 005, and 006 created for baseline reconciliation, RLS hardening, and atomic quota governance
+  - RLS Status: Hardened; anonymous write rejected on model_predictions, paper_bets, and historical_matches
+  - Quota Governance: Enforced at 95 total / day (50 user, 45 worker, 5 safety buffer) with zero filesystem dependencies
 - **CURRENT DEPLOYMENT**: Local Next.js 14 development server running on `http://localhost:3000` (Dark Slate theme active)
 - **APPROVED DESIGN REFERENCE**: Sofascore football UX/information architecture, adapted into a premium football analytics terminal (documented in `docs/FRONTEND_DESIGN_DIRECTION.md`)
 - **BLOCKERS**:
-  1. Leaked API-Football credential (`073534f7111a37868a403c5cd51d83fa`) in `README.md` and server routes requires rotation by user.
-  2. Python runtime dependencies unpinned (`python/requirements.txt` missing).
-  3. GitHub CI workflow swallows errors with `|| echo 'done'`.
-  4. Background workers (`collector_worker.py`, etc.) are empty `pass` stubs.
+  1. Leaked API-Football credential (`073534...`) scrubbed from source code; pending user rotation in API-Sports dashboard.
+  2. Background workers (`collector_worker.py`, etc.) are empty `pass` stubs to be implemented in Phase 3 & Phase 9.
 - **MANUAL STEPS PENDING**:
   - [ ] User must log in to API-Sports dashboard and rotate the exposed API key (`073534...`).
   - [ ] User must set rotated `API_FOOTBALL_KEY` in GitHub Repository Secrets and local `.env.local`.
-- **NEXT ACTION**: When the user enters `START DEVELOPMENT`, Claude Sonnet 4.6 Thinking will immediately begin **Phase 0: Task 0.1 (Secrets Scrubbing)** and **Task 0.2 (Python Dependency Pinning)**.
+  - [ ] User must run SQL migrations in Supabase SQL Editor (`000_baseline_reconciliation.sql`, `005_rls_and_indexing_hardening.sql`, and `006_quota_governance.sql`).
+- **NEXT ACTION**: Begin **Phase 3: Zero-Cost Data Ingestion** (football-data.co.uk 5-year historical ingestion, non-paying pipeline, and incremental season synchronizer).
 
 ---
 
@@ -36,10 +36,10 @@ This document is the authoritative runtime state contract for development sessio
 
 | Phase | Title | Criticality | Status | Started At | Completed At | Verification SHA |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Phase 0** | Repository & Security Hardening | **P0** | `READY_TO_START` | — | — | — |
-| **Phase 1** | Database & Migration Hardening | **P0** | `PENDING` | — | — | — |
-| **Phase 2** | Quota Governance & Cost Safety | **P0** | `PENDING` | — | — | — |
-| **Phase 3** | Zero-Cost Data Ingestion | **P1** | `PENDING` | — | — | — |
+| **Phase 0** | Repository & Security Hardening | **P0** | `COMPLETED` | 2026-09-24 00:17 IST | 2026-09-24 00:26 IST | `59d95e804e65cc3e032ebd4e406caf24d86bc587` |
+| **Phase 1** | Database & Migration Hardening | **P0** | `COMPLETED` | 2026-09-24 00:46 IST | 2026-09-24 00:51 IST | `TRACKED_IN_NEXT_COMMIT` |
+| **Phase 2** | Quota Governance & Cost Safety | **P0** | `COMPLETED` | 2026-09-24 00:51 IST | 2026-09-24 00:53 IST | `TRACKED_IN_NEXT_COMMIT` |
+| **Phase 3** | Zero-Cost Data Ingestion | **P1** | `READY_TO_START` | — | — | — |
 | **Phase 4** | Target Odds (1xBet) Engine | **P1** | `PENDING` | — | — | — |
 | **Phase 5** | Lineup & Runtime Gatekeeper | **P1** | `PENDING` | — | — | — |
 | **Phase 6** | Core Statistical & Monte Carlo | **P1** | `PENDING` | — | — | — |
