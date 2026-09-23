@@ -63,14 +63,9 @@ class AnalysisWorker:
         # In-memory prediction ledger for dry-run and cross-checkpoint delta lookups
         self._in_memory_predictions: Dict[str, Dict[str, Any]] = {}
 
-    def _build_default_calibrator(self) -> ProbabilityCalibrator:
-        """Initialize and fit a baseline probability calibrator to prevent uncalibrated errors."""
-        cal = ProbabilityCalibrator(method="isotonic")
-        # Synthetic baseline anchor to establish smooth isotonic identity
-        grid = [0.05, 0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]
-        y_true = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1]
-        cal.fit(y_true, grid)
-        return cal
+    def _build_default_calibrator(self) -> Optional[ProbabilityCalibrator]:
+        """Do not invent calibration parameters; use a validated calibrator supplied by the caller."""
+        return None
 
     def compute_starter_ratings(
         self,
@@ -127,8 +122,8 @@ class AnalysisWorker:
         market: str,
         selection: str,
         current_prob: float,
-        current_odds: float,
-        current_ev: float,
+        current_odds: Optional[float],
+        current_ev: Optional[float],
     ) -> Dict[str, float]:
         """Compute Lineup Information Value (LIV) against prior INITIAL checkpoint.
         
@@ -139,15 +134,16 @@ class AnalysisWorker:
         key = f"{match_id}:{market}:{selection}:INITIAL"
         initial_pred = self._in_memory_predictions.get(key)
 
-        if initial_pred:
-            p_init = initial_pred.get("calibrated_prob", current_prob)
-            odds_init = initial_pred.get("decimal_odds", current_odds)
-            ev_init = initial_pred.get("expected_value", current_ev)
-            return {
-                "delta_p": round(current_prob - p_init, 6),
-                "delta_odds": round(current_odds - odds_init, 4),
-                "delta_ev": round(current_ev - ev_init, 6),
-            }
+        if initial_pred and current_odds is not None and current_ev is not None:
+            p_init = initial_pred.get("calibrated_probability")
+            odds_init = initial_pred.get("decimal_odds")
+            ev_init = initial_pred.get("expected_value")
+            if p_init is not None and odds_init is not None and ev_init is not None:
+                return {
+                    "delta_p": round(current_prob - p_init, 6),
+                    "delta_odds": round(current_odds - odds_init, 4),
+                    "delta_ev": round(current_ev - ev_init, 6),
+                }
 
         return {
             "delta_p": 0.0,
@@ -204,20 +200,19 @@ class AnalysisWorker:
             min_simulations=10_000,
         )
 
-        mc_se = dist.get("std_error", 0.005)
+        mc_se = dist.get("std_error")
+        simulation_count = dist.get("simulation_count")
+        if mc_se is None or simulation_count is None:
+            raise RuntimeError("Monte Carlo output is incomplete; refusing to generate a prediction snapshot.")
         now_utc = datetime.now(timezone.utc)
 
-        # Baseline 1xBet odds fallbacks if not supplied
-        default_odds = {
-            "1X2_1": 2.10,
-            "1X2_X": 3.40,
-            "1X2_2": 3.50,
-            "OU_OVER": 1.95,
-            "OU_UNDER": 1.90,
-            "BTTS_YES": 1.85,
-            "BTTS_NO": 1.95,
-        }
-        active_odds = {**default_odds, **(odds_dict or {})}
+        required_odds = ["1X2_1", "1X2_X", "1X2_2", "OU_OVER", "OU_UNDER", "BTTS_YES", "BTTS_NO"]
+        active_odds = dict(odds_dict or {})
+        missing_odds = [
+            key for key in required_odds
+            if active_odds.get(key) is None or float(active_odds[key]) <= 1.0
+        ]
+        odds_available = not missing_odds
 
         # Market configs: (market, selection, line, raw_prob, odds_key)
         markets = [
@@ -230,63 +225,84 @@ class AnalysisWorker:
             ("BTTS", "NO", None, dist["btts"]["no"], "BTTS_NO"),
         ]
 
-        # Devig 1xBet odds
-        devig_1x2, _ = DeVIgEngine.shin_devig([
-            active_odds["1X2_1"],
-            active_odds["1X2_X"],
-            active_odds["1X2_2"],
-        ])
-        devig_ou = DeVIgEngine.multiplicative_devig([
-            active_odds["OU_OVER"],
-            active_odds["OU_UNDER"],
-        ])
-        devig_btts = DeVIgEngine.multiplicative_devig([
-            active_odds["BTTS_YES"],
-            active_odds["BTTS_NO"],
-        ])
-
-        fair_probs = {
-            "1X2_1": devig_1x2[0],
-            "1X2_X": devig_1x2[1],
-            "1X2_2": devig_1x2[2],
-            "OU_OVER": devig_ou[0],
-            "OU_UNDER": devig_ou[1],
-            "BTTS_YES": devig_btts[0],
-            "BTTS_NO": devig_btts[1],
-        }
+        fair_probs: Dict[str, Optional[float]]
+        if odds_available:
+            devig_1x2, _ = DeVIgEngine.shin_devig([
+                active_odds["1X2_1"], active_odds["1X2_X"], active_odds["1X2_2"],
+            ])
+            devig_ou = DeVIgEngine.multiplicative_devig([
+                active_odds["OU_OVER"], active_odds["OU_UNDER"],
+            ])
+            devig_btts = DeVIgEngine.multiplicative_devig([
+                active_odds["BTTS_YES"], active_odds["BTTS_NO"],
+            ])
+            fair_probs = {
+                "1X2_1": devig_1x2[0],
+                "1X2_X": devig_1x2[1],
+                "1X2_2": devig_1x2[2],
+                "OU_OVER": devig_ou[0],
+                "OU_UNDER": devig_ou[1],
+                "BTTS_YES": devig_btts[0],
+                "BTTS_NO": devig_btts[1],
+            }
+        else:
+            fair_probs = {key: None for key in required_odds}
 
         predictions: List[Dict[str, Any]] = []
 
         for market, sel, line, raw_p, o_key in markets:
-            calibrated_p = float(np.ravel(self.calibrator.calibrate(raw_p))[0])
-            calibrated_p = float(max(0.01, min(0.99, calibrated_p)))
-            decimal_odds = active_odds[o_key]
-            fair_p = fair_probs[o_key]
+            raw_p = float(max(0.0, min(1.0, raw_p)))
+            calibration_applied = self.calibrator is not None
+            if calibration_applied:
+                calibrated_p = float(np.ravel(self.calibrator.calibrate(raw_p))[0])
+                calibrated_p = float(max(0.01, min(0.99, calibrated_p)))
+                calibration_version = "validated_calibrator"
+            else:
+                # Keep the raw model probability auditable, but explicitly mark it
+                # as uncalibrated. Downstream gate logic will force NO_BET.
+                calibrated_p = raw_p
+                calibration_version = "UNAVAILABLE"
 
-            ev = (calibrated_p * decimal_odds) - 1.0
-            edge = calibrated_p - fair_p
+            decimal_odds = float(active_odds[o_key]) if odds_available else None
+            fair_p = fair_probs[o_key]
+            ev = (
+                (calibrated_p * decimal_odds) - 1.0
+                if calibration_applied and decimal_odds is not None
+                else None
+            )
+            edge = (
+                calibrated_p - fair_p
+                if calibration_applied and fair_p is not None
+                else None
+            )
 
             prob_lower = max(0.0, calibrated_p - (1.96 * mc_se))
             prob_upper = min(1.0, calibrated_p + (1.96 * mc_se))
 
-            # 10-point NO-BET gate evaluation
             gate_res: NoBetGateResult = self.no_bet_gate.evaluate(
-                ev=ev,
+                ev=ev if ev is not None else 0.0,
                 edge=edge,
                 lineup_confirmed=lineup_confirmed,
                 home_starters_count=11 if lineup_confirmed else None,
                 away_starters_count=11 if lineup_confirmed else None,
-                odds_age_seconds=120.0,
+                # Missing odds are represented as unavailable, not as a fake age.
+                odds_age_seconds=0.0 if odds_available else float("inf"),
                 is_live=(stage == "LIVE"),
-                is_market_suspended=False,
-                odds_available=True,
+                is_market_suspended=not odds_available,
+                odds_available=odds_available,
                 odds_1xbet=decimal_odds,
                 monte_carlo_se=mc_se,
                 prob_lower=prob_lower,
                 prob_upper=prob_upper,
-                model_calibrated=True,
-                historical_sample_size=350,
+                model_calibrated=calibration_applied,
+                historical_sample_size=0,
             )
+            gate_reasons = list(dict.fromkeys(
+                ([ "ODDS_UNAVAILABLE" ] if not odds_available else [])
+                + ([ "MODEL_UNCALIBRATED" ] if not calibration_applied else [])
+                + list(gate_res.reasons)
+            ))
+            gate_res = NoBetGateResult(action="NO_BET" if gate_reasons else gate_res.action, reasons=gate_reasons)
 
             # Compute Lineup Information Value
             liv = self.compute_lineup_information_value(
@@ -308,17 +324,18 @@ class AnalysisWorker:
                 "calibrated_probability": round(calibrated_p, 6),
                 "probability_lower": round(prob_lower, 6),
                 "probability_upper": round(prob_upper, 6),
-                "decimal_odds": round(decimal_odds, 4),
-                "implied_probability": round(1.0 / decimal_odds, 6),
-                "fair_probability": round(fair_p, 6),
-                "expected_value": round(ev, 6),
-                "value_edge": round(edge, 6),
+                "decimal_odds": round(decimal_odds, 4) if decimal_odds is not None else None,
+                "implied_probability": round(1.0 / decimal_odds, 6) if decimal_odds is not None else None,
+                "fair_probability": round(fair_p, 6) if fair_p is not None else None,
+                "expected_value": round(ev, 6) if ev is not None else None,
+                "value_edge": round(edge, 6) if edge is not None else None,
                 "recommended_action": gate_res.action,
                 "no_bet_reasons": gate_res.reasons,
-                "simulation_count": 10_000,
+                "simulation_count": int(simulation_count),
                 "simulation_version": "vectorized_mc_v1",
                 "model_version": "dixon_coles_ewma_v1",
-                "calibration_version": "isotonic_v1",
+                "calibration_version": calibration_version,
+                "calibration_applied": calibration_applied,
                 "lineup_information_value": liv,
                 "predicted_at": now_utc.isoformat(),
             }
@@ -327,25 +344,34 @@ class AnalysisWorker:
             mem_key = f"{match_id}:{market}:{sel}:{stage}"
             self._in_memory_predictions[mem_key] = prediction_record
 
-            # Log to Counterfactual candidate ledger
-            action_choice = "BET" if gate_res.action == "BET" else "ABSTAIN"
-            self.cf_logger.record_opportunity(
-                fixture_id=match_id,
-                match_timestamp=now_utc,
-                market=market,
-                competition=competition,
-                decimal_odds=decimal_odds,
-                fair_probability=fair_p,
-                expected_value=ev,
-                value_edge=edge,
-                raw_probability=raw_p,
-                calibrated_probability=calibrated_p,
-                probability_interval=(prob_lower, prob_upper),
-                gate_action=gate_res.action,
-                gate_reasons=gate_res.reasons,
-                chosen_action=action_choice,
-                action_propensity=1.0,
-            )
+            # Counterfactual policy logging requires a real, complete market and
+            # a validated probability. Missing prerequisites stay in the prediction
+            # ledger but are not masqueraded as policy observations.
+            if (
+                odds_available
+                and calibration_applied
+                and decimal_odds is not None
+                and fair_p is not None
+                and ev is not None
+            ):
+                action_choice = "BET" if gate_res.action == "BET" else "ABSTAIN"
+                self.cf_logger.record_opportunity(
+                    fixture_id=match_id,
+                    match_timestamp=now_utc,
+                    market=market,
+                    competition=competition,
+                    decimal_odds=decimal_odds,
+                    fair_probability=fair_p,
+                    expected_value=ev,
+                    value_edge=edge or 0.0,
+                    raw_probability=raw_p,
+                    calibrated_probability=calibrated_p,
+                    probability_interval=(prob_lower, prob_upper),
+                    gate_action=gate_res.action,
+                    gate_reasons=gate_res.reasons,
+                    chosen_action=action_choice,
+                    action_propensity=1.0,
+                )
 
             predictions.append(prediction_record)
 

@@ -54,6 +54,6 @@ jobs:
         run: mypy python/ --ignore-missing-imports
 
       - name: Run tests
-        run: pytest python/tests/ -v
+        run: pytest tests/ -v
         env:
           PYTHONPATH: ${{ github.workspace }}
