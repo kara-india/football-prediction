@@ -1,5 +1,6 @@
 import time
 import logging
+import os
 import requests
 from requests.adapters import HTTPAdapter, Retry
 from functools import lru_cache
@@ -15,10 +16,10 @@ class DataNotAvailableError(Exception):
     pass
 
 class APIFootballAdapter:
-    def __init__(self, api_key: str = "dummy", cache: DataCache = None, quota_manager: Optional[CentralQuotaManager] = None):
+    def __init__(self, api_key: Optional[str] = None, cache: DataCache = None, quota_manager: Optional[CentralQuotaManager] = None):
         self.base_url = 'https://v3.football.api-sports.io'
-        self.api_key = api_key
-        self.headers = {'x-apisports-key': self.api_key}
+        self.api_key = api_key or os.environ.get("API_FOOTBALL_KEY")
+        self.headers = {'x-apisports-key': self.api_key} if self.api_key else {}
         self.cache = cache or DataCache()
         self.quota_manager = quota_manager or CentralQuotaManager()
         self._quota_remaining: Optional[int] = None
@@ -58,6 +59,9 @@ class APIFootballAdapter:
         # Atomically reserve quota before making network call
         self.quota_manager.reserve(is_user=is_user, cost=1)
             
+        if not self.api_key:
+            raise APIError("API_FOOTBALL_KEY is not configured; refusing external API call.")
+
         url = f"{self.base_url}/{endpoint}"
         self.logger.info(f"Request: {url} {params}")
         
