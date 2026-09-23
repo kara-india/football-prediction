@@ -10,7 +10,7 @@ This document is the authoritative runtime state contract for development sessio
 - **CURRENT PHASE**: `Phase 4 — Target Odds (1xBet) Engine`
 - **STATUS**: `READY_TO_START`
 - **LAST COMPLETED PHASE**: `Phase 3 — Zero-Cost Data Ingestion`
-- **LAST VERIFIED GIT SHA**: `PENDING_COMMIT`
+- **LAST VERIFIED GIT SHA**: `3e890ea52e5f207321cc19160a729807eb7bc4f9`
 - **LAST VERIFIED SUPABASE STATE**: 
   - Project URL: `https://qqcxjjkgvqknesrtnwal.supabase.co`
   - Engine: PostgreSQL 17 (Healthy)
@@ -37,7 +37,7 @@ This document is the authoritative runtime state contract for development sessio
 | **Phase 0** | Repository & Security Hardening | **P0** | `COMPLETED` | 2026-09-24 00:17 IST | 2026-09-24 00:26 IST | `59d95e804e65cc3e032ebd4e406caf24d86bc587` |
 | **Phase 1** | Database & Migration Hardening | **P0** | `COMPLETED` | 2026-09-24 00:46 IST | 2026-09-24 00:51 IST | `af3700772c65ffd9947c47ab330f5d499703e91f` |
 | **Phase 2** | Quota Governance & Cost Safety | **P0** | `COMPLETED` | 2026-09-24 00:51 IST | 2026-09-24 00:54 IST | `af3700772c65ffd9947c47ab330f5d499703e91f` |
-| **Phase 3** | Zero-Cost Data Ingestion | **P1** | `COMPLETED` | 2026-09-24 00:54 IST | 2026-09-24 00:56 IST | `TRACKED_IN_NEXT_COMMIT` |
+| **Phase 3** | Zero-Cost Data Ingestion | **P1** | `COMPLETED` | 2026-09-24 00:54 IST | 2026-09-24 00:56 IST | `3e890ea52e5f207321cc19160a729807eb7bc4f9` |
 | **Phase 4** | Target Odds (1xBet) Engine | **P1** | `READY_TO_START` | — | — | — |
 | **Phase 5** | Lineup & Runtime Gatekeeper | **P1** | `PENDING` | — | — | — |
 | **Phase 6** | Core Statistical & Monte Carlo | **P1** | `PENDING` | — | — | — |
