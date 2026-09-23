@@ -133,9 +133,73 @@ class CanonicalSettlement:
     match_id: str
     market: str
     selection: str
-    line: Optional[float]
     odds_at_prediction: float
-    actual_outcome: str                # "WIN", "LOSS", "PUSH", "VOID"
+    actual_outcome: str                # "WON", "LOST", "PUSH", "VOID" (or "WIN", "LOSS")
     profit_loss: float                 # Normalized PnL per 1.0 unit stake
-    brier_score_contribution: float
     settled_at: datetime
+    line: Optional[float] = None
+    closing_odds: Optional[float] = None
+    clv: Optional[float] = None        # (odds_at_prediction / closing_odds) - 1.0
+    actual_home_goals: Optional[int] = None
+    actual_away_goals: Optional[int] = None
+    actual_cards: Optional[int] = None
+    actual_corners: Optional[int] = None
+    brier_score_contribution: Optional[float] = None
+    error_classification: Optional[str] = None
+
+    @property
+    def outcome(self) -> str:
+        """Alias for actual_outcome."""
+        return self.actual_outcome
+
+    @property
+    def closing_odds_1xbet(self) -> Optional[float]:
+        """Alias for closing_odds."""
+        return self.closing_odds
+
+    @property
+    def actual_score_home(self) -> Optional[int]:
+        """Alias for actual_home_goals."""
+        return self.actual_home_goals
+
+    @property
+    def actual_score_away(self) -> Optional[int]:
+        """Alias for actual_away_goals."""
+        return self.actual_away_goals
+
+
+from enum import Enum
+
+
+class ErrorCategory(str, Enum):
+    """Authoritative 11-category post-settlement error taxonomy."""
+    TEAM_STRENGTH_MISS = "TEAM_STRENGTH_MISS"
+    LINEUP_MISASSESSMENT = "LINEUP_MISASSESSMENT"
+    PLAYER_PROJECTION_ERROR = "PLAYER_PROJECTION_ERROR"
+    TACTICAL_MISMATCH = "TACTICAL_MISMATCH"
+    LIVE_STATE_ERROR = "LIVE_STATE_ERROR"
+    ODDS_STALENESS = "ODDS_STALENESS"
+    SOURCE_CONFLICT = "SOURCE_CONFLICT"
+    DATA_MISSING = "DATA_MISSING"
+    CALIBRATION_ERROR = "CALIBRATION_ERROR"
+    PARAMETER_DRIFT = "PARAMETER_DRIFT"
+    RANDOM_VARIANCE = "RANDOM_VARIANCE"
+
+
+@dataclass(frozen=True)
+class CanonicalForecastError:
+    """Outcome evaluation and causal error classification record generated post-settlement."""
+    error_id: str
+    prediction_id: str
+    match_id: str
+    brier_contribution: float
+    log_loss_contribution: float
+    calibration_residual: float
+    scoreline_error: int               # Absolute goal difference error
+    ev_realization: float              # Realized PnL - Expected Value
+    clv: Optional[float]
+    primary_category: ErrorCategory
+    secondary_category: Optional[ErrorCategory] = None
+    evidence_notes: str = ""
+    goal_count_residual: Optional[float] = None
+    prediction_stage: Optional[str] = "FINAL_PREMATCH"

@@ -35,6 +35,8 @@ export default function Header() {
         return { section: 'Audit Ledger', title: 'Paper Bet Performance Ledger' }
       case '/analytics':
         return { section: 'Analytics', title: 'Performance Analytics' }
+      case '/models':
+        return { section: 'Governance', title: 'Model Improvement & LIV Telemetry' }
       case '/providers':
         return { section: 'System', title: 'System Status & Quota Protection' }
       default:
