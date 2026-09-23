@@ -133,6 +133,6 @@ export async function GET() {
   } catch (error: any) {
     console.error('Failed to fetch upcoming matches:', error)
     const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)
-    return NextResponse.json(stale || [])
+    return NextResponse.json((stale || []).filter((m: any) => isActuallyUpcoming(m)))
   }
 }
