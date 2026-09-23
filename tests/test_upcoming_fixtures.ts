@@ -1,4 +1,4 @@
-import { isActuallyUpcoming } from '../src/app/api/matches/upcoming/route'
+import { isActuallyUpcoming } from '../src/lib/upcomingFixtures'
 
 describe('isActuallyUpcoming', () => {
   const now = new Date('2026-09-24T10:00:00.000Z').getTime()

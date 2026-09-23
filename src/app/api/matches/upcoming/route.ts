@@ -1,21 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getDiskCache, setDiskCache } from '@/lib/diskCache'
 import { canMakeAPIRequest, recordAPIRequest } from '@/lib/quotaGuard'
+import { isActuallyUpcoming } from '@/lib/upcomingFixtures'
 
-// 30-minute disk cache for upcoming fixtures (0 calls if refreshed within 30 min)
+// 30-minute disk cache for upcoming fixtures (0 calls if refreshed within 30 mins)
 const CACHE_TTL_MS = 30 * 60 * 1000
 const CACHE_KEY = 'upcoming_fixtures_cache'
-const TERMINAL_STATUSES = new Set(['FT', 'AET', 'PEN', 'PST', 'CANC', 'ABD', 'AWD', 'WO'])
 
 const ALLOWED_LEAGUES = new Set([39, 71, 135, 140, 78, 61, 94, 88, 128, 144, 2, 3, 1, 4, 5, 9, 6, 7, 10])
 
-
-export function isActuallyUpcoming(m: any, nowMs = Date.now()): boolean {
-  const kickoffMs = new Date(m?.kickoff).getTime()
-  return Number.isFinite(kickoffMs) &&
-    kickoffMs > nowMs &&
-    !TERMINAL_STATUSES.has(m?.status)
-}
 
 function isEligibleFixture(m: any): boolean {
   const leagueId = m.league?.id
