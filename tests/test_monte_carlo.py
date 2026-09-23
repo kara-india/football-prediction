@@ -1,3 +1,4 @@
+import math
 import pytest
 from python.simulation.match_state import MatchState
 from python.simulation.event_intensities import EventIntensityEstimator
@@ -126,3 +127,75 @@ def test_score_state_effect():
     away_goals_0_0 = [p.final_score_away - state_0_0.score_away for p in res_0_0.paths]
     
     assert sum(away_goals_2_0) != sum(away_goals_0_0)
+
+
+def test_red_card_reduces_goal_expectation():
+    """Verify red card penalty results in approximately 35% reduction in goal intensity."""
+    state_even = get_base_state()
+    state_red = get_base_state()
+    state_red.red_cards_home = 1
+
+    sim = MonteCarloSimulator(seed=123)
+    res_even = sim.simulate_match_from_state(state_even, 0.02, 0.02, n_simulations=20000)
+    res_red = sim.simulate_match_from_state(state_red, 0.02, 0.02, n_simulations=20000)
+
+    avg_home_even = sum(p.final_score_home for p in res_even.paths) / 20000
+    avg_home_red = sum(p.final_score_home for p in res_red.paths) / 20000
+
+    # Ratio of red card goals to even goals should be close to 0.65 (within empirical margin 0.58 - 0.72)
+    ratio = avg_home_red / avg_home_even
+    assert 0.58 <= ratio <= 0.72
+
+
+def test_standard_error_matches_theoretical_formula():
+    """Verify empirical standard error matches sqrt(p * (1 - p) / N) and decays with 1/sqrt(N)."""
+    state = get_base_state()
+    sim = MonteCarloSimulator(seed=42)
+
+    # 1. Test at N = 10,000
+    res_10k = sim.simulate_match_from_state(state, 0.02, 0.02, n_simulations=10000)
+    p_home_10k = sum(1 for p in res_10k.paths if p.final_score_home > p.final_score_away) / 10000
+    expected_se_10k = math.sqrt(p_home_10k * (1.0 - p_home_10k) / 10000)
+
+    assert pytest.approx(res_10k.std_error, rel=0.15) == expected_se_10k
+
+    # 2. Test at N = 40,000 (should be roughly half the standard error of 10,000: 1/sqrt(4) = 0.5)
+    res_40k = sim.simulate_match_from_state(state, 0.02, 0.02, n_simulations=40000)
+    assert res_40k.std_error < res_10k.std_error
+    ratio = res_40k.std_error / res_10k.std_error
+    assert 0.40 <= ratio <= 0.60
+
+
+def test_vectorized_cpu_benchmark_10k_paths():
+    """Verify 10,000 paths simulate in < 250ms on CPU."""
+    import time
+    state = get_base_state()
+    sim = MonteCarloSimulator(seed=42)
+
+    t0 = time.perf_counter()
+    res = sim.simulate_match_from_state(state, 0.02, 0.02, n_simulations=10000)
+    elapsed_ms = (time.perf_counter() - t0) * 1000.0
+
+    assert len(res.paths) == 10000
+    assert elapsed_ms < 250.0, f"Simulation exceeded 250ms benchmark: took {elapsed_ms:.1f}ms"
+
+
+def test_vectorized_simulator_early_convergence():
+    """Verify simulate_with_convergence halts early when target standard error is achieved."""
+    from python.simulation.vectorized_mc import VectorizedMonteCarloSimulator
+    vec_sim = VectorizedMonteCarloSimulator(seed=42)
+    state = get_base_state()
+
+    paths, dist = vec_sim.simulate_with_convergence(
+        state=state,
+        home_lambda_per_min=0.02,
+        away_lambda_per_min=0.02,
+        min_simulations=10000,
+        max_simulations=50000,
+        target_std_error=0.005,
+        batch_size=5000,
+    )
+
+    assert dist["std_error"] <= 0.005
+    assert len(paths) >= 10000
+

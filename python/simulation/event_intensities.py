@@ -26,13 +26,13 @@ class EventIntensityEstimator:
         
         diff = state.score_home - state.score_away
         
-        # Red card effect
+        # Red card effect (immediate 35% reduction in goal intensity for penalized team)
         if state.red_cards_home > 0:
-            home_lambda *= (0.8 ** state.red_cards_home)
-            away_lambda *= (1.2 ** state.red_cards_home)
+            home_lambda *= (0.65 ** state.red_cards_home)
+            away_lambda *= (1.20 ** state.red_cards_home)
         if state.red_cards_away > 0:
-            away_lambda *= (0.8 ** state.red_cards_away)
-            home_lambda *= (1.2 ** state.red_cards_away)
+            away_lambda *= (0.65 ** state.red_cards_away)
+            home_lambda *= (1.20 ** state.red_cards_away)
 
         # Score state multipliers
         if diff == 1:
