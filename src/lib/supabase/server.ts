@@ -5,6 +5,8 @@ export function createServerClientWrapper() {
   const cookieStore = cookies()
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    // WARNING: In production workers, SUPABASE_SERVICE_ROLE_KEY must be set.
+    // The publishable key fallback is only acceptable for read-only client operations during local dev.
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, // Use service role for writes if needed, but not here by default
     {
       cookies: {

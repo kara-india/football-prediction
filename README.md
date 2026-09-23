@@ -154,7 +154,7 @@ The database schema and API keys are already configured in `.env.local`:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://qqcxjjkgvqknesrtnwal.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_MWK1XOnTtdc4MsagVnYHHw_qJUNnqsh
-API_FOOTBALL_KEY=073534f7111a37868a403c5cd51d83fa
+API_FOOTBALL_KEY=  # Obtain from https://dashboard.api-football.com (free tier, 100 req/day)
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 PYTHON_ENGINE_URL=http://localhost:8001
 ```

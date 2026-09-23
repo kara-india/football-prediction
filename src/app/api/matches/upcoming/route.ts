@@ -39,8 +39,14 @@ export async function GET() {
     return NextResponse.json(stale || [])
   }
 
-  const apiKey = process.env.API_FOOTBALL_KEY || '073534f7111a37868a403c5cd51d83fa'
-  const headers = { 'x-apisports-key': apiKey }
+  const API_KEY = process.env.API_FOOTBALL_KEY;
+  if (!API_KEY) {
+    return NextResponse.json(
+      { error: 'API_FOOTBALL_KEY environment variable is not configured. Set it in .env.local.' },
+      { status: 500 }
+    );
+  }
+  const headers = { 'x-apisports-key': API_KEY }
 
   try {
     const nowUtc = new Date()

@@ -1,0 +1,4 @@
+# Development and linting dependencies
+-r requirements.txt
+ruff>=0.4.9,<0.8.0
+mypy>=1.10.0,<2.0.0
