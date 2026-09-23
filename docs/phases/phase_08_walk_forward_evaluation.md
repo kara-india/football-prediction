@@ -75,10 +75,10 @@ Build a mathematically authentic historical replay backtester and walk-forward v
   3. Verify that model comparison identifies superior model on synthetic biased test data.
 
 ## 8. Acceptance Criteria
-- [ ] Hardcoded placeholder metrics (`brier: 0.1`, `winner: challenger`) completely excised.
-- [ ] No-lookahead invariant mathematically verified via unit tests.
-- [ ] Walk-forward evaluation runs across multiple temporal folds producing genuine empirical metrics.
-- [ ] Champion vs challenger comparison requires statistically significant improvement ($p < 0.05$) for promotion recommendation.
+- [x] Hardcoded placeholder metrics (`brier: 0.1`, `winner: challenger`) completely excised.
+- [x] No-lookahead invariant mathematically verified via unit tests.
+- [x] Walk-forward evaluation runs across multiple temporal folds producing genuine empirical metrics.
+- [x] Champion vs challenger comparison requires statistically significant improvement ($p < 0.05$) for promotion recommendation.
 
 ## 9. Deployment Method & Automated Actions
 - **Automated by Claude**:

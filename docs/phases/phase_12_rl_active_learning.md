@@ -56,10 +56,10 @@ Implement an advanced, safe Reinforcement Learning (Contextual Bandit) policy la
   3. Verify off-policy evaluation rejects policies with high variance or negative expected return.
 
 ## 8. Acceptance Criteria
-- [ ] Contextual bandit policy trains cleanly on historical paper bets.
-- [ ] Off-policy evaluation proves policy value prior to any consideration of production use.
-- [ ] Safety constraints cannot be violated by exploration parameters.
-- [ ] System remains in `RESEARCH` mode until explicit user administrative activation.
+- [x] Contextual bandit policy trains cleanly on historical paper bets.
+- [x] Off-policy evaluation proves policy value prior to any consideration of production use.
+- [x] Safety constraints cannot be violated by exploration parameters.
+- [x] System remains in `RESEARCH` mode until explicit user administrative activation.
 
 ## 9. Deployment Method & Automated Actions
 - **Automated by Claude**:

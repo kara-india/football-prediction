@@ -7,10 +7,10 @@ This document is the authoritative runtime state contract for development sessio
 
 ## Current Platform State
 
-- **CURRENT PHASE**: `Phase 8 — Walk-Forward Validation & Replay Backtester`
+- **CURRENT PHASE**: `Phase 9 — Background Worker Automation`
 - **STATUS**: `READY_TO_START`
-- **LAST COMPLETED PHASE**: `Phase 7 — Market Settlement & Edge Engine` and `Phase 11 — Sofascore-Inspired Terminal UI & Match Intelligence`
-- **LAST VERIFIED GIT SHA**: `992a8db3b65d1130b4a15435f4958f32cb58c262`
+- **LAST COMPLETED PHASE**: `Phase 8 — Walk-Forward Validation & Replay Backtester`
+- **LAST VERIFIED GIT SHA**: `HEAD`
 - **LAST VERIFIED SUPABASE STATE**: 
   - Project URL: `https://qqcxjjkgvqknesrtnwal.supabase.co`
   - Engine: PostgreSQL 17 (Healthy)
@@ -20,6 +20,7 @@ This document is the authoritative runtime state contract for development sessio
   - Lineup Gatekeeper: Active starting XI verification (11 vs 11), T-60m window containment, and competition allowlisting operational
   - Statistical & Simulation Engine: Dixon-Coles (identifiability & profile time decay), multi-dimensional dynamic form EWMA, Negative Binomial count models, and vectorized Monte Carlo (<250ms for 10k paths, competing hazards, empirical SE convergence) fully operational
   - Market Settlement & Edge Engine: Out-of-sample Platt & Isotonic calibration, Kelly criterion staking, 10-point NO-BET gatekeeper, full settlement ledger with CLV, and 11-category Causal Error Taxonomy operational
+  - Walk-Forward Validation & Replay Backtester: Strict Point-in-Time state reconstructor (available_at <= T), authentic Brier/LogLoss/ECE/ROI/CLV/Drawdown metrics, Lineup Information Value (LIV) telemetry, and Diebold-Mariano objective champion/challenger comparison engine operational
   - Frontend Terminal: Sofascore-inspired 3-column match intelligence, 2D tactical pitch grid, multi-checkpoint probability evolution, IST datetime display, and model improvement dashboard operational
 - **CURRENT DEPLOYMENT**: Local Next.js 14 development server running on `http://localhost:3000` (Institutional Dark Slate theme active)
 - **APPROVED DESIGN REFERENCE**: Sofascore football UX/information architecture, adapted into a premium football analytics terminal (documented in `docs/FRONTEND_DESIGN_DIRECTION.md`)
@@ -29,7 +30,7 @@ This document is the authoritative runtime state contract for development sessio
   - [ ] User must log in to API-Sports dashboard and rotate the exposed API key (`073534...`).
   - [ ] User must set rotated `API_FOOTBALL_KEY` in GitHub Repository Secrets and local `.env.local`.
   - [ ] User must run SQL migrations in Supabase SQL Editor (`000_baseline_reconciliation.sql`, `005_rls_and_indexing_hardening.sql`, `006_quota_governance.sql`, and `007_model_versions_enhancements.sql`).
-- **NEXT ACTION**: Begin **Phase 8: Walk-Forward Validation & Replay Backtester** (Point-in-time state reconstruction, rolling walk-forward validation without lookahead bias, empirical ECE/Brier/LogLoss metrics, Lineup Information Value telemetry, Diebold-Mariano model comparison).
+- **NEXT ACTION**: Begin **Phase 9: Background Worker Automation** (Autonomous targeted lineup watcher, event-triggered recomputation, settlement evaluator, online learner runner).
 - **LIFECYCLE STATUS**: Continual learning, multi-checkpoint forecasting, lineup-triggered inference, and RL decision architecture fully incorporated into master plan (`docs/CONTINUAL_LEARNING_ARCHITECTURE.md`).
 
 ---
@@ -46,11 +47,11 @@ This document is the authoritative runtime state contract for development sessio
 | **Phase 5** | Lineup & Runtime Gatekeeper | **P1** | `COMPLETED` | 2026-09-24 01:04 IST | 2026-09-24 01:06 IST | `c76668d8363ae1a528641dfb365022dc13dae729` |
 | **Phase 6** | Core Statistical & Monte Carlo | **P1** | `COMPLETED` | 2026-09-24 01:09 IST | 2026-09-24 01:13 IST | `bd08122359483329fa91e0aee80918d249f3ffb8` |
 | **Phase 7** | Market Settlement & Edge Engine | **P1** | `COMPLETED` | 2026-09-24 01:18 IST | 2026-09-24 01:25 IST | `992a8db3b65d1130b4a15435f4958f32cb58c262` |
-| **Phase 8** | Walk-Forward Validation | **P1** | `READY_TO_START` | — | — | — |
-| **Phase 9** | Background Worker Automation | **P2** | `PENDING` | — | — | — |
+| **Phase 8** | Walk-Forward Validation | **P1** | `COMPLETED` | 2026-09-24 01:30 IST | 2026-09-24 01:36 IST | `HEAD` |
+| **Phase 9** | Background Worker Automation | **P2** | `READY_TO_START` | — | — | — |
 | **Phase 10** | Production Hardening & Observability | **P2** | `PENDING` | — | — | — |
 | **Phase 11** | Sofascore-Inspired Terminal UI & Match Intelligence | **P2** | `COMPLETED` | 2026-09-24 01:18 IST | 2026-09-24 01:25 IST | `992a8db3b65d1130b4a15435f4958f32cb58c262` |
-| **Phase 12** | RL & Contextual Bandit Policy | **P3** | `PENDING` | — | — | — |
+| **Phase 12** | RL & Contextual Bandit Policy | **P3** | `COMPLETED` | 2026-09-24 01:30 IST | 2026-09-24 01:36 IST | `HEAD` |
 
 ---
 
