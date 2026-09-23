@@ -81,10 +81,10 @@ Transform the stubbed background workers (`collector_worker.py`, `evaluator_work
   4. Test evaluator settlement idempotent execution on duplicate runs.
 
 ## 8. Acceptance Criteria
-- [ ] Empty `pass` statements completely removed from all worker files.
-- [ ] Workers execute cleanly from terminal via `python -m python.workers.runner <job>`.
-- [ ] Evaluator worker automatically settles bets and logs error taxonomy upon match completion.
-- [ ] Worker execution history logged to Supabase `worker_runs`.
+- [x] Empty `pass` statements completely removed from all worker files.
+- [x] Workers execute cleanly from terminal via `python -m python.workers.runner <job>`.
+- [x] Evaluator worker automatically settles bets and logs error taxonomy upon match completion.
+- [x] Worker execution history logged to Supabase `worker_runs`.
 
 ## 9. Deployment Method & Automated Actions
 - **Automated by Claude**:
