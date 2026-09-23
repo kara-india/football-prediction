@@ -18,7 +18,7 @@ function isEligibleFixture(m: any): boolean {
   const away = m.teams?.away?.name || ''
   const leagueName = m.league?.name || ''
 
-  const youthOrExcluded = /\\b(U17|U18|U19|U20|U21|U23|Youth|Women|Fem|W|Reserves)\\b/i
+  const youthOrExcluded = /\b(U17|U18|U19|U20|U21|U23|Youth|Women|Fem|W|Reserves)\b/i
   if (youthOrExcluded.test(home) || youthOrExcluded.test(away) || youthOrExcluded.test(leagueName)) {
     return false
   }
