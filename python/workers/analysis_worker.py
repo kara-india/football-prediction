@@ -122,8 +122,8 @@ class AnalysisWorker:
         market: str,
         selection: str,
         current_prob: float,
-        current_odds: float,
-        current_ev: float,
+        current_odds: Optional[float],
+        current_ev: Optional[float],
     ) -> Dict[str, float]:
         """Compute Lineup Information Value (LIV) against prior INITIAL checkpoint.
         
@@ -134,15 +134,16 @@ class AnalysisWorker:
         key = f"{match_id}:{market}:{selection}:INITIAL"
         initial_pred = self._in_memory_predictions.get(key)
 
-        if initial_pred:
-            p_init = initial_pred.get("calibrated_prob", current_prob)
-            odds_init = initial_pred.get("decimal_odds", current_odds)
-            ev_init = initial_pred.get("expected_value", current_ev)
-            return {
-                "delta_p": round(current_prob - p_init, 6),
-                "delta_odds": round(current_odds - odds_init, 4),
-                "delta_ev": round(current_ev - ev_init, 6),
-            }
+        if initial_pred and current_odds is not None and current_ev is not None:
+            p_init = initial_pred.get("calibrated_probability")
+            odds_init = initial_pred.get("decimal_odds")
+            ev_init = initial_pred.get("expected_value")
+            if p_init is not None and odds_init is not None and ev_init is not None:
+                return {
+                    "delta_p": round(current_prob - p_init, 6),
+                    "delta_odds": round(current_odds - odds_init, 4),
+                    "delta_ev": round(current_ev - ev_init, 6),
+                }
 
         return {
             "delta_p": 0.0,
@@ -212,7 +213,6 @@ class AnalysisWorker:
             if active_odds.get(key) is None or float(active_odds[key]) <= 1.0
         ]
         odds_available = not missing_odds
-        calibration_available = self.calibrator is not None
 
         # Market configs: (market, selection, line, raw_prob, odds_key)
         markets = [
