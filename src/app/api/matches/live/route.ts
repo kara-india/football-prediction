@@ -1,99 +1,29 @@
 import { NextResponse } from 'next/server'
 import { getDiskCache, setDiskCache } from '@/lib/diskCache'
-import { canMakeAPIRequest, recordAPIRequest } from '@/lib/quotaGuard'
+import { fetchFootball, formatFixture } from '@/lib/feed'
+import { isEligibleFixture } from '@/lib/fixtureEligibility'
 
-const CACHE_TTL_MS = 60 * 1000 // 60 seconds cache for live matches
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+const CACHE_TTL_MS = 60 * 1000
 const CACHE_KEY = 'live_matches_cache'
-
-const ALLOWED_LEAGUES = new Set([39, 71, 135, 140, 78, 61, 94, 88, 128, 144, 2, 3, 1, 4, 5, 9, 6, 7, 10])
-
-function isEligibleFixture(m: any): boolean {
-  const leagueId = m.league?.id
-  if (!ALLOWED_LEAGUES.has(leagueId)) return false
-
-  const home = m.teams?.home?.name || ''
-  const away = m.teams?.away?.name || ''
-  const leagueName = m.league?.name || ''
-
-  const youthOrExcluded = /\b(U17|U18|U19|U20|U21|U23|Youth|Women|Fem|W|Reserves)\b/i
-  if (youthOrExcluded.test(home) || youthOrExcluded.test(away) || youthOrExcluded.test(leagueName)) {
-    return false
-  }
-
-  return true
-}
+const HEADERS = { 'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0' }
 
 export async function GET() {
-  // 1. Check disk cache first (Zero API calls if fresh within 60s)
   const cached = getDiskCache<any[]>(CACHE_KEY, CACHE_TTL_MS)
-  if (cached !== null) {
-    return NextResponse.json(cached)
-  }
+  if (cached !== null) return NextResponse.json(cached, { headers: HEADERS })
 
-  // 2. Strict Quota Guard check (Max 45 automated worker requests/day)
-  const quotaCheck = await canMakeAPIRequest(false)
-  if (!quotaCheck.allowed) {
-    console.warn('[QUOTA GUARD LIVE]', quotaCheck.reason)
+  const result = await fetchFootball('/fixtures?live=all', true)
+  if (!result.ok) {
     const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)
-    return NextResponse.json(stale || [])
+    if (stale?.length) return NextResponse.json(stale, { headers: HEADERS })
+    return NextResponse.json({ error: result.reason || 'LIVE_FEED_UNAVAILABLE' }, { status: result.status || 502, headers: HEADERS })
   }
 
-  const API_KEY = process.env.API_FOOTBALL_KEY;
-  if (!API_KEY) {
-    return NextResponse.json(
-      { error: 'API_FOOTBALL_KEY environment variable is not configured. Set it in .env.local.' },
-      { status: 500 }
-    );
-  }
-  const headers = { 'x-apisports-key': API_KEY }
-
-  try {
-    // 3. Exactly 1 request to fetch all global live matches
-    const res = await fetch('https://v3.football.api-sports.io/fixtures?live=all', {
-      headers
-    })
-    recordAPIRequest('/fixtures?live=all')
-
-    const json = await res.json()
-    const fixtures = json.response || []
-
-    const eligible = fixtures
-      .filter((f: any) => isEligibleFixture(f))
-      .map((m: any) => ({
-        id: m.fixture.id,
-        minute: m.fixture.status.elapsed,
-        status: m.fixture.status.short,
-        statusLong: m.fixture.status.long,
-        score: {
-          home: m.goals.home ?? 0,
-          away: m.goals.away ?? 0
-        },
-        league: {
-          id: m.league.id,
-          name: m.league.name,
-          country: m.league.country,
-          logo: m.league.logo
-        },
-        teams: {
-          home: {
-            id: m.teams.home.id,
-            name: m.teams.home.name,
-            logo: m.teams.home.logo
-          },
-          away: {
-            id: m.teams.away.id,
-            name: m.teams.away.name,
-            logo: m.teams.away.logo
-          }
-        },
-        events: m.events || []
-      }))
-
-    setDiskCache(CACHE_KEY, eligible)
-    return NextResponse.json(eligible)
-  } catch (error: any) {
-    console.error('Failed to fetch live matches:', error)
-    const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)
-    return NextResponse.json(stale || [])
-  }
+  const live = (result.data as any[]).filter(isEligibleFixture).map(formatFixture).map((m: any, i: number) => {
+    const raw = (result.data as any[]).filter(isEligibleFixture)[i]
+    return { ...m, minute: raw.fixture.status.elapsed, events: raw.events || [], score: { home: raw.goals?.home ?? 0, away: raw.goals?.away ?? 0 } }
+  })
+  setDiskCache(CACHE_KEY, live)
+  return NextResponse.json(live, { headers: HEADERS })
 }
