@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, phase-15-advanced-statistical-models]
   pull_request:
     branches: [main]
 
