@@ -40,6 +40,14 @@ export default function MatchdayCommandCenter() {
   const [filterType, setFilterType] = useState<'all' | 'candidates' | 'lineups' | 'live'>('all')
   const [collapsedLeagues, setCollapsedLeagues] = useState<Record<string, boolean>>({})
 
+  const oddsConnected = useMemo(
+    () =>
+      matches.some((m) =>
+        Boolean(m.odds1xBet?.home || m.odds1xBet?.draw || m.odds1xBet?.away),
+      ),
+    [matches],
+  )
+
   // Fetch live matches and upcoming fixtures from the real provider feed
   const fetchAllData = async () => {
     setLoading(true)
@@ -134,7 +142,7 @@ export default function MatchdayCommandCenter() {
         <div className="space-y-2">
           <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-[11px] font-mono text-[#94A3B8] bg-[#0F172A] border border-[#1E293B]">
             <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
-            <span>1xBet Market Data Connected</span>
+            <span>{oddsConnected ? '1xBet Market Data Available' : '1xBet Odds Unavailable'}</span>
             <span className="text-[#64748B]">·</span>
             <span className="text-[#D4AF37] font-semibold">Indian Standard Time (IST, UTC+5:30)</span>
           </div>
