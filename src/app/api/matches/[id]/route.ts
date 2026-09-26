@@ -26,7 +26,7 @@ export async function GET(
     const awayId = Number(fixture.teams?.away?.id)
 
     const [oddsResult, predictionResult, h2hResult] = await Promise.allSettled([
-      fetchApiFootball(`/odds?fixture=${fixtureId}&bookmaker=6`, true),
+      fetchApiFootball(`/odds?fixture=${fixtureId}`, true),
       fetchApiFootball(`/predictions?fixture=${fixtureId}`, true),
       Number.isInteger(homeId) && Number.isInteger(awayId)
         ? fetchApiFootball(`/fixtures/headtohead?h2h=${homeId}-${awayId}`, true)
