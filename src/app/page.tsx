@@ -120,9 +120,11 @@ export default function MatchdayCommandCenter() {
     return groups
   }, [filteredMatches])
 
-  // Priority Watchlist / Candidates
+  // Pre-lineup forecast watchlist. It never invents an edge or betting signal.
   const priorityCandidates = useMemo(() => {
-    return matches.filter((m) => m.decision === 'CANDIDATE' || (m.valueEdge && m.valueEdge > 3.0))
+    return matches
+      .filter((m) => m.decision === 'FORECAST_AVAILABLE' || m.decision === 'CANDIDATE')
+      .slice(0, 6)
   }, [matches])
 
   return (
@@ -240,7 +242,7 @@ export default function MatchdayCommandCenter() {
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#10B981]" />
               <h2 className="text-base font-semibold text-[#F8FAFC]">
-                Priority Watchlist • High Value Candidates
+                Forecast Watchlist • Pre-Lineup Forecasts
               </h2>
               <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30 font-semibold">
                 {priorityCandidates.length} Active
@@ -275,8 +277,8 @@ export default function MatchdayCommandCenter() {
                         {timeUntil.text} • {m.lineupConfirmed ? 'Starting 11 Verified' : 'Forecast before lineups'}
                       </div>
                     </div>
-                    <span className="px-2.5 py-1 rounded bg-[#10B981]/20 text-[#10B981] text-xs font-mono font-bold border border-[#10B981]/40">
-                      CANDIDATE
+                    <span className="px-2.5 py-1 rounded bg-[#1E293B] text-[#94A3B8] text-xs font-mono font-bold border border-[#334155]">
+                      FORECAST
                     </span>
                   </div>
 
@@ -302,8 +304,10 @@ export default function MatchdayCommandCenter() {
                   </div>
 
                   <div className="pt-2 border-t border-[#1E293B] flex items-center justify-between text-xs font-mono">
-                    <span className="text-[#10B981] font-semibold">
-                      +{m.valueEdge ?? 5.6}% Edge on Home
+                    <span className="text-[#64748B]">
+                      {m.valueEdge !== undefined
+                        ? `${m.valueEdge > 0 ? '+' : ''}${m.valueEdge.toFixed(1)} pp model edge`
+                        : 'Forecast only — internal edge not yet validated'}
                     </span>
                     <Link
                       href={`/matches/${m.id}`}
