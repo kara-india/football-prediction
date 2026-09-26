@@ -293,6 +293,15 @@ flowchart TD
 
 ## 9. Mathematical & Statistical Engine Roadmap
 
+### 9.3 Phase 15 — Advanced Statistical Modeling & Assumption Removal
+- Dynamic score-driven Dixon-Coles challenger with learned state persistence and gains.
+- Likelihood/BIC selection between Poisson and Negative Binomial goal distributions.
+- Learned regularized player/XI contributions rather than fixed lineup penalties.
+- Learned discrete-time live goal hazard rather than fixed minute/score/red-card multipliers.
+- Learned form-to-goals mapping rather than fixed feature weights.
+- Real-data-only benchmark CLI; no synthetic historical evidence.
+- Challenger models remain unpromoted until paired chronological out-of-sample validation supports them.
+
 ### 9.1 First Vertical Slice: Over/Under 2.5 Goals
 To ensure end-to-end mathematical rigor before expanding across all 9 markets, the platform will implement a single vertical slice:
 1. **Data**: 5 years of historical goal counts per team (home/away splits).
