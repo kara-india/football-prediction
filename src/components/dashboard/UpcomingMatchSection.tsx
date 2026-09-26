@@ -97,7 +97,7 @@ export default function UpcomingMatchSection() {
       setAnalyzingMatchId(null)
       setAnalyzedFeedback((prev) => ({
         ...prev,
-        [matchId]: '1xBet Market Edge: +4.6% on Draw (Verified Value)'
+        [matchId]: 'Forecast refreshed for the selected fixture.'
       }))
     }, 800)
   }
@@ -259,7 +259,7 @@ export default function UpcomingMatchSection() {
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-[#d4af37]"></span>
                         <span className="text-[#f0f4fc] font-semibold text-[11px]">
-                          1xBet Fixed Odds (Bookmaker ID: 6)
+                          1xBet Fixed Odds
                         </span>
                       </div>
                       {has1xBet ? (
@@ -314,7 +314,7 @@ export default function UpcomingMatchSection() {
                     ) : (
                       <div className="p-3 text-center bg-[#0e131b] border border-[#1e2638] rounded-lg">
                         <p className="text-xs text-[#8a99ad] font-mono">
-                          1xBet odds stored in disk cache. Click analyze to trigger single-call refresh.
+                          1xBet prices are unavailable in the current upstream snapshot.
                         </p>
                       </div>
                     )}
