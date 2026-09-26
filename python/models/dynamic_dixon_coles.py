@@ -339,6 +339,15 @@ class ScoreDrivenDixonColes:
             raise RuntimeError("Invalid dynamic Dixon-Coles score distribution.")
         return matrix / total
 
+    def get_expected_goals(self, home_id: Any, away_id: Any) -> Tuple[float, float]:
+        """Return model-implied expected home and away goals from the score matrix."""
+        matrix = self.predict_score_matrix(home_id, away_id)
+        i_grid, j_grid = np.indices(matrix.shape)
+        return (
+            float(np.sum(i_grid * matrix)),
+            float(np.sum(j_grid * matrix)),
+        )
+
     def predict_1x2(self, home_id: Any, away_id: Any) -> Tuple[float, float, float]:
         matrix = self.predict_score_matrix(home_id, away_id)
         return (
