@@ -1,11 +1,13 @@
+"""Phase 2 quota governor tests.
+
+These tests exercise the application client against a fake atomic RPC service.
+They deliberately do not maintain a local usage counter because quota authority
+must remain centralized in PostgreSQL.
 """
-Quota Governance & Cost Safety Test Suite — Phase 2
-Verifies atomic quota reservation, strict enforcement of the ₹0.00 cost mandate,
-50 user reserve, 45 worker budget, 5 safety buffer, and zero filesystem leaks.
-"""
-import os
 import concurrent.futures
-from datetime import datetime, timezone
+import os
+import threading
+
 import pytest
 
 from python.adapters.quota_manager import CentralQuotaManager, QuotaExceededError
@@ -13,111 +15,204 @@ from python.adapters.quota_manager import CentralQuotaManager, QuotaExceededErro
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
-class TestQuotaGovernor:
-    """Validate strict daily limits and cost containment."""
+class FakeQuotaRPC:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.user_used = 0
+        self.worker_used = 0
+        self.date_utc = "2026-09-26"
 
-    def test_worker_budget_cap_at_45(self):
-        """Sequential worker requests must strictly stop at 45. 46th must raise QuotaExceededError."""
-        # Use an isolated in-memory manager instance without remote DB to test boundary logic
-        manager = CentralQuotaManager(supabase_url="", supabase_key="")
+    def __call__(self, function_name, payload):
+        with self.lock:
+            assert function_name in {"reserve_api_quota", "get_api_quota_status"}
 
-        # Successfully reserve 45 worker credits
-        for i in range(45):
-            res = manager.reserve(is_user=False, cost=1)
-            assert res["allowed"] is True
+            if function_name == "get_api_quota_status":
+                return {
+                    "available": True,
+                    "provider": payload["p_provider"],
+                    "date_utc": self.date_utc,
+                    "user_requests_made": self.user_used,
+                    "worker_requests_made": self.worker_used,
+                    "total_used": self.user_used + self.worker_used,
+                    "daily_limit": 95,
+                    "user_reserve": 50,
+                    "worker_budget": 45,
+                    "safety_buffer": 5,
+                    "remaining_user": 50 - self.user_used,
+                    "remaining_worker": 45 - self.worker_used,
+                }
 
-        status = manager.get_status()
-        assert status["worker_used"] == 45
-        assert status["remaining_worker"] == 0
-        assert status["remaining_user"] == 50
+            cost = payload["p_cost"]
+            is_user = payload["p_is_user"]
+            total = self.user_used + self.worker_used
 
-        # 46th automated worker request must fail
-        with pytest.raises(QuotaExceededError) as exc_info:
-            manager.reserve(is_user=False, cost=1)
-        assert "worker budget exhausted" in str(exc_info.value).lower()
+            if total + cost > 95:
+                return {
+                    "allowed": False,
+                    "reason": "Hard safety stop",
+                    "remaining_user": 50 - self.user_used,
+                    "remaining_worker": 45 - self.worker_used,
+                    "total_used": total,
+                    "date_utc": self.date_utc,
+                }
 
-    def test_user_reserve_cap_at_50(self):
-        """Sequential user requests must strictly stop at 50. 51st must raise QuotaExceededError."""
-        manager = CentralQuotaManager(supabase_url="", supabase_key="")
+            if is_user and self.user_used + cost > 50:
+                return {
+                    "allowed": False,
+                    "reason": "User analysis quota reached",
+                    "remaining_user": 0,
+                    "remaining_worker": 45 - self.worker_used,
+                    "total_used": total,
+                    "date_utc": self.date_utc,
+                }
 
-        # Successfully reserve 50 user credits
-        for i in range(50):
-            res = manager.reserve(is_user=True, cost=1)
-            assert res["allowed"] is True
+            if not is_user and self.worker_used + cost > 45:
+                return {
+                    "allowed": False,
+                    "reason": "Automated worker budget exhausted",
+                    "remaining_user": 50 - self.user_used,
+                    "remaining_worker": 0,
+                    "total_used": total,
+                    "date_utc": self.date_utc,
+                }
 
-        status = manager.get_status()
-        assert status["user_used"] == 50
-        assert status["remaining_user"] == 0
+            if is_user:
+                self.user_used += cost
+            else:
+                self.worker_used += cost
 
-        # 51st user request must fail
-        with pytest.raises(QuotaExceededError) as exc_info:
-            manager.reserve(is_user=True, cost=1)
-        assert "user analysis quota reached" in str(exc_info.value).lower()
+            return {
+                "allowed": True,
+                "remaining_user": 50 - self.user_used,
+                "remaining_worker": 45 - self.worker_used,
+                "total_used": self.user_used + self.worker_used,
+                "date_utc": self.date_utc,
+            }
 
-    def test_hard_stop_total_at_95(self):
-        """Combined usage must never exceed 95 (preserving 5 requests emergency buffer)."""
-        manager = CentralQuotaManager(supabase_url="", supabase_key="")
 
-        # Fill 45 worker + 50 user = 95 total
-        for _ in range(45):
-            manager.reserve(is_user=False, cost=1)
-        for _ in range(50):
-            manager.reserve(is_user=True, cost=1)
+def build_manager(fake=None):
+    return CentralQuotaManager(
+        supabase_url="https://quota.test",
+        supabase_key="service-role-test",
+        rpc_call=fake or FakeQuotaRPC(),
+    )
 
-        status = manager.get_status()
-        assert status["total_used"] == 95
-        assert status["safety_buffer"] == 5
 
-        # Any further request must fail
-        with pytest.raises(QuotaExceededError):
-            manager.reserve(is_user=True, cost=1)
-        with pytest.raises(QuotaExceededError):
-            manager.reserve(is_user=False, cost=1)
+def test_worker_budget_cap_at_45():
+    fake = FakeQuotaRPC()
+    manager = build_manager(fake)
 
-    def test_concurrent_reservation_safety(self):
-        """Simultaneous concurrent requests must not exceed budget."""
-        manager = CentralQuotaManager(supabase_url="", supabase_key="")
+    for _ in range(45):
+        assert manager.reserve(is_user=False, cost=1)["allowed"] is True
 
-        # Concurrently fire 40 worker reservations from 10 threads
-        def make_call():
-            try:
-                manager.reserve(is_user=False, cost=1)
-                return True
-            except QuotaExceededError:
-                return False
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [executor.submit(make_call) for _ in range(50)]
-            results = [f.result() for f in futures]
-
-        status = manager.get_status()
-        # Exactly 45 should succeed and 5 should fail
-        successful = sum(1 for r in results if r is True)
-        assert successful == 45, f"Expected exactly 45 successful worker reservations, got {successful}"
-        assert status["worker_used"] == 45
-
-    def test_no_filesystem_quota_leaks(self):
-        """Ensure no local .cache/api_quota.json or local budget file is created."""
-        cache_file = os.path.join(REPO_ROOT, ".cache", "api_quota.json")
-        manager = CentralQuotaManager(supabase_url="", supabase_key="")
+    with pytest.raises(QuotaExceededError, match="worker budget exhausted"):
         manager.reserve(is_user=False, cost=1)
+
+    status = manager.get_status()
+    assert status["worker_used"] == 45
+    assert status["remaining_worker"] == 0
+
+
+def test_user_reserve_cap_at_50():
+    fake = FakeQuotaRPC()
+    manager = build_manager(fake)
+
+    for _ in range(50):
+        assert manager.reserve(is_user=True, cost=1)["allowed"] is True
+
+    with pytest.raises(QuotaExceededError, match="user analysis quota reached"):
         manager.reserve(is_user=True, cost=1)
 
-        assert not os.path.exists(cache_file), (
-            f"VIOLATION: Quota operation created local filesystem file at {cache_file}!"
-        )
+    status = manager.get_status()
+    assert status["user_used"] == 50
+    assert status["remaining_user"] == 0
 
-    def test_migration_006_sql_syntax(self):
-        """Verify 006_quota_governance.sql contains atomic function and correct grants."""
-        migration_file = os.path.join(REPO_ROOT, "supabase", "migrations", "006_quota_governance.sql")
-        assert os.path.exists(migration_file)
 
-        with open(migration_file, "r", encoding="utf-8") as f:
-            content = f.read()
+def test_hard_stop_at_95():
+    fake = FakeQuotaRPC()
+    manager = build_manager(fake)
 
-        assert "CREATE OR REPLACE FUNCTION public.reserve_api_quota" in content
-        assert "daily_limit" in content
-        assert "user_reserve" in content
-        assert "worker_budget" in content
-        assert "FOR UPDATE" in content
-        assert "get_api_quota_status" in content
+    for _ in range(45):
+        manager.reserve(is_user=False, cost=1)
+    for _ in range(50):
+        manager.reserve(is_user=True, cost=1)
+
+    assert manager.get_status()["total_used"] == 95
+
+    with pytest.raises(QuotaExceededError):
+        manager.reserve(is_user=True, cost=1)
+
+
+def test_concurrent_reservations_are_atomic():
+    fake = FakeQuotaRPC()
+    manager = build_manager(fake)
+
+    def make_call(_):
+        try:
+            manager.reserve(is_user=False, cost=1)
+            return True
+        except QuotaExceededError:
+            return False
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        results = list(executor.map(make_call, range(20)))
+
+    assert sum(results) == 20
+    assert fake.worker_used == 20
+
+
+def test_concurrent_worker_cap():
+    fake = FakeQuotaRPC()
+    manager = build_manager(fake)
+
+    def make_call(_):
+        try:
+            manager.reserve(is_user=False, cost=1)
+            return True
+        except QuotaExceededError:
+            return False
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        results = list(executor.map(make_call, range(50)))
+
+    assert sum(results) == 45
+    assert fake.worker_used == 45
+
+
+def test_missing_governor_fails_closed():
+    manager = CentralQuotaManager(supabase_url="", supabase_key="")
+
+    with pytest.raises(QuotaExceededError, match="QUOTA_GOVERNOR_UNCONFIGURED"):
+        manager.reserve(is_user=False, cost=1)
+
+
+def test_invalid_cost_fails_closed():
+    manager = build_manager()
+
+    with pytest.raises(QuotaExceededError, match="INVALID_QUOTA_COST"):
+        manager.reserve(is_user=False, cost=0)
+
+
+def test_no_local_quota_file():
+    fake = FakeQuotaRPC()
+    manager = build_manager(fake)
+    manager.reserve(is_user=False, cost=1)
+    manager.reserve(is_user=True, cost=1)
+
+    assert not os.path.exists(os.path.join(REPO_ROOT, ".cache", "api_quota.json"))
+    assert not os.path.exists(os.path.join(REPO_ROOT, "request_budget.json"))
+
+
+def test_migration_uses_dedicated_ledger_and_service_role_only():
+    migration_file = os.path.join(
+        REPO_ROOT, "supabase", "migrations", "006_quota_governance.sql"
+    )
+    with open(migration_file, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    assert "CREATE TABLE IF NOT EXISTS public.api_quota_usage" in content
+    assert "FOR UPDATE" in content
+    assert "REVOKE ALL ON FUNCTION public.reserve_api_quota" in content
+    assert "GRANT EXECUTE ON FUNCTION public.reserve_api_quota" in content
+    assert "CREATE TABLE IF NOT EXISTS public.provider_usage" not in content
+    assert "(NOW() AT TIME ZONE 'UTC')::DATE" in content
