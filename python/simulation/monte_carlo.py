@@ -40,8 +40,9 @@ class SimulationResult:
 class MonteCarloSimulator:
     """
     Monte Carlo simulator wrapping VectorizedMonteCarloSimulator.
-    Provides fast, path-dependent match simulations with empirical
-    standard error convergence and backwards-compatible result structures.
+
+    All state-dependent scoring effects are supplied by a fitted hazard model.
+    No hand-written red-card, score-state, or late-game multipliers are applied.
     """
 
     MIN_SIMULATIONS = 10_000
@@ -62,23 +63,20 @@ class MonteCarloSimulator:
         intensity_estimator: Optional[EventIntensityEstimator] = None,
         n_simulations: Optional[int] = None,
     ) -> SimulationResult:
-        """
-        Simulate match outcomes from current state using vectorized competing hazards.
-        """
         n_sims = n_simulations or self.MIN_SIMULATIONS
+        live_hazard_model = getattr(intensity_estimator, "live_hazard_model", None)
 
-        # Run vectorized simulation
         scores = self.vectorized_engine.simulate_batch(
             state=state,
             home_lambda_per_min=home_lambda,
             away_lambda_per_min=away_lambda,
             n_simulations=n_sims,
             rng=self.vectorized_engine.rng,
+            live_hazard_model=live_hazard_model,
         )
 
         dist = self.vectorized_engine.compute_distributions(scores)
 
-        # Baseline cards and corners from state
         base_cards = (
             state.yellow_cards_home
             + state.red_cards_home
@@ -87,7 +85,6 @@ class MonteCarloSimulator:
         )
         base_corners = state.corners_home + state.corners_away
 
-        # Convert to PathResult objects
         paths = [
             PathResult(
                 final_score_home=int(scores[i, 0]),
@@ -107,34 +104,53 @@ class MonteCarloSimulator:
         return SimulationResult(
             simulation_count=n_sims,
             seed=self.seed,
-            simulation_version="2.0",
+            simulation_version="3.0-learned-hazard",
             paths=paths,
             score_distribution=dist.get("score_distribution", {}),
             goal_distribution=dist.get("goal_distribution", {}),
             empirical_std_error=dist.get("std_error", 0.0),
         )
 
-    def _check_convergence(self, results: List[PathResult], metric: str = "1x2") -> Tuple[bool, float]:
-        """Check whether empirical standard error satisfies convergence target."""
+    def _check_convergence(
+        self,
+        results: List[PathResult],
+        metric: str = "1x2"
+    ) -> Tuple[bool, float]:
         n = len(results)
         if n < self.MIN_SIMULATIONS:
             return False, 1.0
 
-        home_wins = sum(1 for p in results if p.final_score_home > p.final_score_away)
+        home_wins = sum(
+            1 for p in results if p.final_score_home > p.final_score_away
+        )
         p = home_wins / n
         se = math.sqrt(p * (1.0 - p) / n)
         return se <= self.TARGET_STD_ERROR, se
 
-    def extract_market_probabilities(self, result: SimulationResult) -> Dict[str, Dict[str, float]]:
-        """Extract primary market outcome probabilities from simulation results."""
-        p_1 = sum(prob for (h, a), prob in result.score_distribution.items() if h > a)
-        p_x = sum(prob for (h, a), prob in result.score_distribution.items() if h == a)
-        p_2 = sum(prob for (h, a), prob in result.score_distribution.items() if h < a)
+    def extract_market_probabilities(
+        self,
+        result: SimulationResult,
+    ) -> Dict[str, Dict[str, float]]:
+        p_1 = sum(
+            prob for (h, a), prob in result.score_distribution.items() if h > a
+        )
+        p_x = sum(
+            prob for (h, a), prob in result.score_distribution.items() if h == a
+        )
+        p_2 = sum(
+            prob for (h, a), prob in result.score_distribution.items() if h < a
+        )
 
-        p_btts_yes = sum(prob for (h, a), prob in result.score_distribution.items() if h > 0 and a > 0)
+        p_btts_yes = sum(
+            prob
+            for (h, a), prob in result.score_distribution.items()
+            if h > 0 and a > 0
+        )
         p_btts_no = 1.0 - p_btts_yes
 
-        p_over_25 = sum(prob for tg, prob in result.goal_distribution.items() if tg > 2.5)
+        p_over_25 = sum(
+            prob for tg, prob in result.goal_distribution.items() if tg > 2.5
+        )
         p_under_25 = 1.0 - p_over_25
 
         return {
