@@ -99,6 +99,33 @@ A model is research-valid only when:
 7. Model parameters and feature versions are persisted for reproducibility.
 8. Selected or rejected models are not chosen from the 10-match chat sample.
 
+
+## First real-data benchmark result — E0
+
+The first reproducible Supabase-backed walk-forward benchmark completed successfully on the 1,900-row Premier League (E0) historical dataset, covering 2019-08-09 through 2024-05-19.
+
+Validation configuration:
+- 10 chronological folds.
+- 24-month expanding/rolling training window.
+- 3-month calibration window.
+- 3-month untouched test window.
+- 1,007 total out-of-sample test observations.
+- Poisson selected by BIC in all 10 folds; Negative Binomial was not selected for this E0 benchmark.
+
+Aggregate test results from the saved benchmark artifact:
+
+| Metric | Static DC | Dynamic DC |
+|---|---:|---:|
+| Home-win Brier | 0.233203 | 0.227431 |
+| Home-win LogLoss | 0.730637 | 0.703359 |
+| Over 2.5 Brier | 0.258759 | 0.255717 |
+| Over 2.5 LogLoss | 0.794666 | 0.760368 |
+| Home-win ECE | 0.064106 | 0.054615 |
+| Over 2.5 ECE | 0.082235 | 0.090111 |
+
+The dynamic challenger is therefore showing lower aggregate Brier and log-loss on these E0 test observations, plus lower home-win ECE, but higher Over 2.5 ECE. This is evidence for continued challenger evaluation, not a promotion decision.
+
+
 ## Exit criteria
 
 - [x] Remove fixed score-state / late-game / red-card multipliers from MC.
