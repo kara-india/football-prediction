@@ -38,10 +38,11 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          BENCHMARK_LEAGUE: ${{ github.event.inputs.league || 'E0' }}
         run: |
           test -n "$SUPABASE_URL" || (echo "SUPABASE_URL secret is not configured" && exit 1)
           test -n "$SUPABASE_SECRET_KEY" || (echo "SUPABASE_SECRET_KEY secret is not configured" && exit 1)
-          python -m python.backtesting.advanced_historical_benchmark --league "${{ github.event.inputs.league }}" > phase15-benchmark-${{ github.event.inputs.league }}.json
+          python -m python.backtesting.advanced_historical_benchmark --league "$BENCHMARK_LEAGUE" > phase15-benchmark-$BENCHMARK_LEAGUE.json
 
       - name: Build concise benchmark summary
         run: |
@@ -49,9 +50,9 @@ jobs:
           import json
           from pathlib import Path
 
-          result = json.loads(Path("phase15-benchmark-${{ github.event.inputs.league }}.json").read_text())
+          result = json.loads(Path("phase15-benchmark-$BENCHMARK_LEAGUE.json").read_text())
           lines = [
-              "# Phase 15 E0 Benchmark Results",
+              "# Phase 15 Historical Benchmark Results",
               f"Status: {result.get('status')}",
               f"Data window: {result['data_window']['first_match']} to {result['data_window']['last_match']}",
               f"Historical matches fetched: {result['data_window']['matches']}",
