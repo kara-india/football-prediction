@@ -344,25 +344,37 @@ class DixonColesModel:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Dixon-Coles Model Training CLI")
-    parser.add_argument("--fit-all-leagues", action="store_true", help="Fit Dixon-Coles on all leagues")
-    parser.add_argument("--save-baseline", action="store_true", help="Save baseline model checkpoint")
+    parser.add_argument(
+        "--data-path",
+        required=True,
+        help="Path to real historical CSV/Parquet data in model-input schema.",
+    )
+    parser.add_argument(
+        "--save-baseline",
+        action="store_true",
+        help="Save the fitted model checkpoint.",
+    )
     args = parser.parse_args()
 
-    print("[Dixon-Coles] Initializing training engine...")
-    if args.fit_all_leagues:
-        print("[Dixon-Coles] Fitting model across historical match records...")
-        # Synthetic sanity check
-        dummy_matches = pd.DataFrame([
-            {"home_id": 1, "away_id": 2, "home_goals": 2, "away_goals": 1, "date": "2024-01-01"},
-            {"home_id": 2, "away_id": 3, "home_goals": 1, "away_goals": 1, "date": "2024-01-08"},
-            {"home_id": 3, "away_id": 1, "home_goals": 0, "away_goals": 2, "date": "2024-01-15"},
-            {"home_id": 2, "away_id": 1, "home_goals": 1, "away_goals": 3, "date": "2024-01-22"},
-        ])
-        model = DixonColesModel()
-        model.fit(dummy_matches)
-        print(f"[Dixon-Coles] Model fit complete. Identifiability check mean(alpha): {np.mean(list(model.attack_params.values())):.6f}")
-        if args.save_baseline:
-            checkpoint = model.serialize()
-            with open("python/models/baseline_dixon_coles.json", "w") as f:
-                json.dump(checkpoint, f, indent=2)
-            print("[Dixon-Coles] Checkpoint persisted to python/models/baseline_dixon_coles.json")
+    if args.data_path.lower().endswith((".parquet", ".pq")):
+        historical = pd.read_parquet(args.data_path)
+    else:
+        historical = pd.read_csv(args.data_path)
+
+    required = {"home_id", "away_id", "home_goals", "away_goals", "date"}
+    missing = sorted(required - set(historical.columns))
+    if missing:
+        raise SystemExit(f"Historical file is missing required columns: {missing}")
+
+    model = DixonColesModel()
+    model.fit(historical)
+    print(
+        "[Dixon-Coles] Model fit complete. "
+        f"Identifiability mean(alpha): {np.mean(list(model.attack_params.values())):.12f}"
+    )
+
+    if args.save_baseline:
+        checkpoint = model.serialize()
+        with open("python/models/baseline_dixon_coles.json", "w", encoding="utf-8") as f:
+            json.dump(checkpoint, f, indent=2)
+        print("[Dixon-Coles] Checkpoint persisted.")
