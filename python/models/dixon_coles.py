@@ -143,8 +143,8 @@ class DixonColesModel:
 
         # Compute match time in days
         if "date" in matches.columns:
-            dates = pd.to_datetime(matches["date"])
-            times = (dates - pd.Timestamp("1970-01-01")).dt.total_seconds().to_numpy() / 86400.0
+            dates = pd.to_datetime(matches["date"], utc=True)
+            times = (dates - pd.Timestamp("1970-01-01", tz="UTC")).dt.total_seconds().to_numpy() / 86400.0
         elif "time" in matches.columns:
             times = matches["time"].to_numpy(dtype=np.float64)
         else:
