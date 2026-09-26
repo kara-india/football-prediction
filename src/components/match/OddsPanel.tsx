@@ -91,13 +91,13 @@ export default function OddsPanel({ market, className = '' }: OddsPanelProps) {
                 <div className="bg-[#0B0F17] border border-[#1E293B] rounded-lg p-2.5">
                   <div className="text-[10px] text-[#64748B]">Over 2.5 Goals</div>
                   <div className="text-sm font-bold text-[#D4AF37] mt-0.5">
-                    {market.over25Odds?.toFixed(2) || '2.05'}
+                    {market.over25Odds?.toFixed(2) ?? '—'}
                   </div>
                 </div>
                 <div className="bg-[#0B0F17] border border-[#1E293B] rounded-lg p-2.5">
                   <div className="text-[10px] text-[#64748B]">Under 2.5 Goals</div>
                   <div className="text-sm font-bold text-[#D4AF37] mt-0.5">
-                    {market.under25Odds?.toFixed(2) || '1.82'}
+                    {market.under25Odds?.toFixed(2) ?? '—'}
                   </div>
                 </div>
               </div>
