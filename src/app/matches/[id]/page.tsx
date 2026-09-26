@@ -1,515 +1,451 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import MatchHeader from '@/components/match/MatchHeader'
-import TriColumnMatrix, {
-  ModelIntelligenceData,
-  MarketExecutionData,
-  LiveStateData,
-} from '@/components/match/TriColumnMatrix'
-import TacticalPitchGrid, {
-  TeamLineupData,
-} from '@/components/ui/terminal/TacticalPitchGrid'
-import ModelTransparencyCard, {
-  ModelTransparencyData,
-} from '@/components/match/ModelTransparencyCard'
-import MultiCheckpointTimeline, {
-  CheckpointData,
-} from '@/components/match/MultiCheckpointTimeline'
-import ProbabilityTimeline, {
-  ProbabilityPoint,
-} from '@/components/match/ProbabilityTimeline'
-import MarketTable, { MarketRow } from '@/components/match/MarketTable'
-import LiveStatePanel from '@/components/match/LiveStatePanel'
+import TacticalPitchGrid, { TeamLineupData, PitchPlayer } from '@/components/ui/terminal/TacticalPitchGrid'
 import OddsPanel from '@/components/match/OddsPanel'
-import ModelPanel from '@/components/match/ModelPanel'
+import MarketTable, { MarketRow } from '@/components/match/MarketTable'
 import TerminalCard from '@/components/ui/terminal/TerminalCard'
-import { formatISTDateTime, formatISTTime } from '@/lib/dateUtils'
+import { MarketExecutionData } from '@/components/match/TriColumnMatrix'
+import { extractTeamStatistic } from '@/lib/apiFootball'
 
-export default function MatchIntelligencePage({
-  params,
-}: {
-  params: { id: string }
-}) {
+interface MatchDetail {
+  fixture: {
+    id: number
+    kickoff: string
+    venue: string
+    status: string
+    statusLong: string
+    minute: number | null
+    referee: string | null
+    league: any
+    teams: any
+    score: any
+    events: any[]
+    statistics: any[]
+    lineups: any[]
+  }
+  odds1xBet: {
+    home: number | null
+    draw: number | null
+    away: number | null
+    over25: number | null
+    under25: number | null
+  } | null
+  oddsUpdatedAt: string | null
+  forecast: {
+    home: number | null
+    draw: number | null
+    away: number | null
+    winnerName: string | null
+    winnerId: number | null
+    goalsHome: number | null
+    goalsAway: number | null
+  } | null
+  forecastSource: string | null
+  history: Array<{
+    id: number
+    date: string
+    status: string
+    homeTeam: string
+    awayTeam: string
+    homeScore: number | null
+    awayScore: number | null
+  }>
+  generatedAt: string
+}
+
+function probability(value: number | null | undefined): number {
+  return Number.isFinite(value) ? Number(value) : 0
+}
+
+function pct(value: number | null | undefined): string {
+  return Number.isFinite(value) ? `${(Number(value) * 100).toFixed(1)}%` : '—'
+}
+
+function asPlayer(player: any, fallbackId: string): PitchPlayer {
+  const rawPosition = String(player?.pos || '').toUpperCase()
+  const position =
+    rawPosition === 'G' || /GK|GOALKEEPER/.test(rawPosition)
+      ? 'G'
+      : /D|DEF/.test(rawPosition)
+        ? 'D'
+        : /M|MID/.test(rawPosition)
+          ? 'M'
+          : /F|FW|ATT/.test(rawPosition)
+            ? 'F'
+            : rawPosition || '—'
+
+  return {
+    id: player?.id ?? fallbackId,
+    name: player?.name || 'Unknown player',
+    number: Number(player?.number) || 0,
+    position,
+  }
+}
+
+function teamLineup(lineups: any[], teamId: number, teamName: string): TeamLineupData {
+  const block = (lineups || []).find((item: any) => Number(item?.team?.id) === Number(teamId))
+  return {
+    name: teamName,
+    formation: block?.formation || 'TBD',
+    starters: (block?.startXI || []).map((item: any, index: number) =>
+      asPlayer(item?.player, `starter-${teamId}-${index}`),
+    ),
+    substitutes: (block?.substitutes || []).map((item: any, index: number) =>
+      asPlayer(item?.player, `sub-${teamId}-${index}`),
+    ),
+    coach: block?.coach?.name || undefined,
+  }
+}
+
+function statLabel(value: any): string {
+  if (value === null || value === undefined || value === '') return '—'
+  return String(value)
+}
+
+export default function MatchIntelligencePage({ params }: { params: { id: string } }) {
   const matchId = params.id
-  const [activeTab, setActiveTab] = useState<
-    'overview' | 'lineups' | 'transparency' | 'markets' | 'simulation'
-  >('overview')
-  const [refreshNotification, setRefreshNotification] = useState<string | null>(null)
+  const [detail, setDetail] = useState<MatchDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Determine specific match data based on fixture ID or reasonable defaults
-  const isLanusMatch = matchId === '1610876'
-  const isArsenalMatch = matchId === '1640055' || !isLanusMatch
-
-  const homeTeamName = isLanusMatch ? 'Lanús' : 'Arsenal'
-  const awayTeamName = isLanusMatch ? 'Estudiantes L.P.' : 'Chelsea'
-  const competitionName = isLanusMatch ? 'Liga Profesional Argentina' : 'Premier League'
-  const competitionCountry = isLanusMatch ? 'Argentina' : 'England'
-  const kickoffUtc = isLanusMatch
-    ? '2026-09-24T18:00:00Z'
-    : '2026-09-24T14:30:00Z'
-
-  // Starters & substitutes for TacticalPitchGrid
-  const homeLineup: TeamLineupData = {
-    name: homeTeamName,
-    formation: isLanusMatch ? '4-3-3' : '4-3-3',
-    starters: isLanusMatch
-      ? [
-          { id: 101, name: 'Losada', number: 1, position: 'G' },
-          { id: 102, name: 'Morgantini', number: 3, position: 'D' },
-          { id: 103, name: 'Izquierdoz', number: 24, position: 'D', isCaptain: true },
-          { id: 104, name: 'Luciatti', number: 6, position: 'D' },
-          { id: 105, name: 'Soler', number: 22, position: 'D' },
-          { id: 106, name: 'Pérez', number: 8, position: 'M' },
-          { id: 107, name: 'Boggio', number: 5, position: 'M' },
-          { id: 108, name: 'Moreno', number: 10, position: 'M' },
-          { id: 109, name: 'Salvio', number: 11, position: 'F' },
-          { id: 110, name: 'Bou', number: 9, position: 'F' },
-          { id: 111, name: 'Carrera', number: 32, position: 'F' },
-        ]
-      : [
-          { id: 201, name: 'Raya', number: 22, position: 'G' },
-          { id: 202, name: 'White', number: 4, position: 'D' },
-          { id: 203, name: 'Saliba', number: 2, position: 'D' },
-          { id: 204, name: 'Gabriel', number: 6, position: 'D' },
-          { id: 205, name: 'Timber', number: 12, position: 'D' },
-          { id: 206, name: 'Partey', number: 5, position: 'M' },
-          { id: 207, name: 'Rice', number: 41, position: 'M' },
-          { id: 208, name: 'Ødegaard', number: 8, position: 'M', isCaptain: true },
-          { id: 209, name: 'Saka', number: 7, position: 'F' },
-          { id: 210, name: 'Havertz', number: 29, position: 'F' },
-          { id: 211, name: 'Martinelli', number: 11, position: 'F' },
-        ],
-    substitutes: [
-      { id: 112, name: 'Acosta', number: 17, position: 'M' },
-      { id: 113, name: 'Sanabria', number: 19, position: 'F' },
-      { id: 114, name: 'Munoz', number: 2, position: 'D' },
-    ],
+  const loadDetail = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(`/api/matches/${encodeURIComponent(matchId)}`, { cache: 'no-store' })
+      const payload = await response.json()
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Match detail unavailable')
+      }
+      setDetail(payload)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Match detail unavailable')
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const awayLineup: TeamLineupData = {
-    name: awayTeamName,
-    formation: isLanusMatch ? '4-4-2' : '4-2-3-1',
-    starters: isLanusMatch
-      ? [
-          { id: 301, name: 'Mansilla', number: 12, position: 'G' },
-          { id: 302, name: 'Meza', number: 20, position: 'D' },
-          { id: 303, name: 'Fernandez', number: 14, position: 'D' },
-          { id: 304, name: 'Lollo', number: 6, position: 'D', isCaptain: true },
-          { id: 305, name: 'Arzamendia', number: 23, position: 'D' },
-          { id: 306, name: 'Manyoma', number: 7, position: 'M' },
-          { id: 307, name: 'Perez', number: 5, position: 'M' },
-          { id: 308, name: 'Ascacibar', number: 8, position: 'M' },
-          { id: 309, name: 'Sosa', number: 10, position: 'M' },
-          { id: 310, name: 'Carrillo', number: 9, position: 'F' },
-          { id: 311, name: 'Gimenez', number: 27, position: 'F' },
-        ]
-      : [
-          { id: 401, name: 'Sanchez', number: 1, position: 'G' },
-          { id: 402, name: 'Gusto', number: 27, position: 'D' },
-          { id: 403, name: 'Fofana', number: 29, position: 'D' },
-          { id: 404, name: 'Colwill', number: 6, position: 'D' },
-          { id: 405, name: 'Cucurella', number: 3, position: 'D' },
-          { id: 406, name: 'Caicedo', number: 25, position: 'M' },
-          { id: 407, name: 'Lavia', number: 45, position: 'M' },
-          { id: 408, name: 'Madueke', number: 11, position: 'F' },
-          { id: 409, name: 'Palmer', number: 20, position: 'M', isCaptain: true },
-          { id: 410, name: 'Sancho', number: 19, position: 'F' },
-          { id: 411, name: 'Jackson', number: 15, position: 'F' },
-        ],
-    substitutes: [
-      { id: 412, name: 'Nkunku', number: 18, position: 'F' },
-      { id: 413, name: 'Neto', number: 7, position: 'F' },
-      { id: 414, name: 'Disasi', number: 2, position: 'D' },
-    ],
-  }
+  useEffect(() => {
+    loadDetail()
+  }, [matchId])
 
-  // Model Intelligence Data
-  const modelData: ModelIntelligenceData = {
-    selection: `${homeTeamName} (Home Win)`,
-    calibratedProb: 0.584,
-    ci95: [0.552, 0.616],
-    rawSimulationCount: 35000,
-    simulationStdError: 0.0028,
-    modelVersion: 'dixon_coles_v1.4 (ident: sum=1)',
-    calibrationTransform: 'Isotonic Regression v2.1',
-    decision: 'CANDIDATE',
-    stakingAdvisory: '0.50 units (Quarter Kelly 0.125)',
-  }
+  const fixture = detail?.fixture
+  const home = fixture?.teams?.home
+  const away = fixture?.teams?.away
+  const forecast = detail?.forecast
+  const odds = detail?.odds1xBet
 
-  // Market Execution Data
+  const lineupConfirmed = useMemo(
+    () =>
+      Boolean(
+        fixture?.lineups?.length >= 2 &&
+        fixture.lineups.every((item: any) => (item?.startXI || []).length === 11),
+      ),
+    [fixture],
+  )
+
+  const homeLineup = fixture && home
+    ? teamLineup(fixture.lineups, Number(home.id), home.name)
+    : { name: 'Home', starters: [], substitutes: [], formation: 'TBD' }
+
+  const awayLineup = fixture && away
+    ? teamLineup(fixture.lineups, Number(away.id), away.name)
+    : { name: 'Away', starters: [], substitutes: [], formation: 'TBD' }
+
+  const homeProb = probability(forecast?.home)
+  const drawProb = probability(forecast?.draw)
+  const awayProb = probability(forecast?.away)
+
   const marketData: MarketExecutionData = {
     bookmaker: '1xBet',
-    homeOdds: 1.84,
-    drawOdds: 3.75,
-    awayOdds: 4.60,
-    over25Odds: 2.12,
-    under25Odds: 1.78,
-    overround: 0.044,
-    targetSelectionOdds: 1.84,
-    impliedProb: 0.543,
-    deviggedProb: 0.528,
-    valueEdge: 5.6, // +5.6 pp
-    expectedValue: 7.45, // +7.45%
-    oddsFreshnessTimestamp: new Date(Date.now() - 34 * 1000).toISOString(),
-    status: 'ACTIVE',
+    homeOdds: odds?.home ?? null,
+    drawOdds: odds?.draw ?? null,
+    awayOdds: odds?.away ?? null,
+    over25Odds: odds?.over25 ?? null,
+    under25Odds: odds?.under25 ?? null,
+    overround:
+      odds?.home && odds?.draw && odds?.away
+        ? 1 / odds.home + 1 / odds.draw + 1 / odds.away - 1
+        : null,
+    targetSelectionOdds: null,
+    impliedProb: null,
+    deviggedProb: null,
+    valueEdge: null,
+    expectedValue: null,
+    oddsFreshnessTimestamp: detail?.oddsUpdatedAt || undefined,
+    status: odds ? 'ACTIVE' : 'UNAVAILABLE',
   }
 
-  // Live State Data
-  const liveStateData: LiveStateData = {
-    minute: 63,
-    status: '2H',
-    homeScore: 1,
-    awayScore: 0,
-    homeXg: 1.48,
-    awayXg: 0.62,
-    homeShots: 13,
-    awayShots: 6,
-    homeShotsOnTarget: 7,
-    awayShotsOnTarget: 2,
-    homeCorners: 6,
-    awayCorners: 3,
-    homeFouls: 9,
-    awayFouls: 11,
-    homeYellowCards: 1,
-    awayYellowCards: 2,
-    homeRedCards: 0,
-    awayRedCards: 0,
-    homePossession: 56,
-    awayPossession: 44,
-    stateFreshnessTimestamp: new Date(Date.now() - 14 * 1000).toISOString(),
-  }
+  const markets: MarketRow[] = useMemo(() => {
+    const rows: MarketRow[] = []
+    const values = [
+      { id: 'home', label: `1 (${home?.name || 'Home'})`, odds: odds?.home, model: homeProb },
+      { id: 'draw', label: 'X (Draw)', odds: odds?.draw, model: drawProb },
+      { id: 'away', label: `2 (${away?.name || 'Away'})`, odds: odds?.away, model: awayProb },
+    ]
 
-  // Transparency Card Data
-  const transparencyData: ModelTransparencyData = {
-    selectionName: `${homeTeamName} (Home Win)`,
-    marketName: '1X2 Match Winner',
-    matchIdentifier: matchId,
-    rawSimProbability: 0.592,
-    calibratedProbability: 0.584,
-    ci95Lower: 0.552,
-    ci95Upper: 0.616,
-    monteCarloPaths: 35000,
-    standardError: 0.0028,
-    modelVersion: 'dixon_coles_v1.4',
-    calibrationMethod: 'Isotonic Regression v2.1',
-    targetBookmaker: '1xBet Fixed Odds',
-    executionPrice: 1.84,
-    deviggedProbability: 0.528,
-    overround: 0.044,
-    valueEdge: 5.6,
-    expectedValue: 7.45,
-    decision: 'CANDIDATE',
-    noBetReasons: [],
-    stateGeneratedAt: liveStateData.stateFreshnessTimestamp,
-    oddsGeneratedAt: marketData.oddsFreshnessTimestamp,
-    featureSnapshotId: `feat-${matchId}-v2`,
-    gitSha: '9f2a71d8',
-  }
-
-  // Lifecycle Checkpoint Data
-  const checkpoints: CheckpointData[] = [
-    {
-      stage: 'INITIAL',
-      label: 'Initial Baseline Forecast',
-      relativeTime: 'T-48h',
-      timestampIST: formatISTDateTime(new Date(Date.now() - 48 * 3600 * 1000).toISOString()),
-      status: 'COMPLETED',
-      modelProb: 0.55,
-      odds: 1.82,
-      deltaP: 0.0,
-      edge: 0.032,
-      ev: 0.041,
-      livImpact: 'NEUTRAL',
-      notes: 'Initial Dixon-Coles run on 5-season EWMA form parameters prior to starting team sheets.',
-    },
-    {
-      stage: 'LINEUP_CONFIRMED',
-      label: 'Lineup Confirmed Re-simulation',
-      relativeTime: 'T-60m',
-      timestampIST: formatISTDateTime(new Date(Date.now() - 60 * 60 * 1000).toISOString()),
-      status: 'COMPLETED',
-      modelProb: 0.584,
-      odds: 1.84,
-      deltaP: 0.034, // +3.4% shift toward home
-      edge: 0.056,
-      ev: 0.0745,
-      livImpact: 'CONFIRMED_EDGE',
-      notes: 'Official team sheets verified (22 starters). Key midfield reinforcement confirmed (+3.4% Δp gain).',
-    },
-    {
-      stage: 'FINAL_PREMATCH',
-      label: 'Closing Market Snapshot',
-      relativeTime: 'T-5m',
-      timestampIST: formatISTDateTime(new Date(Date.now() - 5 * 60 * 1000).toISOString()),
-      status: 'COMPLETED',
-      modelProb: 0.584,
-      odds: 1.84,
-      deltaP: 0.0,
-      edge: 0.056,
-      ev: 0.0745,
-      livImpact: 'CONFIRMED_EDGE',
-      notes: 'Final pre-kickoff clearing lines locked. Passed all minimum edge and liquidity gates.',
-    },
-    {
-      stage: 'SETTLED',
-      label: 'Post-Match Settlement & Evaluation',
-      relativeTime: 'Pending FT',
-      status: 'ACTIVE',
-      livImpact: 'AWAITING',
-      notes: 'Match currently live in 63rd minute. Official settlement and causal error evaluation trigger upon FT.',
-    },
-  ]
-
-  // In-Play Win Probability Drift Data
-  const probabilityDrift: ProbabilityPoint[] = [
-    { minute: 0, homeProb: 0.58, drawProb: 0.26, awayProb: 0.16, event: 'Kickoff' },
-    { minute: 15, homeProb: 0.59, drawProb: 0.26, awayProb: 0.15 },
-    { minute: 28, homeProb: 0.76, drawProb: 0.16, awayProb: 0.08, event: 'Goal 1-0 (28\')' },
-    { minute: 40, homeProb: 0.74, drawProb: 0.17, awayProb: 0.09 },
-    { minute: 45, homeProb: 0.75, drawProb: 0.17, awayProb: 0.08, event: 'Half Time (1-0)' },
-    { minute: 55, homeProb: 0.78, drawProb: 0.15, awayProb: 0.07 },
-    { minute: 63, homeProb: 0.81, drawProb: 0.13, awayProb: 0.06 },
-  ]
-
-  // Institutional Market Rows
-  const marketRows: MarketRow[] = [
-    {
-      id: 'm-1x2-home',
-      outcome: `1 (${homeTeamName})`,
-      market: '1X2 Match Winner',
-      odds1xBet: 1.84,
-      impliedProb: 0.543,
-      deviggedProb: 0.528,
-      modelProb: 0.584,
-      edge: 5.6,
-      ev: 7.45,
-      decisionCode: 'PASSED_ALL_GATES',
-      action: 'CANDIDATE',
-      stakingAdvisory: '0.5u',
-    },
-    {
-      id: 'm-1x2-draw',
-      outcome: 'X (Draw)',
-      market: '1X2 Match Winner',
-      odds1xBet: 3.75,
-      impliedProb: 0.267,
-      deviggedProb: 0.258,
-      modelProb: 0.262,
-      edge: 0.4,
-      ev: -1.75,
-      decisionCode: 'NEGATIVE_EV',
-      action: 'NO_BET',
-    },
-    {
-      id: 'm-1x2-away',
-      outcome: `2 (${awayTeamName})`,
-      market: '1X2 Match Winner',
-      odds1xBet: 4.60,
-      impliedProb: 0.217,
-      deviggedProb: 0.214,
-      modelProb: 0.154,
-      edge: -6.0,
-      ev: -29.16,
-      decisionCode: 'NEGATIVE_EV',
-      action: 'NO_BET',
-    },
-    {
-      id: 'm-totals-over25',
-      outcome: 'Over 2.5 Goals',
-      market: 'Total Goals',
-      odds1xBet: 2.12,
-      impliedProb: 0.472,
-      deviggedProb: 0.491,
-      modelProb: 0.548,
-      edge: 5.7,
-      ev: 16.18,
-      decisionCode: 'PASSED_ALL_GATES',
-      action: 'CANDIDATE',
-      stakingAdvisory: '0.5u',
-    },
-    {
-      id: 'm-totals-under25',
-      outcome: 'Under 2.5 Goals',
-      market: 'Total Goals',
-      odds1xBet: 1.78,
-      impliedProb: 0.562,
-      deviggedProb: 0.509,
-      modelProb: 0.452,
-      edge: -5.7,
-      ev: -19.54,
-      decisionCode: 'NEGATIVE_EV',
-      action: 'NO_BET',
-    },
-    {
-      id: 'm-btts-yes',
-      outcome: 'Both Teams To Score: Yes',
-      market: 'BTTS',
-      odds1xBet: 1.95,
-      impliedProb: 0.513,
-      deviggedProb: 0.495,
-      modelProb: 0.502,
-      edge: 0.7,
-      ev: -2.11,
-      decisionCode: 'EDGE_BELOW_THRESHOLD',
-      action: 'NO_BET',
-    },
-  ]
-
-  const handleRefresh = async () => {
-    try {
-      const res = await fetch(`/api/matches/${matchId}/analyze`, { method: 'POST' })
-      if (res.ok) {
-        setRefreshNotification('Match intelligence synchronized (1 user credit consumed).')
-      } else {
-        setRefreshNotification('Refreshed from persistent cache.')
-      }
-    } catch {
-      setRefreshNotification('Refreshed telemetry.')
+    for (const item of values) {
+      const implied = item.odds && item.odds > 1 ? 1 / item.odds : null
+      const edge = implied !== null && Number.isFinite(item.model) ? (item.model - implied) * 100 : null
+      const ev = item.odds && Number.isFinite(item.model) ? (item.model * item.odds - 1) * 100 : null
+      rows.push({
+        id: `1x2-${item.id}`,
+        outcome: item.label,
+        market: '1X2 Match Winner',
+        odds1xBet: item.odds ?? null,
+        impliedProb: implied,
+        deviggedProb: null,
+        modelProb: item.model,
+        edge,
+        ev,
+        decisionCode: 'FORECAST_ONLY',
+        action: 'NO_BET',
+      })
     }
-    setTimeout(() => setRefreshNotification(null), 4000)
+
+    return rows
+  }, [away?.name, awayProb, drawProb, home?.name, homeProb, odds?.away, odds?.draw, odds?.home])
+
+  const matchStats = useMemo(() => {
+    if (!fixture || !home || !away) return []
+
+    const stats = fixture.statistics || []
+    const definitions = [
+      ['Ball Possession', [/ball possession/i]],
+      ['Total Shots', [/total shots/i]],
+      ['Shots on Target', [/shots on goal|shots on target/i]],
+      ['Corner Kicks', [/corner kicks|corners/i]],
+      ['Fouls', [/fouls/i]],
+      ['Yellow Cards', [/yellow cards/i]],
+      ['Red Cards', [/red cards/i]],
+      ['Expected Goals', [/expected goals|xg/i]],
+    ]
+
+    return definitions.map(([label, patterns]) => ({
+      label: String(label),
+      home: extractTeamStatistic(stats, Number(home.id), patterns as RegExp[]),
+      away: extractTeamStatistic(stats, Number(away.id), patterns as RegExp[]),
+    }))
+  }, [fixture, home, away])
+
+  if (loading) {
+    return (
+      <TerminalCard title="Match Terminal" subtitle={`Loading fixture ${matchId}`}>
+        <div className="p-12 text-center text-sm font-mono text-[#94A3B8]">Synchronizing match state…</div>
+      </TerminalCard>
+    )
   }
+
+  if (error || !fixture || !home || !away) {
+    return (
+      <TerminalCard title="Match Terminal" subtitle={`Fixture ${matchId}`}>
+        <div className="p-10 text-center space-y-3">
+          <div className="text-[#F8FAFC] font-semibold">Match data unavailable</div>
+          <div className="text-xs font-mono text-[#94A3B8]">{error || 'No fixture data returned.'}</div>
+          <button
+            onClick={loadDetail}
+            className="px-3 py-2 rounded-lg bg-[#1E293B] text-xs font-mono text-[#F8FAFC]"
+          >
+            Retry
+          </button>
+        </div>
+      </TerminalCard>
+    )
+  }
+
+  const live = ['1H', '2H', 'HT', 'ET', 'LIVE'].includes(fixture.status)
+  const isFinished = ['FT', 'AET', 'PEN'].includes(fixture.status)
 
   return (
     <div className="space-y-6">
-      {/* On-Demand Refresh Feedback Toast */}
-      {refreshNotification && (
-        <div className="p-3 rounded-xl bg-[#0F172A] border border-[#10B981]/50 text-xs font-mono text-[#10B981] flex items-center justify-between shadow-lg">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" />
-            <span>{refreshNotification}</span>
-          </div>
-          <span className="text-[10px] text-[#64748B]">Quota Safe</span>
-        </div>
-      )}
-
-      {/* 1. Sofascore Match Header */}
       <MatchHeader
         matchId={matchId}
-        homeTeam={{
-          name: homeTeamName,
-          score: liveStateData.homeScore,
-          form: ['W', 'D', 'W', 'W', 'D'],
-        }}
-        awayTeam={{
-          name: awayTeamName,
-          score: liveStateData.awayScore,
-          form: ['L', 'W', 'D', 'L', 'W'],
-        }}
+        homeTeam={{ name: home.name, logo: home.logo, score: fixture.score?.home ?? undefined }}
+        awayTeam={{ name: away.name, logo: away.logo, score: fixture.score?.away ?? undefined }}
         competition={{
-          name: competitionName,
-          country: competitionCountry,
-          round: 'Matchday 28',
+          name: fixture.league?.name || 'Competition',
+          country: fixture.league?.country,
+          logo: fixture.league?.logo,
+          round: fixture.league?.round,
         }}
-        status={liveStateData.status}
-        minute={liveStateData.minute}
-        kickoffUtc={kickoffUtc}
-        venue="Official Competition Stadium"
-        referee="Premier Official Sheet Verified"
-        onRefresh={handleRefresh}
+        status={fixture.status}
+        minute={fixture.minute ?? undefined}
+        kickoffUtc={fixture.kickoff}
+        venue={fixture.venue}
+        referee={fixture.referee || 'Not supplied by provider'}
+        onRefresh={loadDetail}
       />
 
-      {/* 2. Tri-Column Intelligence Matrix (Core Institutional View) */}
-      <TriColumnMatrix
-        model={modelData}
-        market={marketData}
-        liveState={liveStateData}
-        homeTeamName={homeTeamName}
-        awayTeamName={awayTeamName}
-      />
+      <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-6">
+        <TerminalCard
+          title="Forecast — Available Before Lineups"
+          subtitle={detail?.forecastSource || 'Provider forecast unavailable'}
+          badge={
+            <span className="px-2 py-0.5 rounded border border-[#334155] bg-[#1E293B] text-[10px] font-mono text-[#F8FAFC]">
+              {lineupConfirmed ? 'LINEUP-REFINED VIEW' : 'PRE-LINEUP FORECAST'}
+            </span>
+          }
+          padding="none"
+        >
+          <div className="p-5 space-y-5">
+            {forecast ? (
+              <>
+                <div className="grid grid-cols-3 gap-3 text-center font-mono">
+                  {[
+                    [home.name, homeProb],
+                    ['Draw', drawProb],
+                    [away.name, awayProb],
+                  ].map(([label, value]) => (
+                    <div key={String(label)} className="rounded-lg border border-[#1E293B] bg-[#0B0F17] p-4">
+                      <div className="text-[10px] text-[#64748B] truncate">{String(label)}</div>
+                      <div className="text-xl font-bold text-[#F8FAFC] mt-1">{pct(Number(value))}</div>
+                    </div>
+                  ))}
+                </div>
 
-      {/* 3. In-Play Probability Drift Timeline */}
-      <ProbabilityTimeline
-        data={probabilityDrift}
-        homeTeamName={homeTeamName}
-        awayTeamName={awayTeamName}
-        currentMinute={liveStateData.minute}
-      />
+                <div className="rounded-lg border border-[#1E293B] bg-[#0B0F17] p-4 font-mono text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[#64748B]">Forecast winner</span>
+                    <span className="font-semibold text-[#D4AF37]">{forecast.winnerName || 'Unspecified'}</span>
+                  </div>
+                  <div className="flex items-center justify-between mt-2">
+                    <span className="text-[#64748B]">Estimated score</span>
+                    <span className="text-[#F8FAFC]">
+                      {forecast.goalsHome ?? '—'} – {forecast.goalsAway ?? '—'}
+                    </span>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-[#1E293B] text-[10px] text-[#64748B]">
+                    This is a provider forecast until the internal statistically validated model is served from the model registry.
+                    Official lineups refine the forecast; they do not gate forecast availability.
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="p-8 text-center font-mono text-xs text-[#64748B]">
+                No provider forecast returned for this fixture.
+              </div>
+            )}
+          </div>
+        </TerminalCard>
 
-      {/* 4. Sofascore-Style Drill-Down Tab Bar */}
-      <div className="flex items-center gap-1 overflow-x-auto p-1 rounded-xl bg-[#0B0F17] border border-[#1E293B] text-xs font-mono">
-        {[
-          { key: 'overview', label: 'Match Overview' },
-          { key: 'lineups', label: 'Tactical Pitch & Lineups' },
-          { key: 'transparency', label: 'Model Transparency & Provenance' },
-          { key: 'markets', label: '1xBet Market Matrix' },
-          { key: 'simulation', label: 'Dixon-Coles & Poisson' },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key as any)}
-            className={`px-3.5 py-1.5 rounded-lg whitespace-nowrap transition-colors ${
-              activeTab === tab.key
-                ? 'bg-[#1E293B] text-[#F8FAFC] font-semibold border border-[#334155]'
-                : 'text-[#94A3B8] hover:text-[#F8FAFC]'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+        <OddsPanel market={marketData} />
       </div>
 
-      {/* 5. Tab Content Views */}
-      {activeTab === 'overview' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <LiveStatePanel
-              liveState={liveStateData}
-              homeTeamName={homeTeamName}
-              awayTeamName={awayTeamName}
-            />
-            <OddsPanel market={marketData} />
+      <TerminalCard
+        title="1xBet Market Matrix"
+        subtitle="Real upstream prices are shown when supplied; forecast-vs-market arithmetic is informational until the internal model registry is active."
+        padding="none"
+      >
+        <MarketTable rows={markets} />
+      </TerminalCard>
+
+      <TerminalCard
+        title="Current Match Statistics"
+        subtitle={live ? 'Live statistics from the fixture feed' : isFinished ? 'Final match statistics from the fixture feed' : 'Available match statistics from the provider'}
+        padding="none"
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs font-mono">
+            <thead className="bg-[#0B0F17] text-[10px] uppercase tracking-wider text-[#64748B] border-b border-[#1E293B]">
+              <tr>
+                <th className="py-3 px-4">Metric</th>
+                <th className="py-3 px-4 text-right">{home.name}</th>
+                <th className="py-3 px-4 text-right">{away.name}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#1E293B]">
+              {matchStats.map((row) => (
+                <tr key={row.label}>
+                  <td className="py-2.5 px-4 text-[#94A3B8]">{row.label}</td>
+                  <td className="py-2.5 px-4 text-right text-[#F8FAFC]">{statLabel(row.home)}</td>
+                  <td className="py-2.5 px-4 text-right text-[#F8FAFC]">{statLabel(row.away)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </TerminalCard>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <TacticalPitchGrid
+          homeTeam={homeLineup}
+          awayTeam={awayLineup}
+          lineupConfirmed={lineupConfirmed}
+          lineupExpectedAt={new Date(new Date(fixture.kickoff).getTime() - 60 * 60 * 1000).toISOString()}
+        />
+
+        <TerminalCard
+          title="Match Events"
+          subtitle="Provider event feed for the selected fixture"
+          padding="none"
+        >
+          <div className="divide-y divide-[#1E293B]">
+            {fixture.events?.length ? (
+              fixture.events.map((event: any, index: number) => (
+                <div key={`event-${index}`} className="p-3.5 flex items-center justify-between gap-4 text-xs font-mono">
+                  <div className="text-[#D4AF37] w-12">{event.time?.elapsed ? `${event.time.elapsed}'` : '—'}</div>
+                  <div className="flex-1">
+                    <div className="text-[#F8FAFC]">{event.detail || event.type || 'Match event'}</div>
+                    <div className="text-[10px] text-[#64748B] mt-0.5">
+                      {event.team?.name || 'Team'}{event.player?.name ? ` • ${event.player.name}` : ''}
+                    </div>
+                  </div>
+                  <div className="text-[#94A3B8]">{event.comments || ''}</div>
+                </div>
+              ))
+            ) : (
+              <div className="p-8 text-center text-xs font-mono text-[#64748B]">No events returned.</div>
+            )}
           </div>
-          <MarketTable rows={marketRows} />
-        </div>
-      )}
+        </TerminalCard>
+      </div>
 
-      {activeTab === 'lineups' && (
-        <div className="space-y-6">
-          <TacticalPitchGrid
-            homeTeam={homeLineup}
-            awayTeam={awayLineup}
-            lineupConfirmed={true}
-            lineupExpectedAt={formatISTTime(new Date(Date.now() - 60 * 60 * 1000).toISOString())}
-          />
+      <TerminalCard
+        title="Head-to-Head History"
+        subtitle={`Latest provider H2H records for ${home.name} vs ${away.name}`}
+        padding="none"
+      >
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs font-mono">
+            <thead className="bg-[#0B0F17] text-[10px] uppercase tracking-wider text-[#64748B] border-b border-[#1E293B]">
+              <tr>
+                <th className="py-3 px-4">Date</th>
+                <th className="py-3 px-4">Home</th>
+                <th className="py-3 px-4">Score</th>
+                <th className="py-3 px-4">Away</th>
+                <th className="py-3 px-4">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#1E293B]">
+              {detail?.history?.length ? (
+                detail.history.map((match) => (
+                  <tr key={match.id}>
+                    <td className="py-2.5 px-4 text-[#64748B]">{new Date(match.date).toLocaleDateString('en-IN')}</td>
+                    <td className="py-2.5 px-4 text-[#F8FAFC]">{match.homeTeam}</td>
+                    <td className="py-2.5 px-4 text-[#D4AF37] font-bold">
+                      {match.homeScore ?? '—'} – {match.awayScore ?? '—'}
+                    </td>
+                    <td className="py-2.5 px-4 text-[#F8FAFC]">{match.awayTeam}</td>
+                    <td className="py-2.5 px-4 text-[#64748B]">{match.status}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-[#64748B]">No H2H history returned.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
+      </TerminalCard>
 
-      {activeTab === 'transparency' && (
-        <div className="space-y-6">
-          <ModelTransparencyCard data={transparencyData} />
-          <MultiCheckpointTimeline
-            checkpoints={checkpoints}
-            matchName={`${homeTeamName} vs ${awayTeamName}`}
-          />
-        </div>
-      )}
-
-      {activeTab === 'markets' && (
-        <div className="space-y-6">
-          <MarketTable rows={marketRows} />
-          <OddsPanel market={marketData} />
-        </div>
-      )}
-
-      {activeTab === 'simulation' && (
-        <div className="space-y-6">
-          <ModelPanel
-            homeProb={modelData.calibratedProb}
-            drawProb={0.262}
-            awayProb={0.154}
-            ciHome={modelData.ci95}
-            ciDraw={[0.235, 0.289]}
-            ciAway={[0.132, 0.176]}
-            homeTeamName={homeTeamName}
-            awayTeamName={awayTeamName}
-            modelVersion={modelData.modelVersion}
-            calibrationMethod={modelData.calibrationTransform}
-            monteCarloPaths={modelData.rawSimulationCount}
-          />
-          <ModelTransparencyCard data={transparencyData} />
-        </div>
-      )}
+      <div className="flex items-center justify-between text-[10px] font-mono text-[#64748B]">
+        <Link href="/" className="hover:text-[#F8FAFC]">← Back to Matchday Command Center</Link>
+        <span>Fixture {fixture.id} • Synchronized {new Date(detail?.generatedAt || Date.now()).toLocaleTimeString('en-IN')}</span>
+      </div>
     </div>
   )
 }
