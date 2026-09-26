@@ -32,6 +32,8 @@ class MatchState:
     # Key flags
     is_live: bool
     lineup_confirmed: bool
+    # Optional competition-state feature; effect is learned, never hard-coded.
+    knockout_context: float = 0.0
     
     @property
     def score_difference(self) -> int:
@@ -43,6 +45,8 @@ class MatchState:
     
     @property
     def remaining_minutes(self) -> float:
+        if self.period in ('PREMATCH', 'prematch'):
+            return 90.0 + max(0, self.added_time)
         if self.period == 'first_half':
             return max(0, 45 - self.minute + self.added_time)
         elif self.period == 'second_half':
