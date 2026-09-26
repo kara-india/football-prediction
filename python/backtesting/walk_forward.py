@@ -349,7 +349,29 @@ class WalkForwardValidator:
         }
 
     def _fit_model(self, model: Any, train_df: pd.DataFrame, target_col: str) -> None:
-        """Internal adapter to fit different model types."""
+        """Internal adapter to fit different model types without synthetic fallbacks."""
+        # 0. Goal-based probabilistic models that consume the complete match frame.
+        if model.__class__.__name__ in {"ScoreDrivenDixonColes", "DixonColesModel"}:
+            required = {"home_id", "away_id", "home_goals", "away_goals"}
+            if not required.issubset(train_df.columns):
+                rename_map = {
+                    "home_team_id": "home_id",
+                    "away_team_id": "away_id",
+                    "fulltime_home": "home_goals",
+                    "fulltime_away": "away_goals",
+                    "kickoff_utc": "date",
+                }
+                goal_df = train_df.rename(columns=rename_map).copy()
+            else:
+                goal_df = train_df.copy()
+            required = {"home_id", "away_id", "home_goals", "away_goals"}
+            if not required.issubset(goal_df.columns):
+                raise ValueError(
+                    "Dynamic goal model requires home_id, away_id, home_goals and away_goals."
+                )
+            model.fit(goal_df)
+            return
+
         # 1. Standard scikit-learn classifier
         if hasattr(model, "fit"):
             feature_cols = [c for c in train_df.columns if c not in (target_col, "_parsed_date", "date", "match_date", "id", "match_id")]
@@ -399,8 +421,9 @@ class WalkForwardValidator:
         if callable(model):
             return np.asarray(model(test_df), dtype=float)
 
-        # Baseline fallback
-        return np.full(N, 0.5)
+        raise TypeError(
+            f"Unsupported model type {type(model).__name__}: no probabilistic prediction adapter exists."
+        )
 
     def compare_models(
         self,
