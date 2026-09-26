@@ -51,14 +51,8 @@ class AnalysisWorker:
         prematch_model: Optional[ScoreDrivenDixonColes] = None,
         lineup_effect_model: Optional[LearnedLineupEffectModel] = None,
     ):
-        self.supabase_url = supabase_url or os.environ.get(
-            "NEXT_PUBLIC_SUPABASE_URL",
-            "https://qqcxjjkgvqknesrtnwal.supabase.co"
-        )
-        self.supabase_key = supabase_key or os.environ.get(
-            "SUPABASE_SERVICE_ROLE_KEY",
-            os.environ.get("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "")
-        )
+        self.supabase_url = supabase_url or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+        self.supabase_key = supabase_key or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
         self.cf_logger = cf_logger or CounterfactualLogger()
         self.simulator = simulator or VectorizedMonteCarloSimulator(seed=42)
         self.no_bet_gate = no_bet_gate or NoBetGate()
