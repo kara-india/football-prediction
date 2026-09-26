@@ -28,6 +28,9 @@ jobs:
       - name: ESLint
         run: npm run lint
 
+      - name: Next.js production build
+        run: NEXT_TELEMETRY_DISABLED=1 npm run build
+
   backend:
     name: Backend Checks
     runs-on: ubuntu-latest
