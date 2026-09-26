@@ -40,14 +40,8 @@ class LearnerWorker:
         metrics_engine: Optional[MetricsEngine] = None,
         online_learner: Optional[OnlineLearner] = None,
     ):
-        self.supabase_url = supabase_url or os.environ.get(
-            "NEXT_PUBLIC_SUPABASE_URL",
-            os.environ.get("SUPABASE_URL", "https://qqcxjjkgvqknesrtnwal.supabase.co")
-        )
-        self.supabase_key = supabase_key or os.environ.get(
-            "SUPABASE_SERVICE_ROLE_KEY",
-            os.environ.get("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "")
-        )
+        self.supabase_url = supabase_url or os.environ.get("NEXT_PUBLIC_SUPABASE_URL") or os.environ.get("SUPABASE_URL")
+        self.supabase_key = supabase_key or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
         self.metrics_engine = metrics_engine or MetricsEngine()
         self.online_learner = online_learner or OnlineLearner()
         self.comparator = comparator or ModelComparator(
