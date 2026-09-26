@@ -1,6 +1,9 @@
 name: Phase 15 Historical Benchmark
 
 on:
+  push:
+    branches:
+      - phase-15-advanced-statistical-models
   workflow_dispatch:
     inputs:
       league:
@@ -34,10 +37,10 @@ jobs:
       - name: Run real-data benchmark
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
           test -n "$SUPABASE_URL" || (echo "SUPABASE_URL secret is not configured" && exit 1)
-          test -n "$SUPABASE_SERVICE_ROLE_KEY" || (echo "SUPABASE_SERVICE_ROLE_KEY secret is not configured" && exit 1)
+          test -n "$SUPABASE_SECRET_KEY" || (echo "SUPABASE_SECRET_KEY secret is not configured" && exit 1)
           python -m python.backtesting.advanced_historical_benchmark --league "${{ github.event.inputs.league }}" > phase15-benchmark-${{ github.event.inputs.league }}.json
 
       - name: Build concise benchmark summary
