@@ -176,14 +176,20 @@ class ScoreDrivenDixonColes:
         prev_time: Optional[float] = None
         total_nll = 0.0
 
-        for row in df.itertuples(index=False):
+        for home_id, away_id, home_goals, away_goals, current_time in zip(
+            df["home_id"].to_numpy(),
+            df["away_id"].to_numpy(),
+            df["home_goals"].to_numpy(),
+            df["away_goals"].to_numpy(),
+            df["_time_days"].to_numpy(dtype=float),
+        ):
             _, _, ll = self._one_step(
-                row.home_id,
-                row.away_id,
-                int(row.home_goals),
-                int(row.away_goals),
+                home_id,
+                away_id,
+                int(home_goals),
+                int(away_goals),
                 prev_time,
-                float(row._time_days),
+                float(current_time),
                 attack,
                 defence,
                 theta,
@@ -192,7 +198,7 @@ class ScoreDrivenDixonColes:
             if not np.isfinite(ll):
                 return 1e12
             total_nll -= ll
-            prev_time = float(row._time_days)
+            prev_time = float(current_time)
 
         penalty = 1e-6 * float(np.sum(np.square(theta[3:])))
         return float(total_nll + penalty)
@@ -249,21 +255,27 @@ class ScoreDrivenDixonColes:
         prev_time: Optional[float] = None
         predictive_ll = []
 
-        for row in df.itertuples(index=False):
+        for home_id, away_id, home_goals, away_goals, current_time in zip(
+            df["home_id"].to_numpy(),
+            df["away_id"].to_numpy(),
+            df["home_goals"].to_numpy(),
+            df["away_goals"].to_numpy(),
+            df["_time_days"].to_numpy(dtype=float),
+        ):
             _, _, ll = self._one_step(
-                row.home_id,
-                row.away_id,
-                int(row.home_goals),
-                int(row.away_goals),
+                home_id,
+                away_id,
+                int(home_goals),
+                int(away_goals),
                 prev_time,
-                float(row._time_days),
+                float(current_time),
                 attack,
                 defence,
                 theta,
                 update=True,
             )
             predictive_ll.append(ll)
-            prev_time = float(row._time_days)
+            prev_time = float(current_time)
 
         self.mu = float(theta[0])
         self.home_advantage = float(theta[1])
