@@ -26,7 +26,7 @@ export default function OddsPanel({ market, className = '' }: OddsPanelProps) {
           }`}
         >
           <span className={`w-1.5 h-1.5 rounded-full ${hasOdds ? 'bg-[#10B981]' : 'bg-[#64748B]'}`} />
-          {hasOdds ? '1xBet Verified Feed (ID: 6)' : '1xBet Odds Unavailable'}
+          {hasOdds ? '1xBet Verified Feed' : '1xBet Odds Unavailable'}
         </span>
       }
       actions={
@@ -46,7 +46,7 @@ export default function OddsPanel({ market, className = '' }: OddsPanelProps) {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-[11px] text-[#94A3B8]">
                 <span className="font-semibold text-[#F8FAFC]">1X2 Match Result</span>
-                <span className="text-[#64748B]">Overround: {((market.overround || 0.04) * 100).toFixed(1)}%</span>
+                <span className="text-[#64748B]">Overround: {market.overround !== null ? `${(market.overround * 100).toFixed(1)}%` : '—'}</span>
               </div>
 
               <div className="grid grid-cols-3 gap-2 text-center">
