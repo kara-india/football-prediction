@@ -1,18 +1,19 @@
 """
 Historical match repository for the statistical engine.
 
-The repository reads the project-owned public.historical_matches table using
-supabase-py and paginates deterministically. No fixture/synthetic fallback is
-allowed in production benchmark execution.
+Uses Supabase PostgREST directly so modern sb_secret_* API keys work with the
+benchmark even when the wider Python application still contains older client
+library pins. Results are paginated deterministically; no synthetic fallback.
 """
 
 from __future__ import annotations
 
 import os
 from typing import Iterable, List, Optional
+from urllib.parse import quote
 
+import httpx
 import pandas as pd
-from supabase import Client, create_client
 
 
 HISTORICAL_COLUMNS = [
@@ -51,18 +52,48 @@ class HistoricalMatchRepository:
         key: Optional[str] = None,
         page_size: int = 1000,
     ):
-        self.url = url or os.environ.get("NEXT_PUBLIC_SUPABASE_URL") or os.environ.get("SUPABASE_URL")
-        self.key = key or os.environ.get("SUPABASE_SECRET_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        self.url = (
+            url
+            or os.environ.get("SUPABASE_URL")
+            or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+        )
+        self.key = (
+            key
+            or os.environ.get("SUPABASE_SECRET_KEY")
+            or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        )
         self.page_size = int(page_size)
 
         if not self.url:
-            raise RuntimeError("Supabase URL is not configured.")
+            raise RuntimeError("SUPABASE_URL is not configured.")
         if not self.key:
             raise RuntimeError("SUPABASE_SECRET_KEY is required for historical benchmark access.")
         if self.page_size < 1 or self.page_size > 1000:
             raise ValueError("page_size must be between 1 and 1000.")
 
-        self.client: Client = create_client(self.url, self.key)
+    def _build_query(
+        self,
+        offset: int,
+        leagues: Optional[List[str]],
+        start_date: Optional[str],
+        end_date: Optional[str],
+    ) -> str:
+        params = [
+            ("select", ",".join(HISTORICAL_COLUMNS)),
+            ("order", "match_date.asc,id.asc"),
+            ("limit", str(self.page_size)),
+            ("offset", str(offset)),
+        ]
+
+        if leagues:
+            encoded = ",".join(quote(value, safe="") for value in leagues)
+            params.append(("league_code", f"in.({encoded})"))
+        if start_date:
+            params.append(("match_date", f"gte.{start_date}"))
+        if end_date:
+            params.append(("match_date", f"lte.{end_date}"))
+
+        return "&".join(f"{quote(k, safe='')}={quote(v, safe='(),.')}" for k, v in params)
 
     def fetch(
         self,
@@ -70,34 +101,35 @@ class HistoricalMatchRepository:
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
     ) -> pd.DataFrame:
-        league_values = [str(v) for v in leagues] if leagues else None
+        league_values = [str(value) for value in leagues] if leagues else None
         rows: List[dict] = []
         offset = 0
+        endpoint = f"{self.url.rstrip('/')}/rest/v1/historical_matches"
+        headers = {
+            "apikey": self.key,
+            "Authorization": f"Bearer {self.key}",
+            "Accept": "application/json",
+        }
 
-        while True:
-            query = (
-                self.client
-                .table("historical_matches")
-                .select(",".join(HISTORICAL_COLUMNS))
-                .order("match_date", desc=False)
-                .order("id", desc=False)
-                .range(offset, offset + self.page_size - 1)
-            )
+        with httpx.Client(timeout=30.0) as client:
+            while True:
+                response = client.get(
+                    f"{endpoint}?{self._build_query(offset, league_values, start_date, end_date)}",
+                    headers=headers,
+                )
+                if response.status_code >= 400:
+                    raise RuntimeError(
+                        f"Supabase historical_matches request failed with HTTP {response.status_code}."
+                    )
 
-            if league_values:
-                query = query.in_("league_code", league_values)
-            if start_date:
-                query = query.gte("match_date", start_date)
-            if end_date:
-                query = query.lte("match_date", end_date)
+                batch = response.json() or []
+                if not isinstance(batch, list):
+                    raise RuntimeError("Supabase historical_matches response is not a list.")
 
-            response = query.execute()
-            batch = response.data or []
-            rows.extend(batch)
-
-            if len(batch) < self.page_size:
-                break
-            offset += self.page_size
+                rows.extend(batch)
+                if len(batch) < self.page_size:
+                    break
+                offset += self.page_size
 
         if not rows:
             return pd.DataFrame(columns=HISTORICAL_COLUMNS)
