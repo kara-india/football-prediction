@@ -220,12 +220,32 @@ class AdvancedHistoricalBenchmark:
                 test_probs_1x2, test_xg = self._predict_1x2(model, test)
 
                 if self.calibration_months > 0:
-                    cal_home = (cal["home_goals"].to_numpy() > cal["away_goals"].to_numpy()).astype(int)
+                    cal_outcome = np.select(
+                        [
+                            cal["home_goals"].to_numpy() > cal["away_goals"].to_numpy(),
+                            cal["home_goals"].to_numpy() == cal["away_goals"].to_numpy(),
+                        ],
+                        [0, 1],
+                        default=2,
+                    ).astype(int)
                     cal_o25 = (cal["total_goals"].to_numpy() > 2).astype(int)
 
-                    home_calibrator = ProbabilityCalibrator(method="isotonic")
+                    class_calibrators = []
+                    for class_idx, market_name in enumerate(("HOME_WIN", "DRAW", "AWAY_WIN")):
+                        binary_target = (cal_outcome == class_idx).astype(int)
+                        cal_model = ProbabilityCalibrator(method="isotonic")
+                        if len(np.unique(binary_target)) < 2:
+                            raise RuntimeError(
+                                f"Calibration window lacks both classes for {market_name}."
+                            )
+                        cal_model.fit(
+                            binary_target,
+                            cal_probs_1x2[:, class_idx],
+                            market=market_name,
+                        )
+                        class_calibrators.append(cal_model)
+
                     ou_calibrator = ProbabilityCalibrator(method="isotonic")
-                    home_calibrator.fit(cal_home, cal_probs_1x2[:, 0], market="HOME_WIN")
                     ou_raw_cal = np.asarray([
                         distributions.predict_over_under(
                             2.5,
@@ -234,12 +254,23 @@ class AdvancedHistoricalBenchmark:
                         )[0]
                         for h, a in cal_xg
                     ])
+                    if len(np.unique(cal_o25)) < 2:
+                        raise RuntimeError("Calibration window lacks both O/U 2.5 classes.")
                     ou_calibrator.fit(cal_o25, ou_raw_cal, market="OVER_2_5")
 
-                    calibrated_home = np.asarray(
-                        home_calibrator.calibrate(test_probs_1x2[:, 0], market="HOME_WIN"),
-                        dtype=float,
-                    )
+                    calibrated_1x2_raw = np.column_stack([
+                        np.asarray(
+                            class_calibrators[i].calibrate(
+                                test_probs_1x2[:, i],
+                                market=("HOME_WIN", "DRAW", "AWAY_WIN")[i],
+                            ),
+                            dtype=float,
+                        )
+                        for i in range(3)
+                    ])
+                    row_sums = np.maximum(calibrated_1x2_raw.sum(axis=1, keepdims=True), 1e-12)
+                    calibrated_1x2 = calibrated_1x2_raw / row_sums
+
                     raw_over_test = np.asarray([
                         distributions.predict_over_under(
                             2.5,
@@ -257,18 +288,6 @@ class AdvancedHistoricalBenchmark:
 
                 y_home = (test["home_goals"].to_numpy() > test["away_goals"].to_numpy()).astype(int)
                 y_over = (test["total_goals"].to_numpy() > 2).astype(int)
-
-                # Preserve the uncalibrated 1X2 distribution and renormalize after
-                # replacing only the calibrated home component.
-                others = test_probs_1x2[:, 1:]
-                remaining = np.maximum(1.0 - calibrated_home, 1e-9)
-                calibrated_draw = others[:, 0] / np.maximum(others.sum(axis=1), 1e-9) * remaining
-                calibrated_away = others[:, 1] / np.maximum(others.sum(axis=1), 1e-9) * remaining
-                calibrated_1x2 = np.column_stack([
-                    calibrated_home,
-                    calibrated_draw,
-                    calibrated_away,
-                ])
 
                 fold_metric[f"{name}_home_brier"] = self.metrics.brier_score(y_home, calibrated_home)
                 fold_metric[f"{name}_home_log_loss"] = self.metrics.log_loss(y_home, calibrated_home)
