@@ -1,19 +1,19 @@
 import math
 from typing import Any, Dict, Optional, Tuple
+
 import numpy as np
 
 from .match_state import MatchState
+from python.models.live_hazard import LearnedLiveHazard
 
 
 class VectorizedMonteCarloSimulator:
     """
-    High-performance vectorized Monte Carlo match simulator.
-    Simulates thousands of concurrent match trajectories in milliseconds
-    using NumPy matrix operations with in-play competing hazards:
-    - Path-dependent scoreline chasing/leading feedback
-    - Red card penalty (35% goal hazard reduction)
-    - Non-linear minute-by-minute hazard decay
-    - Empirical standard error calculation with early convergence stopping
+    Vectorized Monte Carlo simulator.
+
+    The simulator itself is a probability propagation mechanism. It does not
+    contain hand-written football effects. Optional live corrections must come
+    from a fitted LearnedLiveHazard model.
     """
 
     MIN_SIMULATIONS: int = 10_000
@@ -21,9 +21,14 @@ class VectorizedMonteCarloSimulator:
     TARGET_STD_ERROR: float = 0.004
     BATCH_SIZE: int = 5_000
 
-    def __init__(self, seed: Optional[int] = None):
+    def __init__(
+        self,
+        seed: Optional[int] = None,
+        live_hazard_model: Optional[LearnedLiveHazard] = None,
+    ):
         self.seed = seed
         self.rng = np.random.default_rng(seed)
+        self.live_hazard_model = live_hazard_model
 
     def simulate_batch(
         self,
@@ -32,11 +37,8 @@ class VectorizedMonteCarloSimulator:
         away_lambda_per_min: float,
         n_simulations: int,
         rng: Optional[np.random.Generator] = None,
+        live_hazard_model: Optional[LearnedLiveHazard] = None,
     ) -> np.ndarray:
-        """
-        Simulate n_simulations trajectories from the given MatchState simultaneously.
-        Returns ndarray of shape (n_simulations, 2) containing [final_home_goals, final_away_goals].
-        """
         active_rng = rng if rng is not None else self.rng
         rem_mins = int(math.ceil(state.remaining_minutes))
 
@@ -46,57 +48,66 @@ class VectorizedMonteCarloSimulator:
             res[:, 1] = state.score_away
             return res
 
-        # Starting scores
         scores = np.empty((n_simulations, 2), dtype=np.int32)
         scores[:, 0] = state.score_home
         scores[:, 1] = state.score_away
 
-        # Precompute red card multipliers (35% reduction in goal intensity for penalized team)
-        h_card_mult = (0.65 ** state.red_cards_home) * (1.20 ** state.red_cards_away)
-        a_card_mult = (0.65 ** state.red_cards_away) * (1.20 ** state.red_cards_home)
+        hazard = live_hazard_model or self.live_hazard_model
+        hazard_ready = bool(hazard is not None and getattr(hazard, "fitted", False))
 
-        start_min = state.minute
+        start_min = int(state.minute)
         end_min = start_min + rem_mins
 
-        # Step through remaining minutes vectorially across all n_simulations paths
-        for m in range(start_min, end_min):
-            # Empirical minute weight: goals are ~25% more frequent in late stages (75-90')
-            clamped_m = min(m, 90)
-            time_weight = 0.85 + 0.30 * (clamped_m / 90.0)
+        for minute in range(start_min, end_min):
+            if hazard_ready:
+                diff = scores[:, 0].astype(float) - scores[:, 1].astype(float)
+                red_diff = float(state.red_cards_home - state.red_cards_away)
+                sot_diff = float(state.shots_on_target_home - state.shots_on_target_away)
+                xg_diff = float(state.xg_home - state.xg_away)
+                sub_diff = float(state.substitutions_home - state.substitutions_away)
+                knockout_context = float(getattr(state, "knockout_context", 0.0))
 
-            # Score difference: home - away
-            diff = scores[:, 0] - scores[:, 1]
+                home_corr = hazard.correction_multiplier(
+                    minute=np.full(n_simulations, float(minute)),
+                    score_diff=diff,
+                    red_card_diff=np.full(n_simulations, red_diff),
+                    shots_on_target_diff=np.full(n_simulations, sot_diff),
+                    xg_diff=np.full(n_simulations, xg_diff),
+                    substitution_diff=np.full(n_simulations, sub_diff),
+                    knockout_context=np.full(n_simulations, knockout_context),
+                    home_indicator=np.ones(n_simulations),
+                )
+                away_corr = hazard.correction_multiplier(
+                    minute=np.full(n_simulations, float(minute)),
+                    score_diff=-diff,
+                    red_card_diff=np.full(n_simulations, -red_diff),
+                    shots_on_target_diff=np.full(n_simulations, -sot_diff),
+                    xg_diff=np.full(n_simulations, -xg_diff),
+                    substitution_diff=np.full(n_simulations, -sub_diff),
+                    knockout_context=np.full(n_simulations, knockout_context),
+                    home_indicator=np.zeros(n_simulations),
+                )
 
-            # Vectorized score-state adjustments
-            # Home multiplier: cautious when leading (0.95 / 0.88), urgent when trailing (1.08 / 1.15)
-            h_state_mult = np.ones(n_simulations, dtype=np.float64)
-            h_state_mult[diff == 1] = 0.95
-            h_state_mult[diff >= 2] = 0.88
-            h_state_mult[diff == -1] = 1.08
-            h_state_mult[diff <= -2] = 1.15
+                lam_h = np.maximum(
+                    1e-12,
+                    float(home_lambda_per_min) * home_corr,
+                )
+                lam_a = np.maximum(
+                    1e-12,
+                    float(away_lambda_per_min) * away_corr,
+                )
+            else:
+                # Neutral propagation. No hard-coded red-card, late-game, or
+                # score-state assumptions are applied without a trained model.
+                lam_h = np.full(n_simulations, float(home_lambda_per_min))
+                lam_a = np.full(n_simulations, float(away_lambda_per_min))
 
-            # Away multiplier: urgent when trailing (diff > 0), cautious when leading (diff < 0)
-            a_state_mult = np.ones(n_simulations, dtype=np.float64)
-            a_state_mult[diff == 1] = 1.08
-            a_state_mult[diff >= 2] = 1.15
-            a_state_mult[diff == -1] = 0.95
-            a_state_mult[diff <= -2] = 0.88
-
-            # Competing hazard intensity
-            lam_h = home_lambda_per_min * time_weight * h_card_mult * h_state_mult
-            lam_a = away_lambda_per_min * time_weight * a_card_mult * a_state_mult
-
-            # Draw goal occurrences
             scores[:, 0] += active_rng.poisson(lam_h)
             scores[:, 1] += active_rng.poisson(lam_a)
 
         return scores
 
     def compute_distributions(self, paths_array: np.ndarray) -> Dict[str, Any]:
-        """
-        Compute empirical score distributions, marginals, market probabilities,
-        and standard error from simulation paths array.
-        """
         n_sims = len(paths_array)
         if n_sims == 0:
             return {}
@@ -105,7 +116,6 @@ class VectorizedMonteCarloSimulator:
         away_scores = paths_array[:, 1]
         total_goals = home_scores + away_scores
 
-        # 1X2 Probabilities
         home_wins = np.sum(home_scores > away_scores)
         draws = np.sum(home_scores == away_scores)
         away_wins = np.sum(home_scores < away_scores)
@@ -114,31 +124,25 @@ class VectorizedMonteCarloSimulator:
         p_draw = float(draws / n_sims)
         p_away = float(away_wins / n_sims)
 
-        # Standard error strictly from empirical variance SE = sqrt(p * (1 - p) / N)
-        # Using maximum across 1, X, 2 outcomes
         se_home = math.sqrt(p_home * (1.0 - p_home) / n_sims)
         se_draw = math.sqrt(p_draw * (1.0 - p_draw) / n_sims)
         se_away = math.sqrt(p_away * (1.0 - p_away) / n_sims)
         std_error = max(se_home, se_draw, se_away)
 
-        # Over / Under 2.5
         over_25_count = np.sum(total_goals > 2)
         p_over_25 = float(over_25_count / n_sims)
         p_under_25 = 1.0 - p_over_25
 
-        # Both Teams to Score (BTTS)
         btts_count = np.sum((home_scores > 0) & (away_scores > 0))
         p_btts_yes = float(btts_count / n_sims)
         p_btts_no = 1.0 - p_btts_yes
 
-        # Score distribution
         unique_scores, counts = np.unique(paths_array, axis=0, return_counts=True)
         score_distribution = {
             (int(row[0]), int(row[1])): float(count / n_sims)
             for row, count in zip(unique_scores, counts)
         }
 
-        # Total goal distribution
         unique_goals, g_counts = np.unique(total_goals, return_counts=True)
         goal_distribution = {
             int(g): float(c / n_sims)
@@ -164,11 +168,8 @@ class VectorizedMonteCarloSimulator:
         max_simulations: Optional[int] = None,
         target_std_error: Optional[float] = None,
         batch_size: Optional[int] = None,
+        live_hazard_model: Optional[LearnedLiveHazard] = None,
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
-        """
-        Run vectorized simulation in batches until standard error convergence
-        SE <= target_std_error or max_simulations is reached.
-        """
         min_sims = min_simulations or self.MIN_SIMULATIONS
         max_sims = max_simulations or self.MAX_SIMULATIONS
         target_se = target_std_error or self.TARGET_STD_ERROR
@@ -180,12 +181,16 @@ class VectorizedMonteCarloSimulator:
         while total_sims < max_sims:
             chunk_size = min(b_size, max_sims - total_sims)
             batch = self.simulate_batch(
-                state, home_lambda_per_min, away_lambda_per_min, chunk_size, self.rng
+                state,
+                home_lambda_per_min,
+                away_lambda_per_min,
+                chunk_size,
+                self.rng,
+                live_hazard_model=live_hazard_model,
             )
             accumulated_paths.append(batch)
             total_sims += chunk_size
 
-            # Check convergence once minimum simulation count is satisfied
             if total_sims >= min_sims:
                 current_all = np.vstack(accumulated_paths)
                 dist = self.compute_distributions(current_all)
@@ -193,5 +198,4 @@ class VectorizedMonteCarloSimulator:
                     return current_all, dist
 
         final_paths = np.vstack(accumulated_paths)
-        dist = self.compute_distributions(final_paths)
-        return final_paths, dist
+        return final_paths, self.compute_distributions(final_paths)
