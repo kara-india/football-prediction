@@ -105,47 +105,34 @@ def test_over_25_high_at_0_when_2_1():
     
     assert pytest.approx(probs['over_under_25']['over']) == 1.0
 
-def test_score_state_effect():
-    # 2-0 at 75 vs 0-0 at 75
-    state_2_0 = get_base_state()
-    state_2_0.minute = 75
-    state_2_0.period = 'second_half'
-    state_2_0.score_home = 2
-    
-    state_0_0 = get_base_state()
-    state_0_0.minute = 75
-    state_0_0.period = 'second_half'
-    
-    estimator = EventIntensityEstimator()
-    sim1 = MonteCarloSimulator(seed=42)
-    res_2_0 = sim1.simulate_match_from_state(state_2_0, 0.02, 0.02, estimator, n_simulations=5000)
-    
-    sim2 = MonteCarloSimulator(seed=42)
-    res_0_0 = sim2.simulate_match_from_state(state_0_0, 0.02, 0.02, estimator, n_simulations=5000)
-    
-    away_goals_2_0 = [p.final_score_away - state_2_0.score_away for p in res_2_0.paths]
-    away_goals_0_0 = [p.final_score_away - state_0_0.score_away for p in res_0_0.paths]
-    
-    assert sum(away_goals_2_0) != sum(away_goals_0_0)
-
-
-def test_red_card_reduces_goal_expectation():
-    """Verify red card penalty results in approximately 35% reduction in goal intensity."""
+def test_neutral_simulator_has_no_hidden_score_or_red_card_effect():
     state_even = get_base_state()
+
+    state_score = get_base_state()
+    state_score.score_home = 2
+
     state_red = get_base_state()
     state_red.red_cards_home = 1
 
-    sim = MonteCarloSimulator(seed=123)
-    res_even = sim.simulate_match_from_state(state_even, 0.02, 0.02, n_simulations=20000)
-    res_red = sim.simulate_match_from_state(state_red, 0.02, 0.02, n_simulations=20000)
+    sim_even = MonteCarloSimulator(seed=123)
+    sim_score = MonteCarloSimulator(seed=123)
+    sim_red = MonteCarloSimulator(seed=123)
 
-    avg_home_even = sum(p.final_score_home for p in res_even.paths) / 20000
-    avg_home_red = sum(p.final_score_home for p in res_red.paths) / 20000
+    res_even = sim_even.simulate_match_from_state(
+        state_even, 0.02, 0.02, n_simulations=5000
+    )
+    res_score = sim_score.simulate_match_from_state(
+        state_score, 0.02, 0.02, n_simulations=5000
+    )
+    res_red = sim_red.simulate_match_from_state(
+        state_red, 0.02, 0.02, n_simulations=5000
+    )
 
-    # Ratio of red card goals to even goals should be close to 0.65 (within empirical margin 0.58 - 0.72)
-    ratio = avg_home_red / avg_home_even
-    assert 0.58 <= ratio <= 0.72
-
+    # With no fitted hazard model, future goal increments must be identical
+    # across these states. The starting score can change 1X2, but the simulator
+    # must not silently encode a score-state/red-card multiplier.
+    assert res_even.goal_distribution == res_score.goal_distribution
+    assert res_even.goal_distribution == res_red.goal_distribution
 
 def test_standard_error_matches_theoretical_formula():
     """Verify empirical standard error matches sqrt(p * (1 - p) / N) and decays with 1/sqrt(N)."""

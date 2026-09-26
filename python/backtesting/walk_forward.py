@@ -349,7 +349,29 @@ class WalkForwardValidator:
         }
 
     def _fit_model(self, model: Any, train_df: pd.DataFrame, target_col: str) -> None:
-        """Internal adapter to fit different model types."""
+        """Internal adapter to fit different model types without synthetic fallbacks."""
+        # 0. Goal-based probabilistic models that consume the complete match frame.
+        if model.__class__.__name__ in {"ScoreDrivenDixonColes", "DixonColesModel"}:
+            required = {"home_id", "away_id", "home_goals", "away_goals"}
+            if not required.issubset(train_df.columns):
+                rename_map = {
+                    "home_team_id": "home_id",
+                    "away_team_id": "away_id",
+                    "fulltime_home": "home_goals",
+                    "fulltime_away": "away_goals",
+                    "kickoff_utc": "date",
+                }
+                goal_df = train_df.rename(columns=rename_map).copy()
+            else:
+                goal_df = train_df.copy()
+            required = {"home_id", "away_id", "home_goals", "away_goals"}
+            if not required.issubset(goal_df.columns):
+                raise ValueError(
+                    "Dynamic goal model requires home_id, away_id, home_goals and away_goals."
+                )
+            model.fit(goal_df)
+            return
+
         # 1. Standard scikit-learn classifier
         if hasattr(model, "fit"):
             feature_cols = [c for c in train_df.columns if c not in (target_col, "_parsed_date", "date", "match_date", "id", "match_id")]
@@ -399,8 +421,9 @@ class WalkForwardValidator:
         if callable(model):
             return np.asarray(model(test_df), dtype=float)
 
-        # Baseline fallback
-        return np.full(N, 0.5)
+        raise TypeError(
+            f"Unsupported model type {type(model).__name__}: no probabilistic prediction adapter exists."
+        )
 
     def compare_models(
         self,
@@ -443,84 +466,70 @@ class WalkForwardValidator:
         }
 
 
-def run_full_backtest(leagues: List[str], seasons: Optional[List[str]] = None) -> None:
-    """CLI runner executing walk-forward backtest across specified domestic leagues."""
-    print("=" * 80)
-    print("FOOTBALL PREDICTION PLATFORM — WALK-FORWARD HISTORICAL REPLAY BACKTESTER")
-    print(f"Target Leagues: {', '.join(leagues)}")
-    print("=" * 80)
+def run_full_backtest(
+    data_path: str,
+    leagues: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """
+    Run a real walk-forward benchmark from an external historical dataset.
 
-    # Generate synthetic realistic test matches if running offline or fetch from data source
-    print("\n[1/3] Generating Historical Point-in-Time Temporal Partitions...")
-    rng = np.random.default_rng(42)
-    n_matches = 1200
-    dates = pd.date_range("2021-01-01", "2024-05-30", periods=n_matches)
+    Synthetic outcomes are intentionally forbidden here. Tests may construct
+    in-memory fixtures, but the production CLI requires a supplied dataset.
+    """
+    if not data_path:
+        raise ValueError("A real historical dataset path is required; synthetic fallback is disabled.")
 
-    synthetic_matches = pd.DataFrame({
-        "match_id": [f"match_{i}" for i in range(n_matches)],
-        "date": dates,
-        "home_team_id": rng.integers(1, 21, size=n_matches),
-        "away_team_id": rng.integers(1, 21, size=n_matches),
-        "home_goals": rng.poisson(1.5, size=n_matches),
-        "away_goals": rng.poisson(1.1, size=n_matches),
-        "odds": rng.uniform(1.8, 2.4, size=n_matches),
-        "closing_odds": rng.uniform(1.75, 2.35, size=n_matches),
-    })
-    synthetic_matches["outcome"] = (synthetic_matches["home_goals"] > synthetic_matches["away_goals"]).astype(int)
+    path = str(data_path)
+    if path.lower().endswith((".parquet", ".pq")):
+        df = pd.read_parquet(path)
+    else:
+        df = pd.read_csv(path)
+
+    if leagues and "league" in df.columns:
+        df = df[df["league"].isin(leagues)].copy()
+
+    if df.empty:
+        return {
+            "status": "insufficient_data",
+            "reason": "Historical dataset contains no usable rows after filtering.",
+            "total_predictions": 0,
+        }
 
     validator = WalkForwardValidator(
-        initial_train_months=18,
+        initial_train_months=24,
         calibration_months=3,
         test_months=1,
         step_months=1,
         calibration_method="isotonic",
     )
 
-    print(f"[2/3] Executing Walk-Forward Validation ({len(synthetic_matches)} fixtures)...")
-
-    # Baseline Champion model: simple empirical Elo / Logistic model
     from sklearn.linear_model import LogisticRegression
 
-    champion_results = validator.validate_model(
-        model_factory=lambda: LogisticRegression(C=0.1),
-        features=synthetic_matches,
+    results = validator.validate_model(
+        model_factory=lambda: LogisticRegression(C=0.1, max_iter=1000),
+        features=df,
         target_col="outcome",
-        date_col="date",
+        date_col="date" if "date" in df.columns else "kickoff_utc",
     )
-
-    print("\n" + "=" * 80)
-    print("OUT-OF-SAMPLE EMPIRICAL METRIC SUMMARY (ZERO MOCKED VALUES)")
-    print("=" * 80)
-    print(f"{'Metric':<25} | {'Champion Value':<20}")
-    print("-" * 50)
-    print(f"{'Mean Brier Score':<25} | {champion_results['mean_brier']:<20.6f}")
-    print(f"{'Mean Log Loss':<25} | {champion_results['mean_log_loss']:<20.6f}")
-    print(f"{'Expected Calib Error (ECE)':<25} | {champion_results['mean_ece']:<20.6f}")
-    print(f"{'Flat Staking ROI':<25} | {champion_results['overall_roi'] * 100:<19.2f}%")
-    print(f"{'Mean Closing Line Value':<25} | {champion_results['mean_clv'] * 100:<19.2f}%")
-    print(f"{'Max Drawdown (Units)':<25} | {champion_results['max_drawdown_units']:<20.2f}")
-    print(f"{'Total Evaluated Matches':<25} | {champion_results['total_predictions']:<20d}")
-    print(f"{'Completed Folds':<25} | {len(champion_results['folds']):<20d}")
-    print("=" * 80)
+    results["status"] = "success"
+    return results
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Walk-Forward Historical Replay Backtester")
     parser.add_argument(
-        "--run-full-backtest",
-        action="store_true",
-        help="Execute full historical walk-forward backtest across allowlisted leagues",
+        "--data-path",
+        required=True,
+        help="Path to real historical CSV/Parquet data; synthetic fallback is disabled.",
     )
     parser.add_argument(
         "--leagues",
         type=str,
-        default="EPL,LaLiga,Bundesliga",
-        help="Comma-separated list of target leagues",
+        default="",
+        help="Optional comma-separated league filter.",
     )
     args = parser.parse_args()
 
-    if args.run_full_backtest:
-        target_leagues = [lg.strip() for lg in args.leagues.split(",")]
-        run_full_backtest(target_leagues)
-    else:
-        parser.print_help()
+    target_leagues = [lg.strip() for lg in args.leagues.split(",") if lg.strip()]
+    result = run_full_backtest(args.data_path, target_leagues or None)
+    print(result)

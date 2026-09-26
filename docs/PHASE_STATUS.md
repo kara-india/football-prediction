@@ -7,9 +7,10 @@ This document is the authoritative runtime state contract for development sessio
 
 ## Current Platform State
 
-- **CURRENT PHASE**: `PHASE 14 — DURABLE STATE & TEMPORAL LEARNING FOUNDATION`
-- **STATUS**: `DEVELOPMENT IN PROGRESS — PRODUCTION CLAIMS QUARANTINED`
+- **CURRENT PHASE**: `PHASE 15 — ADVANCED STATISTICAL MODELING & ASSUMPTION REMOVAL`
+- **STATUS**: `DEVELOPMENT IN PROGRESS — ADVANCED MODELS ARE CHALLENGERS UNTIL WALK-FORWARD VALIDATED`
 - **LAST COMPLETED PHASE**: `Phase 13 — Prediction Integrity & Runtime Truthfulness`
+- **PHASE 14 FOUNDATION**: Durable-state schema is implemented; runtime integration remains under audit while Phase 15 model work proceeds.
 - **LAST VERIFIED GIT SHA**: `6fcc4f6dc9dfa602d7d8061d8fb116382bf93591`
 - **LAST VERIFIED SUPABASE STATE**: 
   - Project URL: `https://qqcxjjkgvqknesrtnwal.supabase.co`
@@ -33,7 +34,7 @@ This document is the authoritative runtime state contract for development sessio
   - [ ] User must log in to API-Sports dashboard and rotate the exposed API key (`073534...`).
   - [ ] User must set rotated `API_FOOTBALL_KEY` in GitHub Repository Secrets and local `.env.local`.
   - [ ] User must run SQL migrations in Supabase SQL Editor (`000_baseline_reconciliation.sql` through `010_retention_and_idempotency.sql`).
-- **NEXT ACTION**: System is fully implemented. User may trigger background workers via `python -m python.workers.runner all --dry-run` or enable GitHub Actions scheduled crons.
+- **NEXT ACTION**: Complete Phase 15 real-data walk-forward comparison, calibration, model artifact persistence, and challenger promotion gates. Do not enable automated production inference until those gates pass.
 - **LIFECYCLE STATUS**: Continual learning, multi-checkpoint forecasting, lineup-triggered inference, and RL decision architecture fully incorporated and operational (`docs/CONTINUAL_LEARNING_ARCHITECTURE.md`).
 
 ---
@@ -55,6 +56,7 @@ This document is the authoritative runtime state contract for development sessio
 | **Phase 10** | Production Hardening & Observability | **P2** | `COMPLETED` | 2026-09-24 01:49 IST | 2026-09-24 01:56 IST | `HEAD` |
 | **Phase 11** | Sofascore-Inspired Terminal UI & Match Intelligence | **P2** | `COMPLETED` | 2026-09-24 01:18 IST | 2026-09-24 01:25 IST | `992a8db3b65d1130b4a15435f4958f32cb58c262` |
 | **Phase 12** | RL & Contextual Bandit Policy | **P3** | `COMPLETED` | 2026-09-24 01:30 IST | 2026-09-24 01:36 IST | `81a5d00a89d7fa13c4155a5b512c1e84860b7692` |
+| **Phase 15** | Advanced Statistical Modeling & Assumption Removal | **P1** | `IN_PROGRESS` | 2026-09-26 IST |  | `phase-15 branch` |
 
 ---
 

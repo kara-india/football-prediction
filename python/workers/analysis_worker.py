@@ -31,6 +31,8 @@ from python.calibration.calibrator import ProbabilityCalibrator
 from python.odds.devig import DeVIgEngine
 from python.engine.nobet_gate import NoBetGate, NoBetGateResult
 from python.rl.counterfactual_logger import CounterfactualLogger
+from python.models.dynamic_dixon_coles import ScoreDrivenDixonColes
+from python.models.learned_lineup_effects import LearnedLineupEffectModel
 
 logger = logging.getLogger("AnalysisWorker")
 
@@ -46,19 +48,17 @@ class AnalysisWorker:
         simulator: Optional[VectorizedMonteCarloSimulator] = None,
         calibrator: Optional[ProbabilityCalibrator] = None,
         no_bet_gate: Optional[NoBetGate] = None,
+        prematch_model: Optional[ScoreDrivenDixonColes] = None,
+        lineup_effect_model: Optional[LearnedLineupEffectModel] = None,
     ):
-        self.supabase_url = supabase_url or os.environ.get(
-            "NEXT_PUBLIC_SUPABASE_URL",
-            "https://qqcxjjkgvqknesrtnwal.supabase.co"
-        )
-        self.supabase_key = supabase_key or os.environ.get(
-            "SUPABASE_SERVICE_ROLE_KEY",
-            os.environ.get("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "")
-        )
+        self.supabase_url = supabase_url or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+        self.supabase_key = supabase_key or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
         self.cf_logger = cf_logger or CounterfactualLogger()
         self.simulator = simulator or VectorizedMonteCarloSimulator(seed=42)
         self.no_bet_gate = no_bet_gate or NoBetGate()
         self.calibrator = calibrator or self._build_default_calibrator()
+        self.prematch_model = prematch_model
+        self.lineup_effect_model = lineup_effect_model
         
         # In-memory prediction ledger for dry-run and cross-checkpoint delta lookups
         self._in_memory_predictions: Dict[str, Dict[str, Any]] = {}
@@ -70,51 +70,70 @@ class AnalysisWorker:
     def compute_starter_ratings(
         self,
         lineup_data: Optional[Dict[str, Any]],
-        base_home_rate: float = 1.45,
-        base_away_rate: float = 1.15,
+        base_home_rate: Optional[float] = None,
+        base_away_rate: Optional[float] = None,
     ) -> Tuple[float, float, Dict[str, Any]]:
-        """Compute starter-specific attacking/defensive goal multipliers.
-        
-        Evaluates missing starters and expected minutes.
-        Returns:
-            Tuple of (effective_home_rate, effective_away_rate, details)
         """
+        Apply learned player/XI contributions to supplied baseline goal rates.
+
+        No fixed "missing starter = -4%" or other hand-written lineup penalty is
+        used. If a fitted lineup-effect model is unavailable, the baseline rates
+        remain unchanged and the source is explicitly marked unavailable.
+        """
+        if base_home_rate is None or base_away_rate is None:
+            raise ValueError("Base home/away goal rates must be supplied by a fitted model or explicit point-in-time observation.")
+
+        home_rate = float(base_home_rate)
+        away_rate = float(base_away_rate)
+
+        if home_rate <= 0 or away_rate <= 0:
+            raise ValueError("Baseline goal rates must be positive.")
+
+        details: Dict[str, Any] = {
+            "lineup_verified": False,
+            "lineup_adjustment_source": "UNAVAILABLE",
+            "home_log_rate_delta": 0.0,
+            "away_log_rate_delta": 0.0,
+        }
+
         if not lineup_data:
-            return base_home_rate, base_away_rate, {
-                "lineup_verified": False,
-                "missing_starters_home": 0,
-                "missing_starters_away": 0,
-                "home_starter_multiplier": 1.0,
-                "away_starter_multiplier": 1.0,
-            }
+            return home_rate, away_rate, details
 
         home = lineup_data.get("home", {})
         away = lineup_data.get("away", {})
-        home_starters = home.get("starters", [])
-        away_starters = away.get("starters", [])
+        home_starters = [
+            p.get("player", {}).get("id")
+            for p in home.get("starters", [])
+            if p.get("player", {}).get("id") is not None
+        ]
+        away_starters = [
+            p.get("player", {}).get("id")
+            for p in away.get("starters", [])
+            if p.get("player", {}).get("id") is not None
+        ]
 
-        # Check for 11 starters
-        home_verified = len(home_starters) == 11
-        away_verified = len(away_starters) == 11
+        verified = len(home_starters) == 11 and len(away_starters) == 11
+        details["lineup_verified"] = verified
 
-        # Calculate adjustments based on key absences (simulated via missing minutes)
-        missing_h = max(0, 11 - len(home_starters))
-        missing_a = max(0, 11 - len(away_starters))
+        if not verified or self.lineup_effect_model is None or not getattr(self.lineup_effect_model, "fitted", False):
+            return home_rate, away_rate, details
 
-        # Attacking/defensive starter multipliers
-        h_mult = 1.0 - (missing_h * 0.04)
-        a_mult = 1.0 - (missing_a * 0.04)
+        home_delta = self.lineup_effect_model.predict_log_rate_delta(
+            home_starters, away_starters
+        )
+        away_delta = self.lineup_effect_model.predict_log_rate_delta(
+            away_starters, home_starters
+        )
 
-        eff_home = max(0.2, base_home_rate * h_mult)
-        eff_away = max(0.2, base_away_rate * a_mult)
+        effective_home = float(np.exp(np.log(home_rate) + home_delta))
+        effective_away = float(np.exp(np.log(away_rate) + away_delta))
 
-        return eff_home, eff_away, {
-            "lineup_verified": home_verified and away_verified,
-            "missing_starters_home": missing_h,
-            "missing_starters_away": missing_a,
-            "home_starter_multiplier": round(h_mult, 4),
-            "away_starter_multiplier": round(a_mult, 4),
-        }
+        details.update({
+            "lineup_adjustment_source": "learned_player_effects",
+            "home_log_rate_delta": round(float(home_delta), 6),
+            "away_log_rate_delta": round(float(away_delta), 6),
+        })
+        return effective_home, effective_away, details
 
     def compute_lineup_information_value(
         self,
@@ -295,7 +314,9 @@ class AnalysisWorker:
                 prob_lower=prob_lower,
                 prob_upper=prob_upper,
                 model_calibrated=calibration_applied,
-                historical_sample_size=0,
+                historical_sample_size=int(
+                getattr(self.prematch_model, "metrics", {}).get("n_matches", 0)
+            ),
             )
             gate_reasons = list(dict.fromkeys(
                 ([ "ODDS_UNAVAILABLE" ] if not odds_available else [])
@@ -332,11 +353,17 @@ class AnalysisWorker:
                 "recommended_action": gate_res.action,
                 "no_bet_reasons": gate_res.reasons,
                 "simulation_count": int(simulation_count),
-                "simulation_version": "vectorized_mc_v1",
-                "model_version": "dixon_coles_ewma_v1",
+                "simulation_seed": int(self.simulator.seed) if getattr(self.simulator, "seed", None) is not None else None,
+                "simulation_version": "3.0-learned-hazard",
+                "model_version": (
+                    "score_driven_dixon_coles_v1"
+                    if self.prematch_model is not None and getattr(self.prematch_model, "fitted", False)
+                    else "external_point_in_time_rate_model"
+                ),
                 "calibration_version": calibration_version,
                 "calibration_applied": calibration_applied,
                 "lineup_information_value": liv,
+                "probability_interval_method": "mc_standard_error_only",
                 "predicted_at": now_utc.isoformat(),
             }
 
@@ -403,6 +430,7 @@ class AnalysisWorker:
                     "implied_probability": p["implied_probability"],
                     "expected_value": p["expected_value"],
                     "simulation_count": p["simulation_count"],
+                    "simulation_seed": p["simulation_seed"],
                     "simulation_version": p["simulation_version"],
                     "no_bet_reasons": p["no_bet_reasons"],
                     "is_candidate": (p["recommended_action"] == "BET"),
@@ -425,6 +453,47 @@ class AnalysisWorker:
         except Exception as e:
             logger.warning(f"Could not persist predictions to Supabase: {e}")
 
+    def _resolve_baseline_goal_rates(
+        self,
+        match: Union[Dict[str, Any], CanonicalMatch],
+    ) -> Tuple[float, float, str]:
+        """
+        Resolve point-in-time pre-lineup baseline rates.
+
+        Preferred sources:
+          1. Explicit rates persisted on the match input.
+          2. A fitted dynamic Dixon-Coles model using team IDs.
+
+        Production execution fails closed when neither source is available.
+        """
+        if isinstance(match, CanonicalMatch):
+            match_map: Dict[str, Any] = match.__dict__
+        else:
+            match_map = dict(match)
+
+        explicit_home = match_map.get("model_home_rate", match_map.get("base_home_rate"))
+        explicit_away = match_map.get("model_away_rate", match_map.get("base_away_rate"))
+
+        if explicit_home is not None and explicit_away is not None:
+            h = float(explicit_home)
+            a = float(explicit_away)
+            if h > 0 and a > 0:
+                return h, a, "explicit_point_in_time_rates"
+
+        model = self.prematch_model
+        home_id = match_map.get("home_team_id", match_map.get("home_id"))
+        away_id = match_map.get("away_team_id", match_map.get("away_id"))
+
+        if model is not None and getattr(model, "fitted", False) and home_id is not None and away_id is not None:
+            h, a = model.get_expected_goals(home_id, away_id)
+            if h > 0 and a > 0:
+                return float(h), float(a), "dynamic_dixon_coles"
+
+        raise RuntimeError(
+            "No fitted point-in-time goal-rate source is available. "
+            "Refusing to fall back to hard-coded home/away rates."
+        )
+
     def run_match_prediction(
         self,
         match: Union[Dict[str, Any], CanonicalMatch],
@@ -442,9 +511,14 @@ class AnalysisWorker:
             comp_name = match.get("competition_name", "Allowed Competition")
 
         lineup_confirmed = (stage in ("LINEUP_CONFIRMED", "LINEUP_V2"))
-        h_rate, a_rate, _ = self.compute_starter_ratings(lineup_data)
+        base_h_rate, base_a_rate, rate_source = self._resolve_baseline_goal_rates(match)
+        h_rate, a_rate, lineup_details = self.compute_starter_ratings(
+            lineup_data,
+            base_home_rate=base_h_rate,
+            base_away_rate=base_a_rate,
+        )
 
-        return self.generate_forecasts(
+        predictions = self.generate_forecasts(
             match_id=match_id,
             competition=comp_name,
             stage=stage,
@@ -454,6 +528,14 @@ class AnalysisWorker:
             lineup_confirmed=lineup_confirmed,
             dry_run=dry_run,
         )
+        for prediction in predictions:
+            prediction["baseline_rate_source"] = rate_source
+            prediction["baseline_home_rate"] = round(base_h_rate, 6)
+            prediction["baseline_away_rate"] = round(base_a_rate, 6)
+            prediction["effective_home_rate"] = round(h_rate, 6)
+            prediction["effective_away_rate"] = round(a_rate, 6)
+            prediction["lineup_adjustment"] = lineup_details
+        return predictions
 
     def run(
         self,
@@ -485,11 +567,17 @@ class AnalysisWorker:
 
         # Provide a synthetic fixture if none found in dry_run mode to test pipeline execution
         if not match_list and dry_run:
+            # Dry-run data is explicitly synthetic and never used as production
+            # evidence. The rates are supplied in the fixture so the runtime
+            # path exercises the same explicit-input contract as real inference.
             match_list = [{
                 "match_id": "dry_run_match_1",
-                "competition_name": "Premier League (England)",
+                "competition_name": "TEST_ONLY",
                 "home_team_name": "Arsenal",
                 "away_team_name": "Chelsea",
+                "model_home_rate": 1.45,
+                "model_away_rate": 1.15,
+                "data_mode": "synthetic_test_only",
             }]
 
         total_predictions = 0

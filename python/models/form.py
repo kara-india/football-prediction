@@ -118,47 +118,28 @@ class FormCalculator:
         half_life_matches: Optional[float] = None,
     ) -> MultiDimensionalForm:
         """
-        Compute multi-dimensional performance decomposition across 4 channels.
-        Higher is better for attacking/territorial; lower is better for defensive/disciplinary.
+        Compute separate raw form channels without hand-written feature weights.
+
+        The returned composite_index is neutral (1.0) unless a fitted
+        LearnedFormModel is applied downstream. This prevents the feature
+        engineering layer from silently imposing arbitrary 60/40 or 35/30
+        football assumptions.
         """
         hl = half_life_matches or self.half_life_matches
 
-        # 1. Attacking form: combination of goals_scored (60%) and shots_on_target (40%)
-        goals_scored_form = self.calculate_ewma_form(results, "goals_scored", hl)
-        sot_form = self.calculate_ewma_form(results, "shots_on_target", hl)
-        attacking_form = (
-            goals_scored_form * 0.6 + (sot_form / 4.5) * 0.4
-            if sot_form > 0
-            else goals_scored_form
-        )
+        attacking_form = self.calculate_ewma_form(results, "goals_scored", hl)
+        defensive_form = self.calculate_ewma_form(results, "goals_conceded", hl)
 
-        # 2. Defensive form: combination of goals_conceded (60%) and shots_on_target_conceded (40%)
-        goals_conceded_form = self.calculate_ewma_form(results, "goals_conceded", hl)
-        sot_conceded_form = self.calculate_ewma_form(results, "shots_on_target_conceded", hl)
-        defensive_form = (
-            goals_conceded_form * 0.6 + (sot_conceded_form / 4.5) * 0.4
-            if sot_conceded_form > 0
-            else goals_conceded_form
-        )
-
-        # 3. Territorial / Set-piece form: net corners ratio
         corners_won = self.calculate_ewma_form(results, "corners_won", hl)
         corners_conceded = self.calculate_ewma_form(results, "corners_conceded", hl)
         total_corners = corners_won + corners_conceded
-        territorial_form = (
-            corners_won / total_corners if total_corners > 0 else 0.50
-        )
+        territorial_form = corners_won / total_corners if total_corners > 0 else 0.50
 
-        # 4. Disciplinary form: cards and fouls (lower is cleaner)
         yellow_cards = self.calculate_ewma_form(results, "yellow_cards", hl)
         red_cards = self.calculate_ewma_form(results, "red_cards", hl)
         fouls = self.calculate_ewma_form(results, "fouls", hl)
-        disciplinary_form = yellow_cards * 1.0 + red_cards * 3.0 + (fouls / 10.0) * 0.5
-
-        # 5. Composite index: attack + territorial - defense (scaled around 1.0)
-        composite_index = max(
-            0.0,
-            1.0 + (attacking_form - defensive_form) * 0.35 + (territorial_form - 0.50) * 0.30,
+        disciplinary_form = (
+            yellow_cards + red_cards + fouls / 10.0
         )
 
         return MultiDimensionalForm(
@@ -166,10 +147,11 @@ class FormCalculator:
             defensive_form=float(round(defensive_form, 4)),
             territorial_form=float(round(territorial_form, 4)),
             disciplinary_form=float(round(disciplinary_form, 4)),
-            composite_index=float(round(composite_index, 4)),
+            composite_index=1.0,
             matches_counted=len(results),
             half_life_matches=hl,
         )
+
 
     def calculate_team_attack_strength(
         self, team_matches: pd.DataFrame, league_avg_goals: float
@@ -198,3 +180,89 @@ class FormCalculator:
         dt1 = pd.to_datetime(last_match_date).date()
         dt2 = pd.to_datetime(current_date).date()
         return max(0, (dt2 - dt1).days)
+
+
+
+class LearnedFormModel:
+    """
+    Learns the relationship between point-in-time form channels and next-match
+    scoring using regularized Poisson regression.
+
+    No manual feature weights are embedded. Coefficients are fit only from
+    chronological training observations.
+    """
+
+    FEATURE_COLUMNS = (
+        "attacking_form",
+        "defensive_form",
+        "territorial_form",
+        "disciplinary_form",
+        "rest_days",
+        "is_home",
+    )
+
+    def __init__(self, l2: float = 1.0):
+        self.l2 = float(l2)
+        self.model = None
+        self.mean_ = None
+        self.scale_ = None
+        self.fitted = False
+        self.metrics: Dict[str, Any] = {}
+
+    def fit(self, observations: pd.DataFrame) -> "LearnedFormModel":
+        from sklearn.linear_model import PoissonRegressor
+
+        required = set(self.FEATURE_COLUMNS) | {"next_goals"}
+        missing = sorted(required - set(observations.columns))
+        if missing:
+            raise ValueError(f"Missing required form columns: {missing}")
+        if len(observations) < 50:
+            raise ValueError("At least 50 historical form observations are required.")
+
+        X = observations.loc[:, self.FEATURE_COLUMNS].apply(
+            pd.to_numeric, errors="raise"
+        ).to_numpy(float)
+        y = pd.to_numeric(observations["next_goals"], errors="raise").to_numpy(float)
+
+        if np.any(y < 0):
+            raise ValueError("next_goals must be non-negative.")
+
+        self.mean_ = X.mean(axis=0)
+        self.scale_ = X.std(axis=0)
+        self.scale_[self.scale_ < 1e-8] = 1.0
+        Xs = (X - self.mean_) / self.scale_
+
+        self.model = PoissonRegressor(alpha=self.l2, max_iter=500)
+        self.model.fit(Xs, y)
+        self.fitted = True
+        self.metrics = {
+            "n_observations": int(len(observations)),
+            "n_features": int(Xs.shape[1]),
+            "l2": self.l2,
+        }
+        return self
+
+    def predict_expected_goals(self, features: Dict[str, float]) -> float:
+        if not self.fitted or self.model is None:
+            raise RuntimeError("LearnedFormModel is not fitted.")
+        row = np.array(
+            [[float(features[col]) for col in self.FEATURE_COLUMNS]],
+            dtype=float,
+        )
+        xs = (row - self.mean_) / self.scale_
+        return float(max(1e-6, self.model.predict(xs)[0]))
+
+    def serialize(self) -> Dict[str, Any]:
+        if not self.fitted or self.model is None:
+            raise RuntimeError("Model is not fitted.")
+        return {
+            "model_type": "LearnedFormModel",
+            "version": "1.0.0",
+            "l2": self.l2,
+            "feature_columns": list(self.FEATURE_COLUMNS),
+            "mean": self.mean_.tolist(),
+            "scale": self.scale_.tolist(),
+            "coef": self.model.coef_.tolist(),
+            "intercept": float(self.model.intercept_),
+            "metrics": self.metrics,
+        }

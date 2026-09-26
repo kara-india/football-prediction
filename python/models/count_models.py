@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import math
 from typing import Any, Dict, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
@@ -103,51 +104,110 @@ class NegativeBinomialModel:
 
 class GoalCountModel:
     """
-    Goal count distribution supporting automatic overdispersion testing.
-    Selects between Poisson (no overdispersion) and Negative Binomial (overdispersed).
+    Goal-count distribution selector using likelihood-based model comparison.
+
+    Fits both:
+      1) Poisson: Var(Y) = mu
+      2) Negative Binomial: Var(Y) = mu + phi * mu^2
+
+    The selected family is determined by BIC, not by a hand-set variance-to-mean
+    threshold. This lets the data decide whether observed tail dispersion is
+    strong enough to justify the extra parameter.
     """
 
-    def __init__(self, dispersion_threshold: float = 1.05):
-        self.threshold = dispersion_threshold
+    def __init__(self):
+        self.mu: float = 0.0
+        self.phi: float = 0.0
         self.is_overdispersed: bool = False
-        self.mu: float = 2.7
-        self.phi: float = 0.05
+        self.selected_distribution: str = "poisson"
+        self.bic_poisson: Optional[float] = None
+        self.bic_negative_binomial: Optional[float] = None
+        self.fitted: bool = False
 
-    def fit(self, goals: Union[pd.Series, np.ndarray]) -> "GoalCountModel":
-        data = np.asarray(goals, dtype=np.float64)
-        mean_val = float(np.mean(data))
-        var_val = float(np.var(data))
+    @staticmethod
+    def _poisson_nll(mu: float, data: np.ndarray) -> float:
+        if mu <= 0:
+            return 1e30
+        ll = poisson.logpmf(data, mu)
+        return float(-np.sum(ll)) if np.all(np.isfinite(ll)) else 1e30
 
-        # Variance-to-mean ratio
-        vmr = var_val / max(mean_val, 1e-6)
-        self.mu = max(mean_val, 0.1)
+    @staticmethod
+    def _nb_nll(params: Tuple[float, float], data: np.ndarray) -> float:
+        mu, phi = params
+        if mu <= 0 or phi <= 0:
+            return 1e30
+        r = 1.0 / phi
+        p = r / (r + mu)
+        ll = nbinom.logpmf(data, r, p)
+        return float(-np.sum(ll)) if np.all(np.isfinite(ll)) else 1e30
 
-        if vmr > self.threshold:
-            self.is_overdispersed = True
-            # phi = (Var - mu) / mu^2
-            self.phi = max(1e-4, (var_val - mean_val) / (mean_val**2))
+    def fit(self, goals: Union[pd.Series, np.ndarray, list]) -> "GoalCountModel":
+        data = np.asarray(goals, dtype=float)
+        data = data[np.isfinite(data)]
+        if data.size < 20:
+            raise ValueError("At least 20 goal observations are required for distribution selection.")
+        if np.any(data < 0) or np.any(np.floor(data) != data):
+            raise ValueError("Goal observations must be non-negative integers.")
+
+        self.mu = max(float(np.mean(data)), 1e-8)
+        poisson_nll = self._poisson_nll(self.mu, data)
+        n = int(data.size)
+        self.bic_poisson = 2.0 * poisson_nll + 1.0 * math.log(n)
+
+        variance = float(np.var(data))
+        phi0 = max(1e-4, (variance - self.mu) / max(self.mu ** 2, 1e-8))
+        nb_res = minimize(
+            self._nb_nll,
+            [self.mu, phi0],
+            args=(data,),
+            bounds=[(1e-8, 50.0), (1e-6, 10.0)],
+            method="L-BFGS-B",
+            options={"maxiter": 250, "ftol": 1e-10},
+        )
+
+        if nb_res.success and np.isfinite(nb_res.fun):
+            nb_nll = float(nb_res.fun)
+            self.bic_negative_binomial = 2.0 * nb_nll + 2.0 * math.log(n)
+            nb_mu, nb_phi = float(nb_res.x[0]), float(nb_res.x[1])
         else:
-            self.is_overdispersed = False
-            self.phi = 0.0
+            self.bic_negative_binomial = float("inf")
+            nb_mu, nb_phi = self.mu, 0.0
 
+        if self.bic_negative_binomial + 1e-9 < self.bic_poisson:
+            self.selected_distribution = "negative_binomial"
+            self.mu = nb_mu
+            self.phi = nb_phi
+            self.is_overdispersed = True
+        else:
+            self.selected_distribution = "poisson"
+            self.phi = 0.0
+            self.is_overdispersed = False
+
+        self.fitted = True
         return self
 
     def predict_exact(self, k: int, custom_mu: Optional[float] = None) -> float:
-        mu = custom_mu if custom_mu is not None else self.mu
-        if not self.is_overdispersed or self.phi <= 1e-5:
+        mu = float(custom_mu if custom_mu is not None else self.mu)
+        if not self.is_overdispersed or self.phi <= 1e-8:
             return float(poisson.pmf(k, mu))
         r = 1.0 / self.phi
         p = r / (r + mu)
         return float(nbinom.pmf(k, r, p))
 
-    def predict_over_under(self, line: float, custom_mu: Optional[float] = None) -> Tuple[float, float]:
-        mu = custom_mu if custom_mu is not None else self.mu
-        if not self.is_overdispersed or self.phi <= 1e-5:
+    def predict_over_under(
+        self,
+        line: float,
+        custom_mu: Optional[float] = None,
+        custom_phi: Optional[float] = None,
+    ) -> Tuple[float, float]:
+        mu = float(custom_mu if custom_mu is not None else self.mu)
+        phi = float(self.phi if custom_phi is None else custom_phi)
+        if phi <= 1e-8:
             under = float(poisson.cdf(int(np.floor(line)), mu))
-            return 1.0 - under, under
-        r = 1.0 / self.phi
-        p = r / (r + mu)
-        under = float(nbinom.cdf(int(np.floor(line)), r, p))
+        else:
+            r = 1.0 / phi
+            p = r / (r + mu)
+            under = float(nbinom.cdf(int(np.floor(line)), r, p))
         return 1.0 - under, under
 
 
