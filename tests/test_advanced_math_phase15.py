@@ -165,3 +165,19 @@ def test_dynamic_dixon_coles_fit_as_of_excludes_future_rows():
     ).fit_as_of(df, base + pd.Timedelta(days=40))
 
     assert model.metrics["n_matches"] == 40
+
+
+def test_analysis_worker_requires_real_rate_source():
+    from python.workers.analysis_worker import AnalysisWorker
+
+    worker = AnalysisWorker()
+    try:
+        worker._resolve_baseline_goal_rates({
+            "match_id": "test",
+            "home_team_id": 1,
+            "away_team_id": 2,
+        })
+    except RuntimeError as exc:
+        assert "No fitted point-in-time goal-rate source" in str(exc)
+    else:
+        raise AssertionError("Worker accepted missing model rates.")
