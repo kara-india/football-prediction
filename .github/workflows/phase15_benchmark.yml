@@ -1,9 +1,6 @@
 name: Phase 15 Historical Benchmark
 
 on:
-  push:
-    branches:
-      - phase-15-advanced-statistical-models
   workflow_dispatch:
     inputs:
       league:
