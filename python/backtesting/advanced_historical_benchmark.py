@@ -288,6 +288,7 @@ class AdvancedHistoricalBenchmark:
 
                 y_home = (test["home_goals"].to_numpy() > test["away_goals"].to_numpy()).astype(int)
                 y_over = (test["total_goals"].to_numpy() > 2).astype(int)
+                calibrated_home = calibrated_1x2[:, 0]
 
                 fold_metric[f"{name}_home_brier"] = self.metrics.brier_score(y_home, calibrated_home)
                 fold_metric[f"{name}_home_log_loss"] = self.metrics.log_loss(y_home, calibrated_home)
@@ -382,7 +383,7 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Phase 15 advanced historical benchmark")
-    parser.add_argument("--league", action="append", default=["E0"], help="Historical league code; repeatable.")
+    parser.add_argument("--league", action="append", default=None, help="Historical league code; repeatable. Defaults to E0.")
     parser.add_argument("--start-date", default=None)
     parser.add_argument("--end-date", default=None)
     args = parser.parse_args()
