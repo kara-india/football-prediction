@@ -54,7 +54,8 @@ jobs:
 
           result = json.loads(Path(__import__("os").environ["BENCHMARK_FILE"]).read_text())
           lines = [
-              "# Phase 15 Historical Benchmark Results",
+              "# Phase 15 Historical Benchmark
+# Explicit benchmark trigger commit; normal pushes are filtered by the job condition. Results",
               f"Status: {result.get('status')}",
               f"Data window: {result['data_window']['first_match']} to {result['data_window']['last_match']}",
               f"Historical matches fetched: {result['data_window']['matches']}",
