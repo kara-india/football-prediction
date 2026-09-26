@@ -336,8 +336,23 @@ class ScoreDrivenDixonColes:
         )
         return lam_h, lam_a
 
-    def predict_score_matrix(self, home_id: Any, away_id: Any, max_goals: int = 12) -> np.ndarray:
+    def predict_score_matrix(
+        self,
+        home_id: Any,
+        away_id: Any,
+        max_goals: Optional[int] = None,
+        tail_tolerance: float = 1e-10,
+    ) -> np.ndarray:
         lam_h, lam_a = self._rates(home_id, away_id)
+        if tail_tolerance <= 0 or tail_tolerance >= 1:
+            raise ValueError("tail_tolerance must be between 0 and 1.")
+        if max_goals is None:
+            max_goals = max(
+                8,
+                int(np.ceil(poisson.ppf(1.0 - tail_tolerance, max(lam_h, lam_a)))),
+            )
+            max_goals = min(max_goals, 50)
+
         matrix = np.zeros((max_goals + 1, max_goals + 1), dtype=float)
         for x in range(max_goals + 1):
             for y in range(max_goals + 1):
