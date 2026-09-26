@@ -149,22 +149,23 @@ export default function MatchIntelligencePage({ params }: { params: { id: string
   const away = fixture?.teams?.away
   const forecast = detail?.forecast
   const odds = detail?.odds1xBet
+  const lineups = fixture?.lineups ?? []
 
   const lineupConfirmed = useMemo(
     () =>
       Boolean(
-        fixture?.lineups?.length >= 2 &&
-        fixture.lineups.every((item: any) => (item?.startXI || []).length === 11),
+        lineups.length >= 2 &&
+        lineups.every((item: any) => (item?.startXI || []).length === 11),
       ),
-    [fixture],
+    [lineups],
   )
 
   const homeLineup = fixture && home
-    ? teamLineup(fixture.lineups, Number(home.id), home.name)
+    ? teamLineup(lineups, Number(home.id), home.name)
     : { name: 'Home', starters: [], substitutes: [], formation: 'TBD' }
 
   const awayLineup = fixture && away
-    ? teamLineup(fixture.lineups, Number(away.id), away.name)
+    ? teamLineup(lineups, Number(away.id), away.name)
     : { name: 'Away', starters: [], substitutes: [], formation: 'TBD' }
 
   const homeProb = probability(forecast?.home)
