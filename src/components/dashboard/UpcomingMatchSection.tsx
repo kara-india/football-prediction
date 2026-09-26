@@ -91,15 +91,25 @@ export default function UpcomingMatchSection() {
     return `in ${hours}h ${mins}m`
   }
 
-  const handleOnDemandAnalyze = (matchId: number) => {
+  const handleOnDemandAnalyze = async (matchId: number) => {
     setAnalyzingMatchId(matchId)
-    setTimeout(() => {
+    try {
+      const res = await fetch(`/api/matches/${matchId}/predictions`, { cache: 'no-store' })
+      const payload = await res.json()
+      if (!res.ok) {
+        throw new Error(payload?.error || 'Forecast refresh failed')
+      }
+      const forecast = payload?.forecast
+      const summary = forecast
+        ? `Forecast: ${forecast.home != null ? (forecast.home * 100).toFixed(1) : '—'}% home / ${forecast.draw != null ? (forecast.draw * 100).toFixed(1) : '—'}% draw / ${forecast.away != null ? (forecast.away * 100).toFixed(1) : '—'}% away`
+        : 'No provider forecast returned for this fixture.'
+      setAnalyzedFeedback((prev) => ({ ...prev, [matchId]: summary }))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Forecast refresh failed'
+      setAnalyzedFeedback((prev) => ({ ...prev, [matchId]: message }))
+    } finally {
       setAnalyzingMatchId(null)
-      setAnalyzedFeedback((prev) => ({
-        ...prev,
-        [matchId]: 'Forecast refreshed for the selected fixture.'
-      }))
-    }, 800)
+    }
   }
 
   // Filter logic
