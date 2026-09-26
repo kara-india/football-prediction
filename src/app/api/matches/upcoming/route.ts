@@ -118,6 +118,17 @@ export async function GET() {
   } catch (error) {
     console.error('Failed to fetch upcoming matches:', error)
     const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)
-    return NextResponse.json(stale || [])
+    if (stale !== null) {
+      return NextResponse.json(stale, {
+        headers: { 'x-data-state': 'stale' },
+      })
+    }
+    return NextResponse.json(
+      {
+        error: 'UPSTREAM_UNAVAILABLE',
+        detail: error instanceof Error ? error.message : 'API-Football request failed',
+      },
+      { status: 502 },
+    )
   }
 }
