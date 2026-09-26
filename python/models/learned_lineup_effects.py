@@ -175,3 +175,23 @@ class LearnedLineupEffectModel:
             "defence_effects": self.defence_effects,
             "metrics": self.metrics,
         }
+
+
+    @classmethod
+    def deserialize(cls, data: Dict[str, Any]) -> "LearnedLineupEffectModel":
+        model = cls(
+            l2_attack=float(data.get("l2_attack", 8.0)),
+            l2_defence=float(data.get("l2_defence", 8.0)),
+        )
+        model.attack_effects = {
+            str(k): float(v) for k, v in data.get("attack_effects", {}).items()
+        }
+        model.defence_effects = {
+            str(k): float(v) for k, v in data.get("defence_effects", {}).items()
+        }
+        model.player_index = {
+            p: i for i, p in enumerate(sorted(model.attack_effects.keys() | model.defence_effects.keys()))
+        }
+        model.metrics = dict(data.get("metrics", {}))
+        model.fitted = bool(model.attack_effects or model.defence_effects)
+        return model
