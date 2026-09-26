@@ -100,10 +100,15 @@ class LearnerWorker:
         for s in match_settlements:
             team_h = str(s.get("home_team_id", s.get("home_team", "H")))
             team_a = str(s.get("away_team_id", s.get("away_team", "A")))
-            h_score = s.get("score_home", s.get("actual_home_goals", 0))
-            a_score = s.get("score_away", s.get("actual_away_goals", 0))
-            pred_h = s.get("predicted_home_goals", 1.45)
-            pred_a = s.get("predicted_away_goals", 1.15)
+            h_score = s.get("score_home", s.get("actual_home_goals"))
+            a_score = s.get("score_away", s.get("actual_away_goals"))
+            pred_h = s.get("predicted_home_goals")
+            pred_a = s.get("predicted_away_goals")
+
+            # Residual learning must use the actual model forecast. Never
+            # substitute a population-average goal assumption.
+            if None in (h_score, a_score, pred_h, pred_a):
+                continue
 
             r_h = float(h_score - pred_h)
             r_a = float(a_score - pred_a)
@@ -232,18 +237,28 @@ class LearnerWorker:
         y_arr = np.array([d.get("y_true", 1 if d.get("actual_outcome") == "WON" else 0) for d in dataset])
         p_champ_arr = np.array([d.get("prob_champion", d.get("calibrated_probability", 0.5)) for d in dataset])
         p_chal_arr = np.array([d.get("prob_challenger", d.get("calibrated_probability", 0.5)) for d in dataset])
-        odds_p_arr = np.array([d.get("odds_pred", d.get("decimal_odds", 2.0)) for d in dataset])
-        odds_c_arr = np.array([d.get("odds_close", d.get("closing_odds", 2.0)) for d in dataset])
+        odds_p_arr = np.array([
+            d.get("odds_pred", d.get("decimal_odds"))
+            for d in dataset
+        ], dtype=object)
+        odds_c_arr = np.array([
+            d.get("odds_close", d.get("closing_odds"))
+            for d in dataset
+        ], dtype=object)
 
         cal_metrics = self.monitor_layer2_calibration(y_arr, p_champ_arr)
 
         # 4. Evaluate Champion vs Challenger promotion gate
+        valid_market = (
+            np.array([v is not None for v in odds_p_arr], dtype=bool)
+            & np.array([v is not None for v in odds_c_arr], dtype=bool)
+        )
         comparison = self.evaluate_challenger_promotion(
-            y_true=y_arr,
-            prob_champion=p_champ_arr,
-            prob_challenger=p_chal_arr,
-            odds_pred=odds_p_arr,
-            odds_close=odds_c_arr,
+            y_true=y_arr[valid_market] if valid_market.any() else y_arr,
+            prob_champion=p_champ_arr[valid_market] if valid_market.any() else p_champ_arr,
+            prob_challenger=p_chal_arr[valid_market] if valid_market.any() else p_chal_arr,
+            odds_pred=np.asarray(odds_p_arr[valid_market], dtype=float) if valid_market.any() else None,
+            odds_close=np.asarray(odds_c_arr[valid_market], dtype=float) if valid_market.any() else None,
         )
 
         logger.info(
