@@ -31,121 +31,8 @@ interface MatchItem {
   expectedValue?: number
 }
 
-// Fallback high-fidelity sample matches in case network or disk cache is empty
-const INITIAL_MATCHES: MatchItem[] = [
-  {
-    id: 1640055,
-    kickoff: new Date(Date.now() + 45 * 60 * 1000).toISOString(),
-    status: 'NS',
-    statusLong: 'Not Started',
-    venue: 'Emirates Stadium, London',
-    league: {
-      id: 39,
-      name: 'Premier League',
-      country: 'England',
-      logo: 'https://media.api-sports.io/football/leagues/39.png',
-    },
-    teams: {
-      home: { id: 42, name: 'Arsenal', logo: 'https://media.api-sports.io/football/teams/42.png' },
-      away: { id: 49, name: 'Chelsea', logo: 'https://media.api-sports.io/football/teams/49.png' },
-    },
-    lineupConfirmed: true,
-    lineupExpectedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-    odds1xBet: { home: 1.84, draw: 3.75, away: 4.60 },
-    decision: 'CANDIDATE',
-    valueEdge: 5.6,
-    expectedValue: 7.45,
-  },
-  {
-    id: 1610876,
-    kickoff: new Date(Date.now() + 90 * 60 * 1000).toISOString(),
-    status: 'NS',
-    statusLong: 'Not Started',
-    venue: 'Estadio Ciudad de Lanús, Buenos Aires',
-    league: {
-      id: 128,
-      name: 'Liga Profesional Argentina',
-      country: 'Argentina',
-      logo: 'https://media.api-sports.io/football/leagues/128.png',
-    },
-    teams: {
-      home: { id: 450, name: 'Lanús', logo: 'https://media.api-sports.io/football/teams/450.png' },
-      away: { id: 452, name: 'Estudiantes L.P.', logo: 'https://media.api-sports.io/football/teams/452.png' },
-    },
-    lineupConfirmed: true,
-    lineupExpectedAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
-    odds1xBet: { home: 1.79, draw: 3.98, away: 4.78 },
-    decision: 'CANDIDATE',
-    valueEdge: 4.8,
-    expectedValue: 6.2,
-  },
-  {
-    id: 1640056,
-    kickoff: new Date(Date.now() + 180 * 60 * 1000).toISOString(),
-    status: 'NS',
-    statusLong: 'Not Started',
-    venue: 'Santiago Bernabéu, Madrid',
-    league: {
-      id: 140,
-      name: 'La Liga',
-      country: 'Spain',
-      logo: 'https://media.api-sports.io/football/leagues/140.png',
-    },
-    teams: {
-      home: { id: 541, name: 'Real Madrid', logo: 'https://media.api-sports.io/football/teams/541.png' },
-      away: { id: 536, name: 'Sevilla', logo: 'https://media.api-sports.io/football/teams/536.png' },
-    },
-    lineupConfirmed: false,
-    lineupExpectedAt: new Date(Date.now() + 120 * 60 * 1000).toISOString(),
-    odds1xBet: { home: 1.44, draw: 4.80, away: 7.20 },
-    decision: 'LINEUP_UNCONFIRMED',
-  },
-  {
-    id: 1640057,
-    kickoff: new Date(Date.now() + 240 * 60 * 1000).toISOString(),
-    status: 'NS',
-    statusLong: 'Not Started',
-    venue: 'San Siro, Milan',
-    league: {
-      id: 135,
-      name: 'Serie A',
-      country: 'Italy',
-      logo: 'https://media.api-sports.io/football/leagues/135.png',
-    },
-    teams: {
-      home: { id: 489, name: 'AC Milan', logo: 'https://media.api-sports.io/football/teams/489.png' },
-      away: { id: 502, name: 'Fiorentina', logo: 'https://media.api-sports.io/football/teams/502.png' },
-    },
-    lineupConfirmed: false,
-    lineupExpectedAt: new Date(Date.now() + 180 * 60 * 1000).toISOString(),
-    odds1xBet: { home: 1.95, draw: 3.50, away: 3.90 },
-    decision: 'LINEUP_UNCONFIRMED',
-  },
-  {
-    id: 1640058,
-    kickoff: new Date(Date.now() + 300 * 60 * 1000).toISOString(),
-    status: 'NS',
-    statusLong: 'Not Started',
-    venue: 'Signal Iduna Park, Dortmund',
-    league: {
-      id: 78,
-      name: 'Bundesliga',
-      country: 'Germany',
-      logo: 'https://media.api-sports.io/football/leagues/78.png',
-    },
-    teams: {
-      home: { id: 165, name: 'Borussia Dortmund', logo: 'https://media.api-sports.io/football/teams/165.png' },
-      away: { id: 168, name: 'Bayer Leverkusen', logo: 'https://media.api-sports.io/football/teams/168.png' },
-    },
-    lineupConfirmed: false,
-    lineupExpectedAt: new Date(Date.now() + 240 * 60 * 1000).toISOString(),
-    odds1xBet: { home: 2.35, draw: 3.80, away: 2.75 },
-    decision: 'LINEUP_UNCONFIRMED',
-  },
-]
-
 export default function MatchdayCommandCenter() {
-  const [matches, setMatches] = useState<MatchItem[]>(INITIAL_MATCHES)
+  const [matches, setMatches] = useState<MatchItem[]>([])
   const [liveMatches, setLiveMatches] = useState<MatchItem[]>([])
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -153,7 +40,7 @@ export default function MatchdayCommandCenter() {
   const [filterType, setFilterType] = useState<'all' | 'candidates' | 'lineups' | 'live'>('all')
   const [collapsedLeagues, setCollapsedLeagues] = useState<Record<string, boolean>>({})
 
-  // Fetch live matches and upcoming fixtures
+  // Fetch live matches and upcoming fixtures from the real provider feed
   const fetchAllData = async () => {
     setLoading(true)
     try {
@@ -173,9 +60,7 @@ export default function MatchdayCommandCenter() {
         if (Array.isArray(upData) && upData.length > 0) {
           setMatches((prev) => {
             const map = new Map<string | number, MatchItem>()
-            // Retain high fidelity fields
-            prev.forEach((m) => map.set(m.id, m))
-            upData.forEach((m: any) => map.set(m.id, { ...map.get(m.id), ...m }))
+            upData.forEach((m: MatchItem) => map.set(m.id, m))
             return Array.from(map.values())
           })
         }
@@ -247,7 +132,7 @@ export default function MatchdayCommandCenter() {
         <div className="space-y-2">
           <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-[11px] font-mono text-[#94A3B8] bg-[#0F172A] border border-[#1E293B]">
             <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
-            <span>1xBet Market Execution Active</span>
+            <span>1xBet Market Data Connected</span>
             <span className="text-[#64748B]">·</span>
             <span className="text-[#D4AF37] font-semibold">Indian Standard Time (IST, UTC+5:30)</span>
           </div>
@@ -257,9 +142,9 @@ export default function MatchdayCommandCenter() {
           </h1>
 
           <p className="text-xs sm:text-sm text-[#94A3B8] max-w-3xl leading-relaxed">
-            Sofascore-inspired matchday terminal with 1xBet clearing prices and verified starting XI
-            governance. Mathematical analysis unlocks strictly at T-60m upon official team sheet
-            verification.
+            Sofascore-inspired matchday terminal. Forecasts are available before lineups; official
+            starting XIs refine the forecast when team sheets arrive. 1xBet prices are shown only
+            when the upstream bookmaker feed returns a real price.
           </p>
         </div>
 
@@ -387,7 +272,7 @@ export default function MatchdayCommandCenter() {
                         {m.teams.home.name} vs {m.teams.away.name}
                       </div>
                       <div className="text-[11px] text-[#94A3B8] font-mono mt-0.5">
-                        {timeUntil.text} • Starting 11 Verified
+                        {timeUntil.text} • {m.lineupConfirmed ? 'Starting 11 Verified' : 'Forecast before lineups'}
                       </div>
                     </div>
                     <span className="px-2.5 py-1 rounded bg-[#10B981]/20 text-[#10B981] text-xs font-mono font-bold border border-[#10B981]/40">
