@@ -1,10 +1,12 @@
 name: Phase 15 Historical Benchmark
 
 on:
-  push:
-    branches:
-      - phase-15-advanced-statistical-models
   workflow_dispatch:
+    inputs:
+      league:
+        description: "Historical league code"
+        required: true
+        default: "E0"
 
 permissions:
   contents: read
@@ -36,7 +38,7 @@ jobs:
         run: |
           test -n "$SUPABASE_URL" || (echo "SUPABASE_URL secret is not configured" && exit 1)
           test -n "$SUPABASE_SERVICE_ROLE_KEY" || (echo "SUPABASE_SERVICE_ROLE_KEY secret is not configured" && exit 1)
-          python -m python.backtesting.advanced_historical_benchmark --league E0 > phase15-benchmark-E0.json
+          python -m python.backtesting.advanced_historical_benchmark --league "${{ github.event.inputs.league }}" > phase15-benchmark-${{ github.event.inputs.league }}.json
 
       - name: Build concise benchmark summary
         run: |
@@ -44,7 +46,7 @@ jobs:
           import json
           from pathlib import Path
 
-          result = json.loads(Path("phase15-benchmark-E0.json").read_text())
+          result = json.loads(Path("phase15-benchmark-${{ github.event.inputs.league }}.json").read_text())
           lines = [
               "# Phase 15 E0 Benchmark Results",
               f"Status: {result.get('status')}",
@@ -79,7 +81,7 @@ jobs:
         with:
           name: phase15-benchmark-e0
           path: |
-            phase15-benchmark-E0.json
+            phase15-benchmark-${{ github.event.inputs.league }}.json
             phase15-summary.md
           if-no-files-found: error
           retention-days: 14
