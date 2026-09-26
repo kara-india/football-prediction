@@ -52,13 +52,13 @@ class HistoricalMatchRepository:
         page_size: int = 1000,
     ):
         self.url = url or os.environ.get("NEXT_PUBLIC_SUPABASE_URL") or os.environ.get("SUPABASE_URL")
-        self.key = key or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        self.key = key or os.environ.get("SUPABASE_SECRET_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
         self.page_size = int(page_size)
 
         if not self.url:
             raise RuntimeError("Supabase URL is not configured.")
         if not self.key:
-            raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY is required for historical benchmark access.")
+            raise RuntimeError("SUPABASE_SECRET_KEY is required for historical benchmark access.")
         if self.page_size < 1 or self.page_size > 1000:
             raise ValueError("page_size must be between 1 and 1000.")
 
