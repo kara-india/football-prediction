@@ -39,6 +39,36 @@ export async function fetchApiFootball(path: string, isUserDemand = false): Prom
   return payload
 }
 
+
+let cached1xBetBookmakerId: number | null | undefined
+
+export async function resolve1xBetBookmakerId(): Promise<number | null> {
+  if (cached1xBetBookmakerId !== undefined) {
+    return cached1xBetBookmakerId
+  }
+
+  const configured = Number(process.env.ODDS_1XBET_BOOKMAKER_ID)
+  if (Number.isInteger(configured) && configured > 0) {
+    cached1xBetBookmakerId = configured
+    return configured
+  }
+
+  try {
+    const payload = await fetchApiFootball('/odds/bookmakers?search=1xBet', true)
+    const bookmakers = Array.isArray(payload?.response) ? payload.response : []
+    const exact = bookmakers.find((item: any) => /^(1xBet|1xBet)$/i.test(String(item?.name || '').trim()))
+    const fallback = bookmakers.find((item: any) => /1xBet/i.test(String(item?.name || '')))
+    const id = Number((exact || fallback)?.id)
+
+    cached1xBetBookmakerId = Number.isInteger(id) && id > 0 ? id : null
+    return cached1xBetBookmakerId
+  } catch (error) {
+    console.warn('[1XBET BOOKMAKER] Unable to resolve bookmaker id', error)
+    cached1xBetBookmakerId = null
+    return null
+  }
+}
+
 function oddFromMarket(market: any, labels: RegExp[]): number | null {
   const value = market?.values?.find((item: any) =>
     labels.some((label) => label.test(String(item?.value || ''))),
