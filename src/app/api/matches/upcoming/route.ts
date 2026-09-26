@@ -55,7 +55,7 @@ export async function GET() {
     // We query each date once and never synthesize an absent 1xBet price.
     for (const date of [todayDate, tomorrowDate]) {
       try {
-        const oddsJson = await fetchApiFootball(`/odds?date=${date}&bookmaker=6`, false)
+        const oddsJson = await fetchApiFootball(`/odds?date=${date}`, false)
         for (const event of oddsJson.response || []) {
           const fixtureId = Number(event.fixture?.id)
           if (Number.isFinite(fixtureId)) {
