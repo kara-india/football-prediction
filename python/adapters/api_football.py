@@ -2,7 +2,7 @@ import time
 import logging
 import os
 import requests
-from requests.adapters import HTTPAdapter, Retry
+from requests.adapters import HTTPAdapter
 from functools import lru_cache
 from typing import List, Dict, Optional, Any
 from ..data_pipeline.cache import DataCache
@@ -22,29 +22,24 @@ class APIFootballAdapter:
         self.headers = {'x-apisports-key': self.api_key} if self.api_key else {}
         self.cache = cache or DataCache()
         self.quota_manager = quota_manager or CentralQuotaManager()
-        self._quota_remaining: Optional[int] = None
         
-        # Setup logging
         self.logger = logging.getLogger("APIFootball")
         handler = logging.FileHandler("requests.log")
         handler.setFormatter(logging.Formatter('%(asctime)s - %(message)s'))
         self.logger.addHandler(handler)
         self.logger.setLevel(logging.INFO)
         
-        # Session with retries
+        # Do not hide retries inside the HTTP adapter: every external attempt must
+        # consume an explicit centralized quota reservation.
         self.session = requests.Session()
-        retries = Retry(total=3, backoff_factor=1, status_forcelist=[429, 503])
-        self.session.mount('https://', HTTPAdapter(max_retries=retries))
+        self.session.mount('https://', HTTPAdapter(max_retries=0))
 
     @property
     def quota_remaining(self) -> int:
-        if self._quota_remaining is not None:
-            return self._quota_remaining
-        return self.quota_manager.get_status().get("remaining_worker", 45)
-
-    @quota_remaining.setter
-    def quota_remaining(self, value: int):
-        self._quota_remaining = value
+        status = self.quota_manager.get_status()
+        if not status.get("available"):
+            return 0
+        return int(status.get("remaining_worker", 0))
         
     def _make_request(self, endpoint: str, params: Dict = None, ttl: int = 60, is_user: bool = False) -> Any:
         cache_key = f"{endpoint}_{params}"
@@ -52,13 +47,9 @@ class APIFootballAdapter:
         if cached is not None:
             return cached
             
-        # Fast pre-check: Never attempt external call if quota <= 5
-        if self.quota_remaining <= 5:
-            raise QuotaExceededError("API quota nearly exhausted")
-
-        # Atomically reserve quota before making network call
+        # Reserve exactly once for this actual outbound HTTP attempt.
         self.quota_manager.reserve(is_user=is_user, cost=1)
-            
+
         if not self.api_key:
             raise APIError("API_FOOTBALL_KEY is not configured; refusing external API call.")
 
