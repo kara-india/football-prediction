@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - phase-15-advanced-statistical-models
+    paths:
+      - '.github/phase15_benchmark.trigger'
   workflow_dispatch:
     inputs:
       league:
@@ -17,7 +19,7 @@ permissions:
 
 jobs:
   benchmark:
-    name: E0 Walk-Forward Benchmark
+    name: Phase 15 Historical Benchmark
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
