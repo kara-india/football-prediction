@@ -41,11 +41,10 @@ jobs:
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           BENCHMARK_LEAGUE: ${{ github.event.inputs.league || 'E0' }}
           BENCHMARK_FILE: phase15-benchmark-${{ github.event.inputs.league || 'E0' }}.json
-          BENCHMARK_LEAGUE: ${{ github.event.inputs.league || 'E0' }}
         run: |
           test -n "$SUPABASE_URL" || (echo "SUPABASE_URL secret is not configured" && exit 1)
           test -n "$SUPABASE_SECRET_KEY" || (echo "SUPABASE_SECRET_KEY secret is not configured" && exit 1)
-          python -m python.backtesting.advanced_historical_benchmark --league "$BENCHMARK_LEAGUE" > phase15-benchmark-$BENCHMARK_LEAGUE.json
+          python -m python.backtesting.advanced_historical_benchmark --league "$BENCHMARK_LEAGUE" > "$BENCHMARK_FILE"
 
       - name: Build concise benchmark summary
         run: |
