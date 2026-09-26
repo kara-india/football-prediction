@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getDiskCache, setDiskCache } from '@/lib/diskCache'
-import { fetchApiFootball, extract1xBetOdds } from '@/lib/apiFootball'
+import { fetchApiFootball, extract1xBetOdds, resolve1xBetBookmakerId } from '@/lib/apiFootball'
 
 const CACHE_TTL_MS = 15 * 60 * 1000
 const CACHE_KEY = 'upcoming_fixtures_v3'
@@ -40,7 +40,7 @@ export async function GET() {
   try {
     const fixtureJson = await fetchApiFootball(
       `/fixtures?from=${todayDate}&to=${tomorrowDate}`,
-      false,
+      true,
     )
 
     const fixtures = (fixtureJson.response || [])
@@ -50,21 +50,40 @@ export async function GET() {
       )
 
     const oddsByFixture = new Map<number, any>()
+    const bookmakerId = await resolve1xBetBookmakerId()
 
-    // API-Football retains real bookmaker odds for the recent pre-match window.
-    // We query each date once and never synthesize an absent 1xBet price.
-    for (const date of [todayDate, tomorrowDate]) {
-      try {
-        const oddsJson = await fetchApiFootball(`/odds?date=${date}`, false)
-        for (const event of oddsJson.response || []) {
-          const fixtureId = Number(event.fixture?.id)
-          if (Number.isFinite(fixtureId)) {
-            oddsByFixture.set(fixtureId, extract1xBetOdds(event.bookmakers || []))
-          }
+    if (bookmakerId) {
+      const groups = new Map<string, { leagueId: number; season: number; date: string }>()
+      for (const fixture of fixtures) {
+        const leagueId = Number(fixture.league?.id)
+        const season = Number(fixture.league?.season)
+        const date = String(fixture.fixture?.date || '').slice(0, 10)
+        if (Number.isInteger(leagueId) && Number.isInteger(season) && date) {
+          groups.set(`${leagueId}:${season}:${date}`, { leagueId, season, date })
         }
-      } catch (error) {
-        console.warn(`[1XBET ODDS] Failed to fetch odds for ${date}`, error)
       }
+
+      for (const group of groups.values()) {
+        try {
+          const oddsJson = await fetchApiFootball(
+            `/odds?league=${group.leagueId}&season=${group.season}&date=${group.date}&bookmaker=${bookmakerId}`,
+            true,
+          )
+          for (const event of oddsJson.response || []) {
+            const fixtureId = Number(event.fixture?.id)
+            if (Number.isFinite(fixtureId)) {
+              oddsByFixture.set(fixtureId, extract1xBetOdds(event.bookmakers || []))
+            }
+          }
+        } catch (error) {
+          console.warn(
+            `[1XBET ODDS] Failed for league=${group.leagueId} season=${group.season} date=${group.date}`,
+            error,
+          )
+        }
+      }
+    } else {
+      console.warn('[1XBET ODDS] 1xBet bookmaker is not available from provider catalog')
     }
 
     const formatted = fixtures.slice(0, 50).map((m: any) => {
