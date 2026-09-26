@@ -8,7 +8,6 @@ import OddsPanel from '@/components/match/OddsPanel'
 import MarketTable, { MarketRow } from '@/components/match/MarketTable'
 import TerminalCard from '@/components/ui/terminal/TerminalCard'
 import { MarketExecutionData } from '@/components/match/TriColumnMatrix'
-import { extractTeamStatistic } from '@/lib/apiFootball'
 
 interface MatchDetail {
   fixture: {
@@ -54,6 +53,17 @@ interface MatchDetail {
     awayScore: number | null
   }>
   generatedAt: string
+}
+
+
+function extractTeamStatistic(statistics: any[], teamId: number, names: RegExp[]): number | null {
+  const teamBlock = (statistics || []).find((item: any) => Number(item?.team?.id) === Number(teamId))
+  const stat = (teamBlock?.statistics || []).find((item: any) =>
+    names.some((pattern) => pattern.test(String(item?.type || ''))),
+  )
+  if (stat?.value === null || stat?.value === undefined) return null
+  const numeric = Number(String(stat.value).replace('%', '').trim())
+  return Number.isFinite(numeric) ? numeric : null
 }
 
 function probability(value: number | null | undefined): number {
