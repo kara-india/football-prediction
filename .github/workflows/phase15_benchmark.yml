@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - phase-15-advanced-statistical-models
+  workflow_dispatch:
 
 permissions:
   contents: read
