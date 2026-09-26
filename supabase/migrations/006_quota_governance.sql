@@ -204,8 +204,4 @@ REVOKE ALL ON FUNCTION public.get_api_quota_status(TEXT)
 GRANT EXECUTE ON FUNCTION public.get_api_quota_status(TEXT)
     TO service_role;
 
-INSERT INTO public.schema_migrations (version, description, applied_at)
-VALUES ('006', 'Atomic daily API quota governor using dedicated api_quota_usage ledger', NOW())
-ON CONFLICT (version) DO UPDATE
-SET description = EXCLUDED.description,
-    applied_at = EXCLUDED.applied_at;
+-- Supabase migration tooling records this migration in supabase_migrations.schema_migrations.
