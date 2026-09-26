@@ -42,7 +42,9 @@ Establish a single, authoritative, atomic quota management system inside Postgre
 - `tests/test_quota_governance.py` [NEW]
 
 ## 6. Database Changes
-- Migration `006_quota_governance.sql` creates function `reserve_api_quota` and enhances `provider_usage` table.
+- Migration `006_quota_governance.sql` creates the dedicated `api_quota_usage` ledger and the `reserve_api_quota` / `get_api_quota_status` functions.
+- The baseline `provider_usage` telemetry table is preserved unchanged.
+- Supabase migration tooling owns migration history; the SQL does not write a custom `public.schema_migrations` record.
 
 ## 7. Tests Required
 - `tests/test_quota_governance.py`:
