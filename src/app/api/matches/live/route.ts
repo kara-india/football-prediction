@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { getDiskCache, setDiskCache } from '@/lib/diskCache'
-import { canMakeAPIRequest, recordAPIRequest } from '@/lib/quotaGuard'
 import { fetchApiFootball, extract1xBetOdds } from '@/lib/apiFootball'
 
 const CACHE_TTL_MS = 60 * 1000 // 60 seconds cache for live matches
@@ -31,31 +30,9 @@ export async function GET() {
     return NextResponse.json(cached)
   }
 
-  // 2. Strict Quota Guard check (Max 45 automated worker requests/day)
-  const quotaCheck = await canMakeAPIRequest(false)
-  if (!quotaCheck.allowed) {
-    console.warn('[QUOTA GUARD LIVE]', quotaCheck.reason)
-    const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)
-    return NextResponse.json(stale || [])
-  }
-
-  const API_KEY = process.env.API_FOOTBALL_KEY;
-  if (!API_KEY) {
-    return NextResponse.json(
-      { error: 'API_FOOTBALL_KEY environment variable is not configured. Set it in .env.local.' },
-      { status: 500 }
-    );
-  }
-  const headers = { 'x-apisports-key': API_KEY }
-
   try {
-    // 3. Exactly 1 request to fetch all global live matches
-    const res = await fetch('https://v3.football.api-sports.io/fixtures?live=all', {
-      headers
-    })
-    recordAPIRequest('/fixtures?live=all')
-
-    const json = await res.json()
+    // Browser-driven live refreshes use the user reservation pool.
+    const json = await fetchApiFootball('/fixtures?live=all', true)
     const fixtures = json.response || []
 
     const eligible = fixtures.filter((f: any) => isEligibleFixture(f))
@@ -63,7 +40,7 @@ export async function GET() {
     let liveOddsByFixture = new Map<number, any>()
     if (eligible.length > 0) {
       try {
-        const oddsJson = await fetchApiFootball('/odds/live', false)
+        const oddsJson = await fetchApiFootball('/odds/live', true)
         for (const event of oddsJson.response || []) {
           const fixtureId = Number(event.fixture?.id)
           if (Number.isFinite(fixtureId)) {
