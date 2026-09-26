@@ -1,43 +1,34 @@
-import fs from 'fs'
-import path from 'path'
+/**
+ * Ephemeral per-runtime cache.
+ *
+ * This intentionally uses memory rather than the Vercel filesystem. It is
+ * never authoritative state and may disappear whenever a serverless instance
+ * is recycled. Durable match/odds state belongs in Supabase.
+ */
 
-const CACHE_DIR = path.join(process.cwd(), '.cache')
-
-function ensureDir() {
-  if (!fs.existsSync(CACHE_DIR)) {
-    fs.mkdirSync(CACHE_DIR, { recursive: true })
-  }
+type CacheEntry = {
+  timestamp: number
+  data: unknown
 }
+
+const cache = new Map<string, CacheEntry>()
 
 export function getDiskCache<T>(key: string, maxAgeMs: number): T | null {
-  ensureDir()
-  const filePath = path.join(CACHE_DIR, `${key}.json`)
-  if (!fs.existsSync(filePath)) return null
+  const entry = cache.get(key)
+  if (!entry) return null
 
-  try {
-    const raw = fs.readFileSync(filePath, 'utf-8')
-    const { timestamp, data } = JSON.parse(raw)
-    const age = Date.now() - timestamp
-
-    if (age < maxAgeMs) {
-      return data as T
-    }
-    return null
-  } catch {
-    return null
+  const age = Date.now() - entry.timestamp
+  if (age < maxAgeMs) {
+    return entry.data as T
   }
+
+  cache.delete(key)
+  return null
 }
 
-export function setDiskCache<T>(key: string, data: T) {
-  ensureDir()
-  const filePath = path.join(CACHE_DIR, `${key}.json`)
-  try {
-    const payload = {
-      timestamp: Date.now(),
-      data
-    }
-    fs.writeFileSync(filePath, JSON.stringify(payload, null, 2))
-  } catch (err) {
-    console.error(`Failed to write disk cache for ${key}:`, err)
-  }
+export function setDiskCache<T>(key: string, data: T): void {
+  cache.set(key, {
+    timestamp: Date.now(),
+    data,
+  })
 }
