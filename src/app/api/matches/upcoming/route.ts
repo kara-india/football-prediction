@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server'
 import { getDiskCache, setDiskCache } from '@/lib/diskCache'
-import { canMakeAPIRequest, recordAPIRequest } from '@/lib/quotaGuard'
+import { fetchApiFootball, extract1xBetOdds } from '@/lib/apiFootball'
 
 const CACHE_TTL_MS = 15 * 60 * 1000
-const CACHE_KEY = 'upcoming_fixtures_v2'
+const CACHE_KEY = 'upcoming_fixtures_v3'
 
 const ALLOWED_LEAGUES = new Set([
   39, 71, 135, 140, 78, 61, 94, 88, 128, 144,
@@ -22,80 +22,26 @@ function isEligibleFixture(m: any): boolean {
   return !(excluded.test(home) || excluded.test(away) || excluded.test(leagueName))
 }
 
-function extract1xBet(bookmakers: any[]): {
-  home: number | null
-  draw: number | null
-  away: number | null
-  over25: number | null
-  under25: number | null
-} | null {
-  const bookmaker = (bookmakers || []).find(
-    (b: any) => Number(b.id) === 6 || /1xBet/i.test(String(b.name || '')),
-  )
-  if (!bookmaker) return null
-
-  const markets = bookmaker.bets || []
-  const winner = markets.find((b: any) => /match winner|1x2/i.test(String(b.name || '')))
-  const totals = markets.find((b: any) =>
-    /over\/under|total goals|goals over\/under/i.test(String(b.name || '')),
-  )
-
-  const getOdd = (market: any, labels: RegExp[]): number | null => {
-    const value = market?.values?.find((v: any) =>
-      labels.some((label) => label.test(String(v.value || ''))),
-    )
-    const odd = Number(value?.odd)
-    return Number.isFinite(odd) && odd > 1 ? odd : null
-  }
-
-  const result = {
-    home: getOdd(winner, [/^home$/i]),
-    draw: getOdd(winner, [/^draw$/i]),
-    away: getOdd(winner, [/^away$/i]),
-    over25: getOdd(totals, [/^over 2\.5$/i, /^over$/i]),
-    under25: getOdd(totals, [/^under 2\.5$/i, /^under$/i]),
-  }
-
-  return Object.values(result).some((v) => v !== null) ? result : null
-}
-
-async function fetchJson(url: string, headers: HeadersInit) {
-  const res = await fetch(url, { headers, cache: 'no-store' })
-  const json = await res.json()
-  if (!res.ok) {
-    throw new Error(`Upstream request failed: ${res.status}`)
-  }
-  return json
-}
-
 export async function GET() {
   const cached = getDiskCache<any[]>(CACHE_KEY, CACHE_TTL_MS)
   if (cached !== null) return NextResponse.json(cached)
 
-  const quotaCheck = await canMakeAPIRequest(false)
-  if (!quotaCheck.allowed) {
-    const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)
-    return NextResponse.json(stale || [])
-  }
-
-  const API_KEY = process.env.API_FOOTBALL_KEY
-  if (!API_KEY) {
+  if (!process.env.API_FOOTBALL_KEY) {
     return NextResponse.json(
       { error: 'API_FOOTBALL_KEY environment variable is not configured.' },
       { status: 500 },
     )
   }
 
-  const headers = { 'x-apisports-key': API_KEY }
   const today = new Date()
   const todayDate = today.toISOString().slice(0, 10)
   const tomorrowDate = new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
   try {
-    const fixtureUrl =
-      `https://v3.football.api-sports.io/fixtures?from=${todayDate}&to=${tomorrowDate}`
-    const fixtureJson = await fetchJson(fixtureUrl, headers)
-    recordAPIRequest(`/fixtures?from=${todayDate}&to=${tomorrowDate}`)
+    const fixtureJson = await fetchApiFootball(
+      `/fixtures?from=${todayDate}&to=${tomorrowDate}`,
+      false,
+    )
 
     const fixtures = (fixtureJson.response || [])
       .filter((f: any) =>
@@ -103,20 +49,21 @@ export async function GET() {
         ['NS', 'TBD'].includes(f.fixture?.status?.short),
       )
 
-    const oddsByFixture = new Map<number, ReturnType<typeof extract1xBet>>()
+    const oddsByFixture = new Map<number, any>()
 
-    // Odds are fetched from the real API-Football bookmaker feed. Never synthesize
-    // prices when 1xBet is absent. One request per date keeps quota bounded.
+    // API-Football retains real bookmaker odds for the recent pre-match window.
+    // We query each date once and never synthesize an absent 1xBet price.
     for (const date of [todayDate, tomorrowDate]) {
-      const oddsUrl = `https://v3.football.api-sports.io/odds?date=${date}&bookmaker=6`
-      const oddsJson = await fetchJson(oddsUrl, headers)
-      recordAPIRequest(`/odds?date=${date}&bookmaker=6`)
-
-      for (const event of oddsJson.response || []) {
-        const fixtureId = Number(event.fixture?.id)
-        if (Number.isFinite(fixtureId)) {
-          oddsByFixture.set(fixtureId, extract1xBet(event.bookmakers || []))
+      try {
+        const oddsJson = await fetchApiFootball(`/odds?date=${date}&bookmaker=6`, false)
+        for (const event of oddsJson.response || []) {
+          const fixtureId = Number(event.fixture?.id)
+          if (Number.isFinite(fixtureId)) {
+            oddsByFixture.set(fixtureId, extract1xBetOdds(event.bookmakers || []))
+          }
         }
+      } catch (error) {
+        console.warn(`[1XBET ODDS] Failed to fetch odds for ${date}`, error)
       }
     }
 
@@ -152,7 +99,16 @@ export async function GET() {
         },
         lineupConfirmed: false,
         lineupExpectedAt: lineupExpectedAt.toISOString(),
-        odds1xBet,
+        odds1xBet: odds1xBet
+          ? {
+              home: odds1xBet.home,
+              draw: odds1xBet.draw,
+              away: odds1xBet.away,
+              over25: odds1xBet.over25,
+              under25: odds1xBet.under25,
+            }
+          : null,
+        oddsUpdatedAt: odds1xBet?.sourceTimestamp ?? null,
         decision: odds1xBet ? 'FORECAST_AVAILABLE' : 'ODDS_UNAVAILABLE',
       }
     })
