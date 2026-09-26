@@ -106,32 +106,33 @@ def test_over_25_high_at_0_when_2_1():
     assert pytest.approx(probs['over_under_25']['over']) == 1.0
 
 def test_neutral_simulator_has_no_hidden_score_or_red_card_effect():
-    state_a = get_base_state()
-    state_b = get_base_state()
-    state_b.score_home = 2
-    state_b.score_away = 0
-    state_b.minute = 75
-    state_b.period = 'second_half'
+    state_even = get_base_state()
 
-    state_c = get_base_state()
-    state_c.red_cards_home = 1
+    state_score = get_base_state()
+    state_score.score_home = 2
 
-    sim_a = MonteCarloSimulator(seed=123)
-    sim_b = MonteCarloSimulator(seed=123)
-    sim_c = MonteCarloSimulator(seed=123)
+    state_red = get_base_state()
+    state_red.red_cards_home = 1
 
-    res_a = sim_a.simulate_match_from_state(state_a, 0.02, 0.02, n_simulations=5000)
-    res_b = sim_b.simulate_match_from_state(state_b, 0.02, 0.02, n_simulations=5000)
-    res_c = sim_c.simulate_match_from_state(state_c, 0.02, 0.02, n_simulations=5000)
+    sim_even = MonteCarloSimulator(seed=123)
+    sim_score = MonteCarloSimulator(seed=123)
+    sim_red = MonteCarloSimulator(seed=123)
 
-    # Without a fitted hazard model, the future goal process is identical;
-    # the observed starting score/red card may change the final outcome,
-    # but must not silently change goal intensity.
-    assert res_a.goal_distribution == res_c.goal_distribution
-    assert res_a.goal_distribution == {
-        total_goals: prob
-        for total_goals, prob in res_b.goal_distribution.items()
-    }
+    res_even = sim_even.simulate_match_from_state(
+        state_even, 0.02, 0.02, n_simulations=5000
+    )
+    res_score = sim_score.simulate_match_from_state(
+        state_score, 0.02, 0.02, n_simulations=5000
+    )
+    res_red = sim_red.simulate_match_from_state(
+        state_red, 0.02, 0.02, n_simulations=5000
+    )
+
+    # With no fitted hazard model, future goal increments must be identical
+    # across these states. The starting score can change 1X2, but the simulator
+    # must not silently encode a score-state/red-card multiplier.
+    assert res_even.goal_distribution == res_score.goal_distribution
+    assert res_even.goal_distribution == res_red.goal_distribution
 
 def test_standard_error_matches_theoretical_formula():
     """Verify empirical standard error matches sqrt(p * (1 - p) / N) and decays with 1/sqrt(N)."""
