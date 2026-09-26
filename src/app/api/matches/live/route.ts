@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getDiskCache, setDiskCache } from '@/lib/diskCache'
 import { canMakeAPIRequest, recordAPIRequest } from '@/lib/quotaGuard'
+import { fetchApiFootball, extract1xBetOdds } from '@/lib/apiFootball'
 
 const CACHE_TTL_MS = 60 * 1000 // 60 seconds cache for live matches
 const CACHE_KEY = 'live_matches_cache'
@@ -57,10 +58,26 @@ export async function GET() {
     const json = await res.json()
     const fixtures = json.response || []
 
-    const eligible = fixtures
-      .filter((f: any) => isEligibleFixture(f))
-      .map((m: any) => ({
+    const eligible = fixtures.filter((f: any) => isEligibleFixture(f))
+
+    let liveOddsByFixture = new Map<number, any>()
+    if (eligible.length > 0) {
+      try {
+        const oddsJson = await fetchApiFootball('/odds/live', false)
+        for (const event of oddsJson.response || []) {
+          const fixtureId = Number(event.fixture?.id)
+          if (Number.isFinite(fixtureId)) {
+            liveOddsByFixture.set(fixtureId, extract1xBetOdds(event.bookmakers || []))
+          }
+        }
+      } catch (error) {
+        console.warn('[1XBET LIVE ODDS] Unavailable', error)
+      }
+    }
+
+    const eligibleMapped = eligible.map((m: any) => ({
         id: m.fixture.id,
+        kickoff: m.fixture.date,
         minute: m.fixture.status.elapsed,
         status: m.fixture.status.short,
         statusLong: m.fixture.status.long,
@@ -86,11 +103,12 @@ export async function GET() {
             logo: m.teams.away.logo
           }
         },
+        odds1xBet: liveOddsByFixture.get(Number(m.fixture.id)) || null,
         events: m.events || []
       }))
 
     setDiskCache(CACHE_KEY, eligible)
-    return NextResponse.json(eligible)
+    return NextResponse.json(eligibleMapped)
   } catch (error: any) {
     console.error('Failed to fetch live matches:', error)
     const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)
