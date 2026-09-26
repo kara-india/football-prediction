@@ -91,7 +91,7 @@ export default function MatchdayCommandCenter() {
         return false
       }
       // Status filter
-      if (filterType === 'candidates' && m.decision !== 'CANDIDATE') {
+      if (filterType === 'candidates' && !['CANDIDATE', 'FORECAST_AVAILABLE'].includes(m.decision || '')) {
         return false
       }
       if (filterType === 'lineups' && !m.lineupConfirmed) {
