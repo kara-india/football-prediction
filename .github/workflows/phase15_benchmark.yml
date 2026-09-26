@@ -6,12 +6,6 @@ on:
       - phase-15-advanced-statistical-models
     paths:
       - '.github/phase15_benchmark.trigger'
-  workflow_dispatch:
-    inputs:
-      league:
-        description: "Historical league code"
-        required: true
-        default: "E0"
 
 permissions:
   contents: read
@@ -19,7 +13,7 @@ permissions:
 
 jobs:
   benchmark:
-    name: Phase 15 Historical Benchmark
+    name: E0 Walk-Forward Benchmark
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -36,34 +30,31 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r python/requirements.txt
 
-      - name: Run real-data benchmark
+      - name: Run E0 benchmark
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-          BENCHMARK_LEAGUE: ${{ github.event.inputs.league || 'E0' }}
-          BENCHMARK_FILE: phase15-benchmark-${{ github.event.inputs.league || 'E0' }}.json
         run: |
-          test -n "$SUPABASE_URL" || (echo "SUPABASE_URL secret is not configured" && exit 1)
-          test -n "$SUPABASE_SECRET_KEY" || (echo "SUPABASE_SECRET_KEY secret is not configured" && exit 1)
-          python -m python.backtesting.advanced_historical_benchmark --league "$BENCHMARK_LEAGUE" > "$BENCHMARK_FILE"
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_SECRET_KEY"
+          python -m python.backtesting.advanced_historical_benchmark --league E0 > phase15-benchmark-E0.json
 
-      - name: Build concise benchmark summary
+      - name: Build benchmark summary
         run: |
           python - <<'PY'
           import json
           from pathlib import Path
 
-          result = json.loads(Path(__import__("os").environ["BENCHMARK_FILE"]).read_text())
+          result = json.loads(Path('phase15-benchmark-E0.json').read_text())
           lines = [
-              "# Phase 15 Historical Benchmark
-# Explicit benchmark trigger commit; normal pushes are filtered by the job condition. Results",
+              '# Phase 15 E0 Benchmark Results',
               f"Status: {result.get('status')}",
               f"Data window: {result['data_window']['first_match']} to {result['data_window']['last_match']}",
               f"Historical matches fetched: {result['data_window']['matches']}",
-              "",
-              "## Candidate summaries",
+              '',
+              '## Candidate summaries',
           ]
-          for name, summary in result.get("candidate_summaries", {}).items():
+          for name, summary in result.get('candidate_summaries', {}).items():
               lines.extend([
                   f"### {name}",
                   f"- Samples: {summary['sample_size']}",
@@ -73,15 +64,10 @@ jobs:
                   f"- Over 2.5 LogLoss: {summary['over25_log_loss']:.6f}",
                   f"- Home-win ECE: {summary['home_win_ece']:.6f}",
                   f"- Over 2.5 ECE: {summary['over25_ece']:.6f}",
-                  "",
+                  '',
               ])
-          lines.extend([
-              "## Goal distribution selections",
-              "```text",
-              json.dumps(result.get("total_goal_distribution_selections", {}), indent=2),
-              "```",
-          ])
-          Path("phase15-summary.md").write_text("\n".join(lines))
+          lines.extend(['## Goal distribution selections', '```text', json.dumps(result.get('total_goal_distribution_selections', {}), indent=2), '```'])
+          Path('phase15-summary.md').write_text('\n'.join(lines))
           PY
 
       - name: Upload benchmark artifacts
@@ -89,7 +75,7 @@ jobs:
         with:
           name: phase15-benchmark-e0
           path: |
-            phase15-benchmark-${{ github.event.inputs.league || 'E0' }}.json
+            phase15-benchmark-E0.json
             phase15-summary.md
           if-no-files-found: error
           retention-days: 14
@@ -99,23 +85,17 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const branch = context.ref.replace('refs/heads/', '');
-            const head = context.repo.owner + ':' + branch;
             const { data: prs } = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              head,
+              head: `${context.repo.owner}:phase-15-advanced-statistical-models`,
               state: 'open'
             });
             const pr = prs.find(p => p.number === 9);
-            if (!pr) {
-              core.setFailed('Phase 15 PR #9 was not found for branch ' + head);
-              return;
-            }
-            const summary = fs.readFileSync('phase15-summary.md', 'utf8');
+            if (!pr) throw new Error('Phase 15 PR #9 not found');
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: pr.number,
-              body: summary
+              issue_number: 9,
+              body: fs.readFileSync('phase15-summary.md', 'utf8')
             });
