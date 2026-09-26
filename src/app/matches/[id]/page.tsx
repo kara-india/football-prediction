@@ -67,11 +67,13 @@ function extractTeamStatistic(statistics: any[], teamId: number, names: RegExp[]
 }
 
 function probability(value: number | null | undefined): number {
-  return Number.isFinite(value) ? Number(value) : 0
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
 function pct(value: number | null | undefined): string {
-  return Number.isFinite(value) ? `${(Number(value) * 100).toFixed(1)}%` : '—'
+  return typeof value === 'number' && Number.isFinite(value)
+    ? `${(value * 100).toFixed(1)}%`
+    : '—'
 }
 
 function asPlayer(player: any, fallbackId: string): PitchPlayer {
