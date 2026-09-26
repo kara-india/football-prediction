@@ -5,6 +5,10 @@ on:
     branches:
       - phase-15-advanced-statistical-models
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   benchmark:
     name: E0 Walk-Forward Benchmark
@@ -29,14 +33,78 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          test -n "${SUPABASE_URL}" || (echo "SUPABASE_URL secret is not configured" && exit 1)
-          test -n "${SUPABASE_SERVICE_ROLE_KEY}" || (echo "SUPABASE_SERVICE_ROLE_KEY secret is not configured" && exit 1)
+          test -n "$SUPABASE_URL" || (echo "SUPABASE_URL secret is not configured" && exit 1)
+          test -n "$SUPABASE_SERVICE_ROLE_KEY" || (echo "SUPABASE_SERVICE_ROLE_KEY secret is not configured" && exit 1)
           python -m python.backtesting.advanced_historical_benchmark --league E0 > phase15-benchmark-E0.json
 
-      - name: Upload benchmark artifact
+      - name: Build concise benchmark summary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          result = json.loads(Path("phase15-benchmark-E0.json").read_text())
+          lines = [
+              "# Phase 15 E0 Benchmark Results",
+              f"Status: {result.get('status')}",
+              f"Data window: {result['data_window']['first_match']} to {result['data_window']['last_match']}",
+              f"Historical matches fetched: {result['data_window']['matches']}",
+              "",
+              "## Candidate summaries",
+          ]
+          for name, summary in result.get("candidate_summaries", {}).items():
+              lines.extend([
+                  f"### {name}",
+                  f"- Samples: {summary['sample_size']}",
+                  f"- Home-win Brier: {summary['home_win_brier']:.6f}",
+                  f"- Home-win LogLoss: {summary['home_win_log_loss']:.6f}",
+                  f"- Over 2.5 Brier: {summary['over25_brier']:.6f}",
+                  f"- Over 2.5 LogLoss: {summary['over25_log_loss']:.6f}",
+                  f"- Home-win ECE: {summary['home_win_ece']:.6f}",
+                  f"- Over 2.5 ECE: {summary['over25_ece']:.6f}",
+                  "",
+              ])
+          lines.extend([
+              "## Goal distribution selections",
+              "```text",
+              json.dumps(result.get("total_goal_distribution_selections", {}), indent=2),
+              "```",
+          ])
+          Path("phase15-summary.md").write_text("\n".join(lines))
+          PY
+
+      - name: Upload benchmark artifacts
         uses: actions/upload-artifact@v4
         with:
           name: phase15-benchmark-e0
-          path: phase15-benchmark-E0.json
+          path: |
+            phase15-benchmark-E0.json
+            phase15-summary.md
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish summary to Phase 15 PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const branch = context.ref.replace('refs/heads/', '');
+            const head = context.repo.owner + ':' + branch;
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head,
+              state: 'open'
+            });
+            const pr = prs.find(p => p.number === 9);
+            if (!pr) {
+              core.setFailed('Phase 15 PR #9 was not found for branch ' + head);
+              return;
+            }
+            const summary = fs.readFileSync('phase15-summary.md', 'utf8');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: pr.number,
+              body: summary
+            });
