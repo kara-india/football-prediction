@@ -107,7 +107,7 @@ export async function GET() {
         events: m.events || []
       }))
 
-    setDiskCache(CACHE_KEY, eligible)
+    setDiskCache(CACHE_KEY, eligibleMapped)
     return NextResponse.json(eligibleMapped)
   } catch (error: any) {
     console.error('Failed to fetch live matches:', error)
