@@ -14,7 +14,7 @@ Establish a single, authoritative, atomic quota management system inside Postgre
 
 ### Parallelizable Subtasks
 - **Task 2.1 [Database Quota Governor Function]**: Create `supabase/migrations/006_quota_governance.sql`:
-  - Table: `provider_usage` tracking `provider`, `date_utc`, `user_requests_made`, `worker_requests_made`, `daily_limit` (95), `user_reserve` (50), `worker_budget` (45), `safety_buffer` (5).
+  - Preserve the baseline endpoint-level `provider_usage` table; create a dedicated daily `api_quota_usage` ledger with `provider`, `usage_date`, `user_requests_made`, `worker_requests_made`, `daily_limit` (95), `user_reserve` (50), `worker_budget` (45), and `safety_buffer` (5).
   - PL/pgSQL function: `reserve_api_quota(p_provider TEXT, p_cost INT, p_is_user BOOLEAN)`:
     - Atomically locks the daily quota row using `FOR UPDATE`.
     - If `p_is_user == TRUE`: verifies `user_requests_made + p_cost <= user_reserve`.
@@ -26,18 +26,17 @@ Establish a single, authoritative, atomic quota management system inside Postgre
   - Return clear UI message if user budget is exhausted: "Daily live refresh quota reached. Resets at 00:00 UTC."
 - **Task 2.3 [Python Central Quota Adapter]**: Update `python/adapters/quota_manager.py`:
   - Deprecate local `request_budget.json`.
-  - Connect to Supabase to call `reserve_api_quota` before every API-Football HTTP request.
-  - If rejected, worker gracefully abstains without throwing an unhandled exception.
+  - Connect to Supabase to call `reserve_api_quota` before every actual API-Football HTTP request.
+  - If rejected or the governor is unavailable, worker fails closed and does not issue the external request.
 
-### Sequential Tasks (Follows 2.1 - 2.3)
-- **Task 2.4 [End-to-End Stress Test]**: Concurrently launch 10 parallel reservation attempts in Python and TypeScript to verify atomic row locking without race conditions or negative balances.
-- **Task 2.5 [Purge Local Quota Artifacts]**: Delete `.cache/api_quota.json` and remove `.cache` references from codebase.
+### Sequential Tasks (Follows 2.1 - 2.4)
+- **Task 2.4 [HTTP Attempt Accounting]**: Ensure hidden HTTP retries are disabled so every external attempt has an explicit reservation.
+- **Task 2.5 [Concurrency Test]**: Run concurrent reservations and verify accepted/rejected boundaries.
+- **Task 2.6 [Local Artifact Audit]**: Confirm no quota-authority file or process-local counter remains.
 
 ## 5. Files / Modules Affected
 - `supabase/migrations/006_quota_governance.sql` [NEW]
 - `src/lib/quotaGuard.ts`
-- `src/app/api/matches/live/route.ts`
-- `src/app/api/matches/upcoming/route.ts`
 - `python/adapters/quota_manager.py`
 - `python/adapters/api_football.py`
 - `tests/test_quota_governance.py` [NEW]
@@ -50,11 +49,13 @@ Establish a single, authoritative, atomic quota management system inside Postgre
   1. Test sequential reservation up to 45 worker requests; 46th request must be rejected.
   2. Test sequential reservation up to 50 user requests; 51st request must be rejected.
   3. Test concurrency: 20 simultaneous threads requesting 1 credit each; verify count increases by exactly 20.
-  4. Test midnight UTC reset logic.
+  4. Test UTC-day reset behavior in the governor.
 
 ## 8. Acceptance Criteria
 - [ ] Strictly zero filesystem quota files remain in the repository.
 - [ ] Atomic reservations prevent race conditions between Next.js server actions and background workers.
+- [ ] Governor outage fails closed rather than switching to a local counter.
+- [ ] Hidden HTTP retries cannot create unreserved provider requests.
 - [ ] Hard stop at 95 total daily requests; 5 requests strictly held in reserve as an emergency buffer.
 - [ ] Zero possibility of incurring billed overages from external API providers.
 
@@ -77,5 +78,7 @@ Establish a single, authoritative, atomic quota management system inside Postgre
 - Database latency: if network to Supabase is slow, API reservation adds ~50ms overhead per call. This is completely acceptable given we make at most ~50 calls per day.
 
 ## 13. What Must NOT Be Considered Complete
-- Any system where Next.js reads from `.cache` while Python reads from memory or Supabase.
-- Any quota tracker that allows requests past 95 on the same UTC day.
+- Any system where Next.js or Python can authorize an external request from a process-local quota counter.
+- Any system where an HTTP retry can occur without an explicit reservation.
+- Any system using the baseline endpoint telemetry table `provider_usage` as the daily quota ledger.
+- Any production claim of quota enforcement before the Supabase migration has actually been applied.
