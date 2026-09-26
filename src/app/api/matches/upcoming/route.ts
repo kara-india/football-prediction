@@ -63,7 +63,7 @@ export async function GET() {
         }
       }
 
-      for (const group of groups.values()) {
+      for (const group of Array.from(groups.values())) {
         try {
           const oddsJson = await fetchApiFootball(
             `/odds?league=${group.leagueId}&season=${group.season}&date=${group.date}&bookmaker=${bookmakerId}`,
