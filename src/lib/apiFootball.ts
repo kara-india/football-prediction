@@ -27,7 +27,13 @@ export async function fetchApiFootball(path: string, isUserDemand = false): Prom
   }
 
   if (payload?.errors && Object.keys(payload.errors).length > 0) {
-    throw new Error(`API-Football returned errors for ${endpoint}`)
+    const details =
+      typeof payload.errors === 'string'
+        ? payload.errors
+        : Object.entries(payload.errors)
+            .map(([key, value]) => `${key}: ${String(value)}`)
+            .join('; ')
+    throw new Error(`API-Football ${endpoint}: ${details || 'provider returned an error'}`)
   }
 
   return payload
