@@ -6,9 +6,11 @@ const CACHE_TTL_MS = 15 * 60 * 1000
 const CACHE_KEY = 'upcoming_fixtures_v3'
 
 const ALLOWED_LEAGUES = new Set([
-  39, 71, 135, 140, 78, 61, 94, 88, 128, 144,
-  2, 3, 1, 4, 5, 9, 6, 7, 10,
+  39, 140, 135, 78, 61, 88, 94, 71, 128,
+  2, 3, 5,
 ])
+
+const FIXTURE_QUERY_LEAGUES = Array.from(ALLOWED_LEAGUES)
 
 function isEligibleFixture(m: any): boolean {
   const leagueId = m.league?.id
@@ -38,16 +40,35 @@ export async function GET() {
   const tomorrowDate = new Date(today.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
   try {
-    const fixtureJson = await fetchApiFootball(
-      `/fixtures?from=${todayDate}&to=${tomorrowDate}`,
-      true,
+    const fixtures: any[] = []
+    const fixtureErrors: string[] = []
+    const season = today.getUTCFullYear()
+
+    // API-Football requires from/to to be paired with a narrowing parameter.
+    // Query the configured competitions individually so current fixtures are
+    // real and the request count remains bounded by the user reserve.
+    for (const leagueId of FIXTURE_QUERY_LEAGUES) {
+      try {
+        const fixtureJson = await fetchApiFootball(
+          `/fixtures?league=${leagueId}&season=${season}&from=${todayDate}&to=${tomorrowDate}`,
+          true,
+        )
+        fixtures.push(...(fixtureJson.response || []))
+      } catch (error) {
+        fixtureErrors.push(
+          `league=${leagueId}: ${error instanceof Error ? error.message : 'request failed'}`,
+        )
+      }
+    }
+
+    const eligible = fixtures.filter((f: any) =>
+      isEligibleFixture(f) &&
+      ['NS', 'TBD'].includes(f.fixture?.status?.short),
     )
 
-    const fixtures = (fixtureJson.response || [])
-      .filter((f: any) =>
-        isEligibleFixture(f) &&
-        ['NS', 'TBD'].includes(f.fixture?.status?.short),
-      )
+    if (eligible.length === 0 && fixtureErrors.length === FIXTURE_QUERY_LEAGUES.length) {
+      throw new Error(fixtureErrors.join(' | '))
+    }
 
     const oddsByFixture = new Map<number, any>()
     const bookmakerId = await resolve1xBetBookmakerId()
@@ -133,7 +154,11 @@ export async function GET() {
     })
 
     setDiskCache(CACHE_KEY, formatted)
-    return NextResponse.json(formatted)
+    return NextResponse.json(formatted, {
+      headers: fixtureErrors.length
+        ? { 'x-data-warning': 'one-or-more-competition-queries-failed' }
+        : undefined,
+    })
   } catch (error) {
     console.error('Failed to fetch upcoming matches:', error)
     const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)
