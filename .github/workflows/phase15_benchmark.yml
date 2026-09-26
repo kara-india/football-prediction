@@ -1,0 +1,42 @@
+name: Phase 15 Historical Benchmark
+
+on:
+  push:
+    branches:
+      - phase-15-advanced-statistical-models
+
+jobs:
+  benchmark:
+    name: E0 Walk-Forward Benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out benchmark branch
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: 'python/requirements.txt'
+
+      - name: Install dependencies
+        run: python -m pip install -r python/requirements.txt
+
+      - name: Run real-data benchmark
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          test -n "${SUPABASE_URL}" || (echo "SUPABASE_URL secret is not configured" && exit 1)
+          test -n "${SUPABASE_SERVICE_ROLE_KEY}" || (echo "SUPABASE_SERVICE_ROLE_KEY secret is not configured" && exit 1)
+          python -m python.backtesting.advanced_historical_benchmark --league E0 > phase15-benchmark-E0.json
+
+      - name: Upload benchmark artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase15-benchmark-e0
+          path: phase15-benchmark-E0.json
+          if-no-files-found: error
+          retention-days: 14
