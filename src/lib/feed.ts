@@ -1,4 +1,4 @@
-import { canMakeAPIRequest, recordAPIRequest } from '@/lib/quotaGuard'
+import { canMakeAPIRequest } from '@/lib/quotaGuard'
 
 const API_BASE = 'https://v3.football.api-sports.io'
 const API_KEY = () => process.env.API_FOOTBALL_KEY
@@ -21,15 +21,24 @@ export async function fetchFootball(path: string, userDemand: boolean): Promise<
       headers: { 'x-apisports-key': API_KEY() as string },
       cache: 'no-store',
     })
-    recordAPIRequest(path)
     const json = await response.json()
     const errors = json?.errors && Object.keys(json.errors).length ? json.errors : null
     if (!response.ok || errors) {
-      return { ok: false, data: null, reason: errors ? JSON.stringify(errors) : 'API_FOOTBALL_UPSTREAM_ERROR', status: 502 }
+      return {
+        ok: false,
+        data: null,
+        reason: errors ? JSON.stringify(errors) : 'API_FOOTBALL_UPSTREAM_ERROR',
+        status: 502,
+      }
     }
     return { ok: true, data: json?.response ?? [], status: response.status }
   } catch (error: any) {
-    return { ok: false, data: null, reason: error?.message || 'API_FOOTBALL_REQUEST_FAILED', status: 502 }
+    return {
+      ok: false,
+      data: null,
+      reason: error?.message || 'API_FOOTBALL_REQUEST_FAILED',
+      status: 502,
+    }
   }
 }
 
