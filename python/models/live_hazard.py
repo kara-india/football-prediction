@@ -201,3 +201,20 @@ class LearnedLiveHazard:
             "coef": self.coef_.tolist() if self.coef_ is not None else None,
             "metrics": self.metrics,
         }
+
+
+    @classmethod
+    def deserialize(cls, data: Dict[str, Any]) -> "LearnedLiveHazard":
+        model = cls(
+            l2=float(data.get("l2", 4.0)),
+            spline_knots=tuple(float(v) for v in data.get("spline_knots", (15.0, 30.0, 45.0, 60.0, 75.0))),
+        )
+        if data.get("feature_mean") is not None:
+            model.feature_mean = np.asarray(data["feature_mean"], dtype=float)
+        if data.get("feature_scale") is not None:
+            model.feature_scale = np.asarray(data["feature_scale"], dtype=float)
+        if data.get("coef") is not None:
+            model.coef_ = np.asarray(data["coef"], dtype=float)
+        model.metrics = dict(data.get("metrics", {}))
+        model.fitted = model.coef_ is not None and model.feature_mean is not None and model.feature_scale is not None
+        return model
