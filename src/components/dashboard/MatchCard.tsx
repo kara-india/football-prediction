@@ -156,7 +156,7 @@ export default function MatchCard({
             </div>
           ) : (
             <div className="text-center py-2 text-[11px] text-[#64748B] font-mono">
-              1xBet odds stored in cache. Open match detail for full analysis.
+              1xBet prices are unavailable in the current upstream snapshot.
             </div>
           )}
         </div>
