@@ -410,3 +410,21 @@ class ScoreDrivenDixonColes:
             "teams": [str(t) for t in self.teams],
             "metrics": self.metrics,
         }
+
+
+    @classmethod
+    def deserialize(cls, data: Dict[str, Any]) -> "ScoreDrivenDixonColes":
+        model = cls()
+        model.mu = float(data["mu"])
+        model.home_advantage = float(data["home_advantage"])
+        model.rho = float(data["rho"])
+        model.attack_persistence = float(data["attack_persistence"])
+        model.defence_persistence = float(data["defence_persistence"])
+        model.attack_gain = float(data["attack_gain"])
+        model.defence_gain = float(data["defence_gain"])
+        model.attack_state = dict(data.get("attack_state", {}))
+        model.defence_state = dict(data.get("defence_state", {}))
+        model.teams = list(data.get("teams", []))
+        model.metrics = dict(data.get("metrics", {}))
+        model.fitted = bool(model.attack_state or model.teams)
+        return model
