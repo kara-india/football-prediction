@@ -108,8 +108,9 @@ A model is research-valid only when:
 - [x] Implement learned live hazard challenger.
 - [x] Remove synthetic full-backtest fallback.
 - [x] Add unit/regression coverage for the new modeling contracts.
-- [ ] Run a real historical walk-forward benchmark using the 13,403-match dataset with no synthetic observations.
-- [ ] Compare dynamic DC, static DC and NB candidates out-of-sample.
+- [x] Wire the 13,403-row `historical_matches` dataset into a paginated Supabase repository and real benchmark CLI.
+- [ ] Execute the real historical walk-forward benchmark using that dataset with no synthetic observations.
+- [ ] Compare dynamic DC, static DC and NB candidates out-of-sample and record the paired results.
 - [ ] Fit calibration only on historical validation windows.
 - [ ] Persist validated model artifacts and parameters to the model registry.
 - [ ] Promote a challenger only after passing the existing statistical gate.
