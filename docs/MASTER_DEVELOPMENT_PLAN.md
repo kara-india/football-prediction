@@ -184,7 +184,7 @@ graph TD
 
 ---
 
-## 6. Phased Implementation Roadmap (Phase 0 to Phase 12)
+## 6. Phased Implementation Roadmap (Phase 0 to Phase 15)
 
 ```mermaid
 gantt
@@ -207,6 +207,7 @@ gantt
     Phase 11: Sofascore-Inspired Terminal UI :p11, after p10, 2d
     section P3 Active Learning
     Phase 12: RL & Contextual Bandit Policy  :p12, after p11, 3d
+    Phase 15: Advanced Statistical Modeling :p15, after p12, 4d
 ```
 
 ---
