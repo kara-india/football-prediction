@@ -569,11 +569,17 @@ class AnalysisWorker:
 
         # Provide a synthetic fixture if none found in dry_run mode to test pipeline execution
         if not match_list and dry_run:
+            # Dry-run data is explicitly synthetic and never used as production
+            # evidence. The rates are supplied in the fixture so the runtime
+            # path exercises the same explicit-input contract as real inference.
             match_list = [{
                 "match_id": "dry_run_match_1",
-                "competition_name": "Premier League (England)",
+                "competition_name": "TEST_ONLY",
                 "home_team_name": "Arsenal",
                 "away_team_name": "Chelsea",
+                "model_home_rate": 1.45,
+                "model_away_rate": 1.15,
+                "data_mode": "synthetic_test_only",
             }]
 
         total_predictions = 0
