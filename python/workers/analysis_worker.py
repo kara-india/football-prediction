@@ -320,7 +320,9 @@ class AnalysisWorker:
                 prob_lower=prob_lower,
                 prob_upper=prob_upper,
                 model_calibrated=calibration_applied,
-                historical_sample_size=0,
+                historical_sample_size=int(
+                getattr(self.prematch_model, "metrics", {}).get("n_matches", 0)
+            ),
             )
             gate_reasons = list(dict.fromkeys(
                 ([ "ODDS_UNAVAILABLE" ] if not odds_available else [])
@@ -357,6 +359,7 @@ class AnalysisWorker:
                 "recommended_action": gate_res.action,
                 "no_bet_reasons": gate_res.reasons,
                 "simulation_count": int(simulation_count),
+                "simulation_seed": int(self.simulator.seed) if getattr(self.simulator, "seed", None) is not None else None,
                 "simulation_version": "3.0-learned-hazard",
                 "model_version": (
                     "score_driven_dixon_coles_v1"
@@ -433,6 +436,7 @@ class AnalysisWorker:
                     "implied_probability": p["implied_probability"],
                     "expected_value": p["expected_value"],
                     "simulation_count": p["simulation_count"],
+                    "simulation_seed": p["simulation_seed"],
                     "simulation_version": p["simulation_version"],
                     "no_bet_reasons": p["no_bet_reasons"],
                     "is_candidate": (p["recommended_action"] == "BET"),
