@@ -85,7 +85,7 @@ class StatisticalTrainingWorker:
                 "candidate": model_type,
                 "benchmark_markets": ["1X2_HOME", "OVER_2_5"],
             },
-            "sample_size": int(candidate.get("sample_size", 0)),
+            "sample_size": int(len(train_df)),
             "brier_score": float(candidate.get("home_win_brier", 0.0)),
             "log_loss": float(candidate.get("home_win_log_loss", 0.0)),
             "ece": float(candidate.get("home_win_ece", 0.0)),
