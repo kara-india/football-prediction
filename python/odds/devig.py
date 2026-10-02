@@ -4,7 +4,7 @@ Provides exact margin calculation, proportional (multiplicative) normalization,
 and Shin's method for adjusting for the favorite-longshot bias in multi-way markets.
 """
 import math
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 
 class DeVIgEngine:
@@ -55,6 +55,7 @@ class DeVIgEngine:
         if len(decimal_odds) < 2:
             return DeVIgEngine.multiplicative_devig(decimal_odds), 0.0
 
+        n = len(decimal_odds)
         implied = [1.0 / o for o in decimal_odds]
         sum_implied = sum(implied)
 

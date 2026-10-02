@@ -12,13 +12,13 @@ Operates in RESEARCH mode by default until 1,000 verified paper bets have settle
 from __future__ import annotations
 import argparse
 import sys
-from python.rl.counterfactual_logger import CounterfactualLogger
+from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 from scipy import stats
 
 from python.engine.nobet_gate import NoBetGate, NoBetGateResult
 from python.rl.action_space import Action, V1_ACTIONS
-from python.rl.counterfactual_logger import CounterfactualLogger, CandidateDecisionOpportunity
+from python.rl.counterfactual_logger import CounterfactualLogger
 from python.rl.reward import MultiObjectiveRewardCalculator, RewardCalculator
 from python.rl.state_representation import RLState
 

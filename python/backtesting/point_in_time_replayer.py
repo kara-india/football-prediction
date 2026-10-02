@@ -9,8 +9,8 @@ from typing import Dict, List, Any, Optional, Union
 import logging
 
 from python.models.elo import EloSystem
-from python.models.form import FormCalculator
-from python.data_contracts import CanonicalMatch
+from python.models.form import FormCalculator, MultiDimensionalForm
+from python.data_contracts import CanonicalMatch, CanonicalOddsMarket, CanonicalEvent
 
 logger = logging.getLogger(__name__)
 
