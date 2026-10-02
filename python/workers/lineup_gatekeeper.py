@@ -4,15 +4,12 @@ Polls upcoming matches within the T-60m window, verifies official 11 starters an
 populates Supabase `lineups`, and strictly gates the prediction engine.
 """
 import os
-import sys
 import logging
 import urllib.request
-import urllib.error
-import json
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 
-from ..adapters.quota_manager import CentralQuotaManager, QuotaExceededError
+from ..adapters.quota_manager import CentralQuotaManager
 from ..adapters.api_football import APIFootballAdapter
 
 logger = logging.getLogger("LineupGatekeeper")
@@ -146,7 +143,7 @@ def main():
     print("=" * 60)
     print("Lineup Gatekeeper Runtime Worker")
     print("=" * 60)
-    worker = LineupGatekeeperWorker()
+    LineupGatekeeperWorker()
     print("Lineup Gatekeeper initialized under quota governance.")
     print("Status: Standby (Active monitoring mode).")
     print("=" * 60)
