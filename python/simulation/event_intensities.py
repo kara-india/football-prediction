@@ -3,7 +3,7 @@ from .match_state import MatchState
 
 class EventIntensityEstimator:
     # Empirical minute distribution (normalized)
-    GOAL_MINUTE_WEIGHTS = {}
+    GOAL_MINUTE_WEIGHTS: dict[int, float] = {}
     
     # Score state multipliers (empirically derived)
     SCORE_STATE_MULTIPLIERS = {
