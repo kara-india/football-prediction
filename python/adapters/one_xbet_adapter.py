@@ -9,7 +9,6 @@ import logging
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
-from typing import List, Dict, Any
 
 from ..data_contracts import CanonicalOddsMarket, CanonicalOddsSelection
 from ..odds.devig import DeVIgEngine
