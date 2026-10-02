@@ -1,15 +1,8 @@
 name: Autonomous Background Workers
 
 on:
-  schedule:
-    # Discovery: daily at 04:00 UTC
-    - cron: '0 4 * * *'
-    # Lineup Watcher: every 15 minutes during match windows
-    - cron: '*/15 * * * *'
-    # Evaluator: hourly
-    - cron: '0 * * * *'
-    # Learner: daily at 02:00 UTC
-    - cron: '0 2 * * *'
+  # Scheduled autonomous runs paused while the configured API-Football Free plan
+  # cannot access the 2026 current season. Keep manual dispatch available.
   workflow_dispatch:
     inputs:
       job:
