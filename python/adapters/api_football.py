@@ -137,7 +137,8 @@ class APIFootballAdapter:
 
     def get_injuries(self, league_id: int = None, team_id: int = None, fixture_id: int = None) -> List[Dict]:
         params = {}
-        if league_id: params["league"] = league_id
+        if league_id:
+            params["league"] = league_id
         if team_id:
             params["team"] = team_id
         if fixture_id:
