@@ -1,11 +1,12 @@
 import math
+from typing import Optional
 
 class EloSystem:
     DEFAULT_RATING = 1500.0
     K_FACTOR = 32.0
     HOME_ADVANTAGE = 100.0
     
-    def __init__(self, ratings: dict[int, float] = None):
+    def __init__(self, ratings: Optional[dict[int, float]] = None):
         self.ratings = ratings or {}
     
     def get_rating(self, team_id: int) -> float:
