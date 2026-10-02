@@ -33,14 +33,12 @@ class ModelRegistry:
         
     def promote_to_champion(self, version_id: str, validation_metrics: dict) -> bool:
         target_v = None
-        target_name = None
         current_champ = None
         
         for name, versions in self.models.items():
             for v in versions:
                 if v.id == version_id:
                     target_v = v
-                    target_name = name
                 if v.status == self.STATUS_CHAMPION:
                     current_champ = v
                     

@@ -9,7 +9,7 @@ import sys
 import json
 import logging
 import urllib.request
-undefinedfrom typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional
 
 from python.simulation.match_state import MatchState
 from python.simulation.vectorized_mc import VectorizedMonteCarloSimulator

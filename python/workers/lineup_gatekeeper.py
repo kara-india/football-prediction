@@ -5,11 +5,10 @@ populates Supabase `lineups`, and strictly gates the prediction engine.
 """
 import os
 import logging
-import urllib.request
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 
-from ..adapters.quota_manager import CentralQuotaManager
+from ..adapters.quota_manager import CentralQuotaManager, QuotaExceededError
 from ..adapters.api_football import APIFootballAdapter
 
 logger = logging.getLogger("LineupGatekeeper")

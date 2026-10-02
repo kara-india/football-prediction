@@ -5,11 +5,10 @@ across top European domestic leagues without consuming API credits.
 """
 import io
 import os
-import json
 import logging
 import urllib.request
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 import pandas as pd
 
 from .quality_scorer import MatchQualityScorer

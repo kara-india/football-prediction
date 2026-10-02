@@ -232,7 +232,7 @@ class DixonColesModel:
         for candidate_xi in xi_grid:
             self.fit(matches, xi=candidate_xi, max_iter=60)
             ll = self.metrics.get("final_neg_log_lik", float("inf"))
-            if np.isfinite(ll) && ll < best_ll:
+            if np.isfinite(ll) and ll < best_ll:
                 best_ll = ll
                 best_xi = candidate_xi
                 best_state = {

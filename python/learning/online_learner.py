@@ -1,4 +1,3 @@
-from typing import Dict, List, Any
 
 class OnlineLearner:
     def update_elo(self, match_result: dict) -> dict:

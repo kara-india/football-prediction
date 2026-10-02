@@ -5,7 +5,7 @@ and informational Fractional Kelly stake allocations.
 """
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any
 import numpy as np
 
 from python.odds.devig import DeVIgEngine

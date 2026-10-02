@@ -7,16 +7,15 @@ Zero hardcoded or mock metrics permitted.
 """
 import argparse
 import logging
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from typing import List, Dict, Any, Callable, Optional, Union
 import numpy as np
 import pandas as pd
 from dateutil.relativedelta import relativedelta
 
 from python.calibration.calibrator import ProbabilityCalibrator
-from python.engine.settlement import SettlementEngine
-from python.backtesting.metrics_engine import MetricsEngine, BacktestMetricsSummary
-from python.backtesting.model_comparator import ModelComparator, ComparisonResult
+from python.backtesting.metrics_engine import MetricsEngine
+from python.backtesting.model_comparator import ModelComparator
 
 logger = logging.getLogger(__name__)
 

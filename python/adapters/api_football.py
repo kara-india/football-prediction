@@ -1,9 +1,7 @@
-import time
 import logging
 import os
 import requests
 from requests.adapters import HTTPAdapter, Retry
-from functools import lru_cache
 from typing import List, Dict, Optional, Any
 from ..data_pipeline.cache import DataCache
 
@@ -88,15 +86,19 @@ class APIFootballAdapter:
 
     def get_fixtures(self, league_id: int, season: int, date: str = None, live: bool = False, status: str = None) -> List[Dict]:
         params = {"league": league_id, "season": season}
-        if date: params["date"] = date
-        if live: params["live"] = "all"
-        if status: params["status"] = status
+        if date:
+            params["date"] = date
+        if live:
+            params["live"] = "all"
+        if status:
+            params["status"] = status
         return self._make_request('fixtures', params, ttl=300)
         
     def get_fixture(self, fixture_id: int) -> Dict:
         params = {"id": fixture_id, "statistics": "true", "events": "true", "lineups": "true"}
         res = self._make_request('fixtures', params, ttl=300)
-        if not res: raise DataNotAvailableError(f"Fixture {fixture_id} not found")
+        if not res:
+            raise DataNotAvailableError(f"Fixture {fixture_id} not found")
         return res[0]
 
     def get_live_fixtures(self, league_ids: List[int]) -> List[Dict]:
@@ -128,15 +130,18 @@ class APIFootballAdapter:
 
     def get_player_statistics(self, player_id: int, season: int, league_id: int = None) -> Dict:
         params = {"id": player_id, "season": season}
-        if league_id: params["league"] = league_id
+        if league_id:
+            params["league"] = league_id
         res = self._make_request('players', params, ttl=3600)
         return res[0] if res else {}
 
     def get_injuries(self, league_id: int = None, team_id: int = None, fixture_id: int = None) -> List[Dict]:
         params = {}
         if league_id: params["league"] = league_id
-        if team_id: params["team"] = team_id
-        if fixture_id: params["fixture"] = fixture_id
+        if team_id:
+            params["team"] = team_id
+        if fixture_id:
+            params["fixture"] = fixture_id
         return self._make_request('injuries', params, ttl=3600)
 
     def get_standings(self, league_id: int, season: int) -> List[Dict]:

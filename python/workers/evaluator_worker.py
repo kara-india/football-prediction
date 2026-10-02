@@ -9,7 +9,7 @@ import sys
 import json
 import logging
 import urllib.request
-undefinedfrom typing import Dict, Any, List, Optional, Set, Union, Tuple
+from typing import Dict, Any, List, Optional, Set, Union, Tuple
 
 from python.engine.settlement import SettlementEngine
 from python.engine.error_evaluator import ErrorEvaluator

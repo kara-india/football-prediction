@@ -3,14 +3,11 @@ Bulk Daily Fixture Discovery Engine
 Consumes exactly 1 API-Football request per day to discover upcoming fixtures
 across allowed competitions, strictly respecting the ₹0.00 cost governance.
 """
-import os
 import re
-import json
 import logging
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
-from .quality_scorer import MatchQualityScorer
 from ..data_contracts import CanonicalMatch
 from ..adapters.quota_manager import CentralQuotaManager, QuotaExceededError
 from ..adapters.api_football import APIFootballAdapter

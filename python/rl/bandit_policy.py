@@ -12,7 +12,7 @@ Operates in RESEARCH mode by default until 1,000 verified paper bets have settle
 from __future__ import annotations
 import argparse
 import sys
-from python.rl.counterfactual_logger import CounterfactualLogger, CandidateDecisionOpportunity
+from python.rl.counterfactual_logger import CounterfactualLogger
 import numpy as np
 from scipy import stats
 
