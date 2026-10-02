@@ -254,7 +254,7 @@ class AnalysisWorker:
             raw_p = float(max(0.0, min(1.0, raw_p)))
             calibrator = self.calibrator
             calibration_applied = calibrator is not None
-            if calibration_applied:
+            if calibrator is not None:
                 calibrated_p = float(np.ravel(calibrator.calibrate(raw_p))[0])
                 calibrated_p = float(max(0.01, min(0.99, calibrated_p)))
                 calibration_version = "validated_calibrator"
