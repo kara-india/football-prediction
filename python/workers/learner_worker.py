@@ -13,7 +13,7 @@ import json
 import logging
 import urllib.request
 from typing import Dict, Any, List, Optional, Union
-from typing import Dict, Any, List, Optional, Tuple, Union
+from typing import Dict, Any, List, Optional, Union
 import numpy as np
 
 from python.backtesting.model_comparator import ModelComparator, ComparisonResult
