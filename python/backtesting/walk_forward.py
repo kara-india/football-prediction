@@ -187,11 +187,11 @@ class WalkForwardValidator:
                 "folds": [],
             }
 
-        fold_summaries = []
-        all_y_true = []
-        all_y_prob = []
-        all_pnl = []
-        all_clv = []
+        fold_summaries: List[Dict[str, Any]] = []
+        all_y_true: List[int] = []
+        all_y_prob: List[float] = []
+        all_pnl: List[float] = []
+        all_clv: List[float] = []
 
         for fold in folds:
             t_start, t_end = fold["train_start"], fold["train_end"]
