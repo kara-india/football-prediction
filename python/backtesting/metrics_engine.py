@@ -5,7 +5,7 @@ flat staking ROI, Closing Line Value (CLV), Maximum Drawdown, and Lineup Informa
 Zero fake or hardcoded metrics permitted.
 """
 from dataclasses import dataclass, field, asdict
-from typing import Dict, List, Optional, Tuple, Union, Any
+from typing import Dict, List, Optional, Union, Any
 import numpy as np
 import pandas as pd
 

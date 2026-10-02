@@ -5,12 +5,12 @@ Prevents data leakage across historical matches, team Elo ratings, EWMA form,
 confirmed lineups, betting odds, and in-play match events.
 """
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Any, Optional, Tuple, Union
+from typing import Dict, List, Any, Optional, Union
 import logging
 
 from python.models.elo import EloSystem
-from python.models.form import FormCalculator, MultiDimensionalForm
-from python.data_contracts import CanonicalMatch, CanonicalOddsMarket, CanonicalEvent
+from python.models.form import FormCalculator
+from python.data_contracts import CanonicalMatch
 
 logger = logging.getLogger(__name__)
 
