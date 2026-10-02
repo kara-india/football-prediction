@@ -223,6 +223,7 @@ class WorkerRunner:
 
         logger.info(f"Acquiring mutex lock for worker '{norm_job}'...")
         with WorkerMutex(norm_job):
+            worker: Any = None
             try:
                 if norm_job == "discovery":
                     worker = CollectorWorker(
