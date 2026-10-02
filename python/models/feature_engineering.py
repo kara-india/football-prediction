@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Optional
 
 class FeatureEngineer:
     def compute_pre_match_features(self, match: dict, 
@@ -8,7 +9,7 @@ class FeatureEngineer:
                                     away_players: list[dict],
                                     h2h_matches: list[dict],
                                     referee_stats: dict,
-                                    weather: dict = None) -> dict:
+                                    weather: Optional[dict] = None) -> dict:
         features = {}
         features['home_form'] = home_team_stats.get('form', 0.0)
         features['away_form'] = away_team_stats.get('form', 0.0)
