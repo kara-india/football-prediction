@@ -7,7 +7,7 @@ import os
 import json
 import logging
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 import urllib.request
 import urllib.error
 
