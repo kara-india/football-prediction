@@ -14,7 +14,7 @@ class DataNotAvailableError(Exception):
     pass
 
 class APIFootballAdapter:
-    def __init__(self, api_key: Optional[str] = None, cache: DataCache = None, quota_manager: Optional[CentralQuotaManager] = None):
+    def __init__(self, api_key: Optional[str] = None, cache: Optional[DataCache] = None, quota_manager: Optional[CentralQuotaManager] = None):
         self.base_url = 'https://v3.football.api-sports.io'
         self.api_key = api_key or os.environ.get("API_FOOTBALL_KEY")
         self.headers = {'x-apisports-key': self.api_key} if self.api_key else {}
@@ -44,7 +44,7 @@ class APIFootballAdapter:
     def quota_remaining(self, value: int):
         self._quota_remaining = value
         
-    def _make_request(self, endpoint: str, params: Dict = None, ttl: int = 60, is_user: bool = False) -> Any:
+    def _make_request(self, endpoint: str, params: Optional[Dict[str, Any]] = None, ttl: int = 60, is_user: bool = False) -> Any:
         cache_key = f"{endpoint}_{params}"
         cached = self.cache.get(cache_key)
         if cached is not None:
@@ -84,8 +84,8 @@ class APIFootballAdapter:
         data = self._make_request('status', ttl=0)
         return data
 
-    def get_fixtures(self, league_id: int, season: int, date: str = None, live: bool = False, status: str = None) -> List[Dict]:
-        params = {"league": league_id, "season": season}
+    def get_fixtures(self, league_id: int, season: int, date: Optional[str] = None, live: bool = False, status: Optional[str] = None) -> List[Dict]:
+        params: Dict[str, Any] = {"league": league_id, "season": season}
         if date:
             params["date"] = date
         if live:
@@ -128,15 +128,15 @@ class APIFootballAdapter:
     def get_players(self, team_id: int, season: int, page: int = 1) -> List[Dict]:
         return self._make_request('players', {"team": team_id, "season": season, "page": page}, ttl=86400)
 
-    def get_player_statistics(self, player_id: int, season: int, league_id: int = None) -> Dict:
+    def get_player_statistics(self, player_id: int, season: int, league_id: Optional[int] = None) -> Dict:
         params = {"id": player_id, "season": season}
         if league_id:
             params["league"] = league_id
         res = self._make_request('players', params, ttl=3600)
         return res[0] if res else {}
 
-    def get_injuries(self, league_id: int = None, team_id: int = None, fixture_id: int = None) -> List[Dict]:
-        params = {}
+    def get_injuries(self, league_id: int = None, team_id: Optional[int] = None, fixture_id: Optional[int] = None) -> List[Dict]:
+        params: Dict[str, Any] = {}
         if league_id:
             params["league"] = league_id
         if team_id:
@@ -152,7 +152,7 @@ class APIFootballAdapter:
         return self._make_request('fixtures/headtohead', {"h2h": f"{team1_id}-{team2_id}", "last": last}, ttl=86400)
 
     def get_odds(self, fixture_id: int = None, league_id: int = None, bookmaker_id: int = 6) -> List[Dict]:
-        params = {"bookmaker": bookmaker_id}
+        params: Dict[str, Any] = {"bookmaker": bookmaker_id}
         if fixture_id:
             params["fixture"] = fixture_id
         if league_id:
