@@ -135,7 +135,7 @@ class APIFootballAdapter:
         res = self._make_request('players', params, ttl=3600)
         return res[0] if res else {}
 
-    def get_injuries(self, league_id: int = None, team_id: Optional[int] = None, fixture_id: Optional[int] = None) -> List[Dict]:
+    def get_injuries(self, league_id: Optional[int] = None, team_id: Optional[int] = None, fixture_id: Optional[int] = None) -> List[Dict]:
         params: Dict[str, Any] = {}
         if league_id:
             params["league"] = league_id
@@ -151,7 +151,7 @@ class APIFootballAdapter:
     def get_h2h(self, team1_id: int, team2_id: int, last: int = 10) -> List[Dict]:
         return self._make_request('fixtures/headtohead', {"h2h": f"{team1_id}-{team2_id}", "last": last}, ttl=86400)
 
-    def get_odds(self, fixture_id: int = None, league_id: int = None, bookmaker_id: int = 6) -> List[Dict]:
+    def get_odds(self, fixture_id: Optional[int] = None, league_id: Optional[int] = None, bookmaker_id: int = 6) -> List[Dict]:
         params: Dict[str, Any] = {"bookmaker": bookmaker_id}
         if fixture_id:
             params["fixture"] = fixture_id
