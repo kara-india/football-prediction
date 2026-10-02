@@ -1,3 +1,4 @@
+from typing import Optional
 from typing import List, Dict
 from ..adapters.api_football import APIFootballAdapter
 
