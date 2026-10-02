@@ -107,6 +107,7 @@ class PointInTimeReplayer:
         # Normalize matches to list of dicts sorted chronologically
         normalized_history: List[Dict[str, Any]] = []
         for m in prior_matches:
+            match_dt: Optional[datetime] = None
             if isinstance(m, CanonicalMatch):
                 home_id = m.home_team_id
                 away_id = m.away_team_id
