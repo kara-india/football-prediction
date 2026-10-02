@@ -4,6 +4,7 @@ Authoritative Python dataclasses representing normalized domain entities.
 Adheres strictly to docs/DATA_CONTRACTS.md.
 """
 from dataclasses import dataclass
+from enum import Enum
 from datetime import datetime
 from typing import Optional, List
 
@@ -166,9 +167,6 @@ class CanonicalSettlement:
     def actual_score_away(self) -> Optional[int]:
         """Alias for actual_away_goals."""
         return self.actual_away_goals
-
-
-from enum import Enum
 
 
 class ErrorCategory(str, Enum):
