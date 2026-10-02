@@ -185,7 +185,7 @@ class TestPrequentialUpdateInvariant:
         }
 
         # Generate prediction at time t
-        preds_t = analysis_worker.run_match_prediction(match, stage="INITIAL", odds_dict=test_odds, dry_run=True)
+        preds_t = analysis_worker.run_match_prediction(match, stage="INITIAL", dry_run=True)
         initial_prob_home = next(p["calibrated_probability"] for p in preds_t if p["selection"] == "1")
 
         # Now simulate match completion at time t (match ends 0-3 away win)
@@ -296,7 +296,7 @@ class TestAnalysisWorkerMultiCheckpoint:
         }
 
         # 1. INITIAL Checkpoint (T-48h)
-        preds_init = worker.run_match_prediction(match, stage="INITIAL", dry_run=True)
+        preds_init = worker.run_match_prediction(match, stage="INITIAL", odds_data=test_odds, dry_run=True)
         assert len(preds_init) == 7
         for p in preds_init:
             assert p["stage"] == "INITIAL"
@@ -314,7 +314,7 @@ class TestAnalysisWorkerMultiCheckpoint:
             },
         }
         preds_lineup = worker.run_match_prediction(
-            match, stage="LINEUP_CONFIRMED", lineup_data=lineup_payload, odds_dict=test_odds, dry_run=True
+            match, stage="LINEUP_CONFIRMED", lineup_data=lineup_payload, odds_data=test_odds, dry_run=True
         )
         assert len(preds_lineup) == 7
         for p in preds_lineup:
