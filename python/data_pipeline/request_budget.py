@@ -1,12 +1,12 @@
-class BudgetState(TypedDict):
-    daily_limit: int
-    used: int
-    last_reset: str
-
 import json
 import os
 from datetime import datetime
 from typing import Dict, TypedDict
+
+class BudgetState(TypedDict):
+    daily_limit: int
+    used: int
+    last_reset: str
 
 class RequestBudgetManager:
     def __init__(self, storage_path: str = "request_budget.json"):

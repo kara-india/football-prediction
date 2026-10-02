@@ -8,7 +8,7 @@ import logging
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional, Set, List
+from typing import Dict, Any, Optional, List
 
 logger = logging.getLogger("RetentionPruner")
 

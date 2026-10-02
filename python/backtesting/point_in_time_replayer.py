@@ -5,7 +5,7 @@ Prevents data leakage across historical matches, team Elo ratings, EWMA form,
 confirmed lineups, betting odds, and in-play match events.
 """
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Any, Optional, Union, Sequence
+from typing import Dict, List, Any, Optional, Union, Sequence, Tuple
 import logging
 
 from python.models.elo import EloSystem
