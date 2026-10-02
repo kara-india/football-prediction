@@ -13,7 +13,7 @@ from typing import Dict, Any, Optional, Set, List
 logger = logging.getLogger("RetentionPruner")
 
 # Tables strictly protected by inviolable retention guarantee
-PROTECTED_TABLES: Set[str] = frozenset({
+PROTECTED_TABLES: frozenset[str] = frozenset({
     "matches",
     "lineups",
     "odds_snapshots",
@@ -35,7 +35,7 @@ PROTECTED_TABLES: Set[str] = frozenset({
 })
 
 # Transient pruning configuration defaults
-DEFAULT_RETENTION_POLICIES = [
+DEFAULT_RETENTION_POLICIES: List[Dict[str, Any]] = [
     {
         "table": "match_event_ticks",
         "timestamp_col": "created_at",
@@ -174,7 +174,7 @@ class RetentionPruner:
         """
         Execute full retention pruning cycle across all transient tables.
         """
-        policies = policies or DEFAULT_RETENTION_POLICIES
+        active_policies: List[Dict[str, Any]] = policies if policies is not None else DEFAULT_RETENTION_POLICIES
         started_at = datetime.now(timezone.utc)
         pruned_counts: Dict[str, int] = {}
         total_pruned = 0
@@ -183,10 +183,10 @@ class RetentionPruner:
             f"Starting Data Retention Pruning cycle ({'DRY-RUN' if dry_run else 'ACTIVE PRUNE'})..."
         )
 
-        for pol in policies:
-            tbl = pol["table"]
-            col = pol.get("timestamp_col", "created_at")
-            days = pol.get("days_to_keep", 14)
+        for pol in active_policies:
+            tbl = str(pol["table"])
+            col = str(pol.get("timestamp_col", "created_at"))
+            days = int(pol.get("days_to_keep", 14))
 
             # Defensive safety check before dispatching
             self.validate_table_safety(tbl)

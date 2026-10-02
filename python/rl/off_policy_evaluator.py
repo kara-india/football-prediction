@@ -10,7 +10,7 @@ Provides statistically rigorous counterfactual policy evaluation using:
 
 from __future__ import annotations
 from dataclasses import dataclass, asdict
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import Ridge
@@ -97,7 +97,7 @@ class OffPolicyEvaluator:
             if not settled:
                 # Fall back to all if none settled (using realized_return or 0.0)
                 settled = logged_data.get_all_candidates()
-            return self._extract_from_opportunities(settled)
+            return self._extract_from_opportunities(cast(List[CandidateDecisionOpportunity], settled))
 
         if isinstance(logged_data, list):
             if len(logged_data) == 0:

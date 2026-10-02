@@ -8,7 +8,7 @@ class FeatureEngineer:
                                     away_players: list[dict],
                                     h2h_matches: list[dict],
                                     referee_stats: dict,
-                                    weather: dict = None) -> dict:
+                                    weather: dict | None = None) -> dict:
         features = {}
         features['home_form'] = home_team_stats.get('form', 0.0)
         features['away_form'] = away_team_stats.get('form', 0.0)

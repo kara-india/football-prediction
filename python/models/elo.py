@@ -5,7 +5,7 @@ class EloSystem:
     K_FACTOR = 32.0
     HOME_ADVANTAGE = 100.0
     
-    def __init__(self, ratings: dict[int, float] = None):
+    def __init__(self, ratings: dict[int, float] | None = None):
         self.ratings = ratings or {}
     
     def get_rating(self, team_id: int) -> float:

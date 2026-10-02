@@ -1,11 +1,17 @@
+class BudgetState(TypedDict):
+    daily_limit: int
+    used: int
+    last_reset: str
+
 import json
 import os
 from datetime import datetime
+from typing import Dict, TypedDict
 
 class RequestBudgetManager:
     def __init__(self, storage_path: str = "request_budget.json"):
         self.storage_path = storage_path
-        self.budgets = {
+        self.budgets: Dict[str, BudgetState] = {
             "api_football": {"daily_limit": 100, "used": 0, "last_reset": datetime.now().date().isoformat()},
         }
         self.priorities = ["P0", "P1", "P2", "P3"]
@@ -15,7 +21,8 @@ class RequestBudgetManager:
         if os.path.exists(self.storage_path):
             with open(self.storage_path, "r") as f:
                 data = json.load(f)
-                self.budgets.update(data)
+                if isinstance(data, dict):
+                    self.budgets.update(data)
                 self._check_reset()
 
     def _save(self):

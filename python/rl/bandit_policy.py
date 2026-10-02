@@ -183,7 +183,7 @@ class ThompsonSamplingAgent:
             # Delta = r1 - r0 ~ Normal(mu_delta, sigma_delta^2)
             mu_delta = (mu1 - mu0).T @ x
             var_delta = (self.v ** 2) * (x.T @ B1_inv @ x + x.T @ B0_inv @ x)
-            sigma_delta = np.sqrt(max(var_delta, 1e-8))
+            sigma_delta = float(np.sqrt(max(float(var_delta), 1e-8)))
 
             p1 = float(stats.norm.cdf(mu_delta / sigma_delta))
             p0 = 1.0 - p1
@@ -347,7 +347,8 @@ class RLDecisionLayer:
         context = state.to_array()
 
         original_decision = getattr(candidate, "decision", "NO_BET")
-        fid = fixture_id or getattr(candidate, "fixture_id", "unknown_fixture")
+        fid_raw = fixture_id if fixture_id is not None else getattr(candidate, "fixture_id", "unknown_fixture")
+        fid = fid_raw if isinstance(fid_raw, (int, str)) else str(fid_raw)
         cid = candidate_id or getattr(candidate, "candidate_id", None)
 
         # STRICT SAFETY SUBORDINATION:

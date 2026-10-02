@@ -220,6 +220,7 @@ class WorkerRunner:
         predictions_count = 0
         errors_count = 0
         error_details = None
+        worker: Any = None
 
         logger.info(f"Acquiring mutex lock for worker '{norm_job}'...")
         with WorkerMutex(norm_job):
