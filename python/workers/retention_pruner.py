@@ -13,7 +13,7 @@ from typing import Dict, Any, Optional, Set, List
 logger = logging.getLogger("RetentionPruner")
 
 # Tables strictly protected by inviolable retention guarantee
-PROTECTED_TABLES: Set[str] = frozenset({
+PROTECTED_TABLES: frozenset[str] = frozenset({
     "matches",
     "lineups",
     "odds_snapshots",
@@ -183,7 +183,8 @@ class RetentionPruner:
             f"Starting Data Retention Pruning cycle ({'DRY-RUN' if dry_run else 'ACTIVE PRUNE'})..."
         )
 
-        for pol in policies:
+        policies_typed: List[Dict[str, Any]] = [dict(p) for p in policies]
+        for pol in policies_typed:
             tbl = pol["table"]
             col = pol.get("timestamp_col", "created_at")
             days = pol.get("days_to_keep", 14)
