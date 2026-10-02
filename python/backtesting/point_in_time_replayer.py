@@ -115,6 +115,7 @@ class PointInTimeReplayer:
                 h_goals = getattr(m, "home_goals", 0)
                 a_goals = getattr(m, "away_goals", 0)
             else:
+                match_dt: Optional[datetime] = None
                 home_id_raw = m.get("home_team_id") or m.get("home_id") or m.get("home_team")
                 away_id_raw = m.get("away_team_id") or m.get("away_id") or m.get("away_team")
                 if home_id_raw is None or away_id_raw is None:
@@ -141,7 +142,7 @@ class PointInTimeReplayer:
 
     def compute_form_at(
         self,
-        historical_matches: List[Union[CanonicalMatch, Dict[str, Any]]],
+        historical_matches: Sequence[Union[CanonicalMatch, Dict[str, Any]]],
         as_of_time: datetime,
         team_id: Any,
         half_life_matches: Optional[float] = None,
