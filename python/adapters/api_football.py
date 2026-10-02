@@ -155,5 +155,6 @@ class APIFootballAdapter:
         params = {"bookmaker": bookmaker_id}
         if fixture_id:
             params["fixture"] = fixture_id
-        if league_id: params["league"] = league_id
+        if league_id:
+            params["league"] = league_id
         return self._make_request('odds', params, ttl=60)
