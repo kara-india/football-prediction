@@ -396,7 +396,7 @@ class PointInTimeReplayer:
         self,
         as_of_time: datetime,
         match: Dict[str, Any],
-        historical_matches: List[Dict[str, Any]],
+        historical_matches: Sequence[Union[CanonicalMatch, Dict[str, Any]]],
         lineup_data: Optional[Dict[str, Any]] = None,
         odds_snapshots: Optional[List[Dict[str, Any]]] = None,
         inplay_events: Optional[List[Dict[str, Any]]] = None,
