@@ -55,7 +55,6 @@ class DeVIgEngine:
         if len(decimal_odds) < 2:
             return DeVIgEngine.multiplicative_devig(decimal_odds), 0.0
 
-        n = len(decimal_odds)
         implied = [1.0 / o for o in decimal_odds]
         sum_implied = sum(implied)
 
