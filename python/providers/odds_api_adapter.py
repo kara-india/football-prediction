@@ -1,6 +1,5 @@
 import os
-from typing import Optional
-import datetime
+undefinedimport datetime
 from .base import OddsProvider, OddsEvent, OddsMarket, ProviderHealth
 
 class ProviderNotConfiguredError(Exception):
