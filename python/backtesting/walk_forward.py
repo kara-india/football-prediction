@@ -241,7 +241,7 @@ class WalkForwardValidator:
             odds_available = bool(odds_col and odds_col in test_df.columns)
             if odds_available:
                 odds_series = pd.to_numeric(test_df[odds_col], errors="coerce")
-                valid_odds_mask = odds_series.notna() & (odds_series > 1.0)
+                valid_odds_mask = (odds_series.notna() & (odds_series > 1.0)).to_numpy(dtype=bool)
                 odds_test = odds_series.to_numpy(dtype=float)
             else:
                 valid_odds_mask = np.zeros(len(test_df), dtype=bool)

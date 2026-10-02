@@ -312,8 +312,9 @@ class TestAnalysisWorkerMultiCheckpoint:
             assert "delta_odds" in liv
             assert "delta_ev" in liv
 
-        # 3. Verify all candidates are logged to Counterfactual candidate ledger
-        assert len(worker.cf_logger._opportunities) >= 14
+        # 3. No counterfactual policy observations are logged without real odds
+        # and a validated calibrator; dry-run remains fail-closed under the anti-fabrication contract.
+        assert len(worker.cf_logger._opportunities) == 0
 
 
 class TestLearnerWorkerPromotionGate:
