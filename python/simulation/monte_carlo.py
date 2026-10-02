@@ -2,8 +2,7 @@ import math
 import time
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
-import numpy as np
-
+undefined
 from .event_intensities import EventIntensityEstimator
 from .match_state import MatchState
 from .vectorized_mc import VectorizedMonteCarloSimulator
