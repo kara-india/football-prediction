@@ -5,7 +5,7 @@ Prevents data leakage across historical matches, team Elo ratings, EWMA form,
 confirmed lineups, betting odds, and in-play match events.
 """
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Any, Optional, Union
+from typing import Dict, List, Any, Optional, Union, Sequence
 import logging
 
 from python.models.elo import EloSystem
@@ -52,7 +52,7 @@ class PointInTimeReplayer:
 
     def filter_matches_strictly_before(
         self,
-        matches: List[Union[CanonicalMatch, Dict[str, Any]]],
+        matches: Sequence[Union[CanonicalMatch, Dict[str, Any]]],
         as_of_time: datetime,
     ) -> List[Union[CanonicalMatch, Dict[str, Any]]]:
         """
@@ -94,7 +94,7 @@ class PointInTimeReplayer:
 
     def compute_elo_at(
         self,
-        historical_matches: List[Union[CanonicalMatch, Dict[str, Any]]],
+        historical_matches: Sequence[Union[CanonicalMatch, Dict[str, Any]]],
         as_of_time: datetime,
     ) -> EloSystem:
         """
@@ -105,7 +105,7 @@ class PointInTimeReplayer:
         elo.K_FACTOR = self.default_elo_k
 
         # Normalize matches to list of dicts sorted chronologically
-        normalized_history = []
+        normalized_history: List[Dict[str, Any]] = []
         for m in prior_matches:
             if isinstance(m, CanonicalMatch):
                 home_id = m.home_team_id
@@ -115,8 +115,12 @@ class PointInTimeReplayer:
                 h_goals = getattr(m, "home_goals", 0)
                 a_goals = getattr(m, "away_goals", 0)
             else:
-                home_id = m.get("home_team_id") or m.get("home_id") or m.get("home_team")
-                away_id = m.get("away_team_id") or m.get("away_id") or m.get("away_team")
+                home_id_raw = m.get("home_team_id") or m.get("home_id") or m.get("home_team")
+                away_id_raw = m.get("away_team_id") or m.get("away_id") or m.get("away_team")
+                if home_id_raw is None or away_id_raw is None:
+                    continue
+                home_id = int(home_id_raw)
+                away_id = int(away_id_raw)
                 h_goals = m.get("home_goals") if m.get("home_goals") is not None else m.get("fthg", 0)
                 a_goals = m.get("away_goals") if m.get("away_goals") is not None else m.get("ftag", 0)
                 match_dt = _to_datetime_utc(m.get("kickoff_utc") or m.get("date") or m.get("match_date"))
@@ -202,8 +206,8 @@ class PointInTimeReplayer:
         - If publication timestamp is unverified, tag lineup_availability_timestamp_quality = "UNKNOWN".
         - If verified <= T, lineup is visible and tagged "VERIFIED".
         """
-        t = _to_datetime_utc(as_of_time)
-        ko = _to_datetime_utc(kickoff_time)
+        t = as_of_time
+        ko = kickoff_time
 
         if lineup_data is None:
             return {
@@ -274,8 +278,8 @@ class PointInTimeReplayer:
         - Kickoff or closing odds are strictly invisible prior to kickoff (T < kickoff).
         - Any snapshot taken after T is invisible.
         """
-        t = _to_datetime_utc(as_of_time)
-        ko = _to_datetime_utc(kickoff_time)
+        t = as_of_time
+        ko = kickoff_time
 
         valid_snapshots = []
         for snap in odds_snapshots:
@@ -401,13 +405,19 @@ class PointInTimeReplayer:
         """
         Construct a complete, point-in-time verified State(T).
         """
-        t = _to_datetime_utc(as_of_time)
+        t = as_of_time
         ko = _to_datetime_utc(match.get("kickoff_utc") or match.get("date"))
+        if ko is None:
+            raise ValueError("match must contain a valid kickoff timestamp")
 
         # 1. Elo and Form ratings as of T
         elo = self.compute_elo_at(historical_matches, t)
-        home_id = match.get("home_team_id") or match.get("home_id") or match.get("home_team")
-        away_id = match.get("away_team_id") or match.get("away_id") or match.get("away_team")
+        home_id_raw = match.get("home_team_id") or match.get("home_id") or match.get("home_team")
+        away_id_raw = match.get("away_team_id") or match.get("away_id") or match.get("away_team")
+        if home_id_raw is None or away_id_raw is None:
+            raise ValueError("match must contain valid home and away team identifiers")
+        home_id = int(home_id_raw)
+        away_id = int(away_id_raw)
 
         home_form = self.compute_form_at(historical_matches, t, home_id)
         away_form = self.compute_form_at(historical_matches, t, away_id)
