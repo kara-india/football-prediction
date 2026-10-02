@@ -276,7 +276,15 @@ class TestAnalysisWorkerMultiCheckpoint:
 
     def test_analysis_worker_generates_initial_and_lineup_checkpoints(self):
         """Test INITIAL and LINEUP_CONFIRMED predictions with LIV computation."""
-        worker = AnalysisWorker()
+        # Use a deliberately synthetic calibration sample in the test so policy
+        # opportunities are eligible without manufacturing calibration in production.
+        from python.calibration.calibrator import ProbabilityCalibrator
+        test_calibrator = ProbabilityCalibrator(method="platt")
+        test_calibrator.fit(
+            y_true=np.array([0, 1] * 5),
+            y_prob=np.array([0.2, 0.8] * 5),
+        )
+        worker = AnalysisWorker(calibrator=test_calibrator)
         match = {
             "match_id": "test_match_liv",
             "competition_name": "Premier League (England)",
