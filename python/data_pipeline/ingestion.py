@@ -1,8 +1,9 @@
+from typing import Optional
 from typing import List, Dict
 from ..adapters.api_football import APIFootballAdapter
 
 class DataIngestionPipeline:
-    def __init__(self, api_adapter: APIFootballAdapter = None):
+    def __init__(self, api_adapter: Optional[APIFootballAdapter] = None):
         self.api = api_adapter or APIFootballAdapter()
 
     def ingest_competition_fixtures(self, league_id: int, season: int) -> int:

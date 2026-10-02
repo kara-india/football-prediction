@@ -16,7 +16,7 @@ class Experience:
 
 class ExperienceReplay:
     def __init__(self, max_size: int = 100_000):
-        self.buffer = deque(maxlen=max_size)
+        self.buffer: deque[Experience] = deque(maxlen=max_size)
     
     def add(self, experience: Experience) -> None:
         self.buffer.append(experience)

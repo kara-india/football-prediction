@@ -1,11 +1,18 @@
 import json
 import os
 from datetime import datetime
+from typing import TypedDict
+
+class BudgetRecord(TypedDict):
+    daily_limit: int
+    used: int
+    last_reset: str
 
 class RequestBudgetManager:
     def __init__(self, storage_path: str = "request_budget.json"):
+        
         self.storage_path = storage_path
-        self.budgets = {
+        self.budgets: dict[str, BudgetRecord] = {
             "api_football": {"daily_limit": 100, "used": 0, "last_reset": datetime.now().date().isoformat()},
         }
         self.priorities = ["P0", "P1", "P2", "P3"]

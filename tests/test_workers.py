@@ -276,14 +276,35 @@ class TestAnalysisWorkerMultiCheckpoint:
 
     def test_analysis_worker_generates_initial_and_lineup_checkpoints(self):
         """Test INITIAL and LINEUP_CONFIRMED predictions with LIV computation."""
-        worker = AnalysisWorker()
+        # Use a deliberately synthetic calibration sample in the test so policy
+        # opportunities are eligible without manufacturing calibration in production.
+        from python.calibration.calibrator import ProbabilityCalibrator
+        test_calibrator = ProbabilityCalibrator(method="platt")
+        test_calibrator.fit(
+            y_true=np.array([0, 1] * 5),
+            y_prob=np.array([0.2, 0.8] * 5),
+        )
+        worker = AnalysisWorker(calibrator=test_calibrator)
         match = {
             "match_id": "test_match_liv",
             "competition_name": "Premier League (England)",
         }
 
+        # Supply explicit synthetic test-market prices so the counterfactual logger
+        # receives genuine test opportunities; production code remains fail-closed
+        # when upstream odds are unavailable.
+        test_odds = {
+            "1X2_1": 2.10,
+            "1X2_X": 3.40,
+            "1X2_2": 3.20,
+            "OU_OVER": 1.90,
+            "OU_UNDER": 1.90,
+            "BTTS_YES": 1.85,
+            "BTTS_NO": 1.95,
+        }
+
         # 1. INITIAL Checkpoint (T-48h)
-        preds_init = worker.run_match_prediction(match, stage="INITIAL", dry_run=True)
+        preds_init = worker.run_match_prediction(match, stage="INITIAL", odds_data=test_odds, dry_run=True)
         assert len(preds_init) == 7
         for p in preds_init:
             assert p["stage"] == "INITIAL"
@@ -301,7 +322,7 @@ class TestAnalysisWorkerMultiCheckpoint:
             },
         }
         preds_lineup = worker.run_match_prediction(
-            match, stage="LINEUP_CONFIRMED", lineup_data=lineup_payload, dry_run=True
+            match, stage="LINEUP_CONFIRMED", lineup_data=lineup_payload, odds_data=test_odds, dry_run=True
         )
         assert len(preds_lineup) == 7
         for p in preds_lineup:

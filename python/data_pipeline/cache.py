@@ -4,7 +4,7 @@ import os
 from typing import Any, Optional
 
 class DataCache:
-    def __init__(self, disk_path: str = None):
+    def __init__(self, disk_path: Optional[str] = None):
         self._memory_cache = {}
         self._disk_path = disk_path
         if self._disk_path and os.path.exists(self._disk_path):

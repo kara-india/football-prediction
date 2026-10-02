@@ -187,11 +187,11 @@ class WalkForwardValidator:
                 "folds": [],
             }
 
-        fold_summaries = []
-        all_y_true = []
-        all_y_prob = []
-        all_pnl = []
-        all_clv = []
+        fold_summaries: List[Dict[str, Any]] = []
+        all_y_true: List[int] = []
+        all_y_prob: List[float] = []
+        all_pnl: List[float] = []
+        all_clv: List[float] = []
 
         for fold in folds:
             t_start, t_end = fold["train_start"], fold["train_end"]
@@ -241,7 +241,7 @@ class WalkForwardValidator:
             odds_available = bool(odds_col and odds_col in test_df.columns)
             if odds_available:
                 odds_series = pd.to_numeric(test_df[odds_col], errors="coerce")
-                valid_odds_mask = odds_series.notna() & (odds_series > 1.0)
+                valid_odds_mask = (odds_series.notna() & (odds_series > 1.0)).to_numpy()
                 odds_test = odds_series.to_numpy(dtype=float)
             else:
                 valid_odds_mask = np.zeros(len(test_df), dtype=bool)

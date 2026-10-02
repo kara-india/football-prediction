@@ -252,9 +252,10 @@ class AnalysisWorker:
 
         for market, sel, line, raw_p, o_key in markets:
             raw_p = float(max(0.0, min(1.0, raw_p)))
-            calibration_applied = self.calibrator is not None
-            if calibration_applied:
-                calibrated_p = float(np.ravel(self.calibrator.calibrate(raw_p))[0])
+            calibrator = self.calibrator
+            calibration_applied = calibrator is not None
+            if calibrator is not None:
+                calibrated_p = float(np.ravel(calibrator.calibrate(raw_p))[0])
                 calibrated_p = float(max(0.01, min(0.99, calibrated_p)))
                 calibration_version = "validated_calibrator"
             else:

@@ -1,4 +1,6 @@
-CANONICAL_MARKETS = {
+from typing import Any
+
+CANONICAL_MARKETS: dict[str, dict[str, Any]] = {
     '1x2': {'description': 'Match Result', 'selections': ['1', 'X', '2'], 'settlement_type': 'binary'},
     'double_chance': {'description': 'Double Chance', 'selections': ['1X', '12', 'X2'], 'settlement_type': 'binary'},
     'over_under_15': {'description': 'Goals Over/Under 1.5', 'selections': ['over', 'under'], 'line': 1.5, 'settlement_type': 'binary'},
