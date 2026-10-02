@@ -185,7 +185,7 @@ class TestPrequentialUpdateInvariant:
         }
 
         # Generate prediction at time t
-        preds_t = analysis_worker.run_match_prediction(match, stage="INITIAL", dry_run=True)
+        preds_t = analysis_worker.run_match_prediction(match, stage="INITIAL", odds_dict=test_odds, dry_run=True)
         initial_prob_home = next(p["calibrated_probability"] for p in preds_t if p["selection"] == "1")
 
         # Now simulate match completion at time t (match ends 0-3 away win)
@@ -282,6 +282,19 @@ class TestAnalysisWorkerMultiCheckpoint:
             "competition_name": "Premier League (England)",
         }
 
+        # Supply explicit synthetic test-market prices so the counterfactual logger
+        # receives genuine test opportunities; production code remains fail-closed
+        # when upstream odds are unavailable.
+        test_odds = {
+            "1X2_1": 2.10,
+            "1X2_X": 3.40,
+            "1X2_2": 3.20,
+            "OU_OVER": 1.90,
+            "OU_UNDER": 1.90,
+            "BTTS_YES": 1.85,
+            "BTTS_NO": 1.95,
+        }
+
         # 1. INITIAL Checkpoint (T-48h)
         preds_init = worker.run_match_prediction(match, stage="INITIAL", dry_run=True)
         assert len(preds_init) == 7
@@ -301,7 +314,7 @@ class TestAnalysisWorkerMultiCheckpoint:
             },
         }
         preds_lineup = worker.run_match_prediction(
-            match, stage="LINEUP_CONFIRMED", lineup_data=lineup_payload, dry_run=True
+            match, stage="LINEUP_CONFIRMED", lineup_data=lineup_payload, odds_dict=test_odds, dry_run=True
         )
         assert len(preds_lineup) == 7
         for p in preds_lineup:
