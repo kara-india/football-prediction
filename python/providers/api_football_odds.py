@@ -1,4 +1,3 @@
-from .market_normalizer import normalize_market_name
 import datetime
 from .base import OddsProvider, OddsEvent, OddsMarket, ProviderHealth
 from .market_normalizer import normalize_market_name
