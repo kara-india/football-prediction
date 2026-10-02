@@ -91,7 +91,7 @@ class APIFootballAdapter:
         if live:
             params["live"] = "all"
         if status:
-            params["status"] = ""
+            params["status"] = status
         return self._make_request('fixtures', params, ttl=300)
         
     def get_fixture(self, fixture_id: int) -> Dict:
