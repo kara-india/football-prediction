@@ -12,7 +12,7 @@ import sys
 import json
 import logging
 import urllib.request
-from datetime import datetime, timezone
+from typing import Dict, Any, List, Optional, Tuple, Union
 from typing import Dict, Any, List, Optional, Tuple, Union
 import numpy as np
 
