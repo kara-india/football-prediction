@@ -1,4 +1,3 @@
-from typing import Dict, List, Any
 
 class PredictionEvaluator:
     def evaluate_predictions(self, match_id: int) -> list[dict]:

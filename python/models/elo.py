@@ -1,6 +1,4 @@
 import math
-from datetime import date
-from typing import Any
 
 class EloSystem:
     DEFAULT_RATING = 1500.0

@@ -4,7 +4,7 @@ Authoritative settlement and reconciliation layer resolving prediction wagers
 against verified official match scores and performance metrics.
 """
 from datetime import datetime, timezone
-from typing import Optional, Dict, Any, Union
+from typing import Optional
 from python.data_contracts import CanonicalSettlement
 
 
