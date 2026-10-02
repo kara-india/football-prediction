@@ -10,7 +10,7 @@ import json
 import logging
 import urllib.request
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional, Tuple, Set
+from ..adapters.quota_manager import CentralQuotaManager, QuotaExceededError
 
 from ..adapters.quota_manager import CentralQuotaManager, QuotaExceededError
 from ..adapters.api_football import APIFootballAdapter
