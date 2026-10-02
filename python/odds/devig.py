@@ -4,7 +4,7 @@ Provides exact margin calculation, proportional (multiplicative) normalization,
 and Shin's method for adjusting for the favorite-longshot bias in multi-way markets.
 """
 import math
-from typing import List, Tuple, Dict
+from typing import List, Tuple
 
 
 class DeVIgEngine:
