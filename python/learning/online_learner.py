@@ -1,3 +1,5 @@
+from typing import Any
+
 
 class OnlineLearner:
     def update_elo(self, match_result: dict) -> dict:
