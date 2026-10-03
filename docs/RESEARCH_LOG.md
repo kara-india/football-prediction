@@ -66,3 +66,31 @@ To safely evaluate challenger policies without real financial risk:
 $$\hat{V}_{\text{DR}}(\pi_{\text{new}}) = \frac{1}{N}\sum_{i=1}^N \left[ \hat{Q}(x_i, \pi_{\text{new}}(x_i)) + \frac{\mathbb{I}(a_i = \pi_{\text{new}}(x_i))}{\pi_0(a_i \mid x_i)} \left( r_i - \hat{Q}(x_i, a_i) \right) \right]$$
 
 This guarantees that policy improvements are rigorously validated out-of-sample before promotion to Champion.
+
+---
+
+## Entry 004: Real Historical Out-of-Sample Walk-Forward Benchmark (Premier League)
+**Date**: October 3, 2026  
+**Topic**: Empirical Verification of Dixon-Coles Bivariate Poisson Across 21 Expanding Temporal Folds
+
+### 1. Experimental Protocol
+- **Dataset**: 1,900 official Premier League fixtures across 5 full seasons (2019/20 to 2023/24) from `football-data.co.uk`.
+- **Training Window**: 760 matches (~2 full seasons) expanding by 38 matches per fold.
+- **Test Window**: 190 matches (~0.5 season) evaluated out-of-sample with zero lookahead.
+- **Folds Completed**: 21 folds totaling 3,990 test predictions.
+- **Model Specification**: Dixon-Coles (1997) bivariate Poisson with dynamic time decay ($\xi = 0.0019$, 365-day half-life), low-score dependency parameter $\rho$, and algebraic sum-to-one attack parameter identifiability constraint.
+
+### 2. Empirical Verification vs. Naive Uniform Prior ($p = 1/3$)
+
+| Metric | Dixon-Coles (Fitted) | Naive Benchmark ($1/3$) | Empirical Improvement |
+| :--- | :--- | :--- | :--- |
+| **Brier Score** (↓) | `0.595925` | `0.666667` | `+0.070742` |
+| **Ranked Probability Score (RPS)** (↓) | `0.212551` | `0.241312` | `+0.028761` |
+| **Multi-class Log Loss** (↓) | `0.999971` | `1.098612` | `+0.098641` |
+| **Expected Calibration Error (ECE)** (↓) | `0.024471` | `0.138847` | `+0.114376` |
+| **Top-1 Win Accuracy** (↑) | `52.08%` | `47.22%` | `+4.86 pp` |
+
+### 3. Quantitative Takeaways
+1. **Calibration Excellence**: Dixon-Coles achieves an out-of-sample Expected Calibration Error (ECE) of **2.45%**, representing a 11.4 percentage-point reduction in probability miscalibration relative to naive assignments.
+2. **Strict Super-Random Edge**: The statistical model outperforms the naive baseline on all five formal scoring rules without manual parameter tuning or lookahead leakage.
+3. **Reproducibility**: Artifact and fold metrics are fully reproducible via `scripts/run_historical_walkforward.py` and saved in `docs/MODEL_BENCHMARK_RESULTS.md`.

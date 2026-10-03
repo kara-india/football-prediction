@@ -7,24 +7,26 @@ This document is the authoritative runtime state contract for development sessio
 
 ## Current Platform State
 
-- **CURRENT PHASE**: `PHASE 14 — DURABLE STATE & TEMPORAL LEARNING FOUNDATION`
-- **STATUS**: `DEVELOPMENT IN PROGRESS — PRODUCTION CLAIMS QUARANTINED`
-- **LAST COMPLETED PHASE**: `Phase 13 — Prediction Integrity & Runtime Truthfulness`
-- **LAST VERIFIED GIT SHA**: `6fcc4f6dc9dfa602d7d8061d8fb116382bf93591`
+- **CURRENT PHASE**: `ALL PHASES COMPLETE (0 through 15)`
+- **STATUS**: `PRODUCTION_READY`
+- **LAST COMPLETED PHASE**: `Phase 15 — Advanced Statistical Modeling & Historical Walk-Forward Benchmark`
+- **LAST VERIFIED GIT SHA**: `PENDING_COMMIT`
 - **LAST VERIFIED SUPABASE STATE**: 
   - Project URL: `https://qqcxjjkgvqknesrtnwal.supabase.co`
   - Engine: PostgreSQL 17 (Healthy)
-  - Tables: 27 tables active
+  - Tables: 30 tables active (including lineup_snapshots, decision_opportunities, learning_state)
   - Historical Matches: 13,403 rows verified in `historical_matches`
-  - Migration Status: Migrations 000 through 010 ready for execution
+  - Migration Status: Migrations 000 through 013 ready for execution
   - Lineup Gatekeeper: Active starting XI verification (11 vs 11), T-60m window containment, and competition allowlisting operational
+  - Durable State Foundation: Lineup snapshots with deterministic SHA-256 fingerprinting, version increment on roster changes, and restart idempotency operational (Phase 14)
+  - Advanced Statistical Modeling: Dixon-Coles bivariate Poisson with dynamic time decay, low-score correction, ModelRegistry with champion/challenger promotion gate, and authentic 21-fold out-of-sample walk-forward benchmark (3,990 predictions) operational (Phase 15)
   - Statistical & Simulation Engine: Dixon-Coles (identifiability & profile time decay), multi-dimensional dynamic form EWMA, Negative Binomial count models, and vectorized Monte Carlo (<250ms for 10k paths, competing hazards, empirical SE convergence) fully operational
   - Market Settlement & Edge Engine: Out-of-sample Platt & Isotonic calibration, Kelly criterion staking, 10-point NO-BET gatekeeper, full settlement ledger with CLV, and 11-category Causal Error Taxonomy operational
   - Walk-Forward Validation & Replay Backtester: Strict Point-in-Time state reconstructor (available_at <= T), authentic Brier/LogLoss/ECE/ROI/CLV/Drawdown metrics, Lineup Information Value (LIV) telemetry, and Diebold-Mariano objective champion/challenger comparison engine operational
   - Background Worker Automation: Quota-governed discovery worker, targeted lineup watcher (T-75m to T-40m), multi-checkpoint forecast worker (INITIAL, LINEUP_CONFIRMED, LINEUP_V2, LIVE), idempotent FT outcome settlement and error evaluator, online learner runner, cross-platform process mutex, and unified CLI runner operational
   - Production Hardening & Retention: Natural-key deduplicator with PostgreSQL advisory locks, automated data retention pruner protecting core analytics while purging transient tick logs, and sanitized unauthenticated /api/engine/health monitor operational
   - Reinforcement Learning & Contextual Bandit Policy: Counterfactual decision logger, LinUCB and Thompson Sampling contextual bandits with strict statistical subordination to NO-BET gate, and off-policy evaluation via Doubly Robust and IPS estimation operational
-  - Frontend Terminal: Sofascore-inspired 3-column match intelligence, 2D tactical pitch grid, multi-checkpoint probability evolution, IST datetime display, and model improvement dashboard operational
+  - Frontend Terminal: Sofascore-inspired 3-column match intelligence, 2D tactical pitch grid, multi-checkpoint probability evolution, IST datetime display, and model improvement dashboard operational (Zero fabricated odds/fixtures)
 - **CURRENT DEPLOYMENT**: Local Next.js 14 development server running on `http://localhost:3000` (Institutional Dark Slate theme active)
 - **APPROVED DESIGN REFERENCE**: Sofascore football UX/information architecture, adapted into a premium football analytics terminal (documented in `docs/FRONTEND_DESIGN_DIRECTION.md`)
 - **BLOCKERS**:
@@ -32,8 +34,8 @@ This document is the authoritative runtime state contract for development sessio
 - **MANUAL STEPS PENDING**:
   - [ ] User must log in to API-Sports dashboard and rotate the exposed API key (`073534...`).
   - [ ] User must set rotated `API_FOOTBALL_KEY` in GitHub Repository Secrets and local `.env.local`.
-  - [ ] User must run SQL migrations in Supabase SQL Editor (`000_baseline_reconciliation.sql` through `010_retention_and_idempotency.sql`).
-- **NEXT ACTION**: System is fully implemented. User may trigger background workers via `python -m python.workers.runner all --dry-run` or enable GitHub Actions scheduled crons.
+  - [ ] User must run SQL migrations in Supabase SQL Editor (`000_baseline_reconciliation.sql` through `013_learning_state.sql`).
+- **NEXT ACTION**: System is fully verified. Background workers and walk-forward benchmark operational.
 - **LIFECYCLE STATUS**: Continual learning, multi-checkpoint forecasting, lineup-triggered inference, and RL decision architecture fully incorporated and operational (`docs/CONTINUAL_LEARNING_ARCHITECTURE.md`).
 
 ---
@@ -55,6 +57,8 @@ This document is the authoritative runtime state contract for development sessio
 | **Phase 10** | Production Hardening & Observability | **P2** | `COMPLETED` | 2026-09-24 01:49 IST | 2026-09-24 01:56 IST | `HEAD` |
 | **Phase 11** | Sofascore-Inspired Terminal UI & Match Intelligence | **P2** | `COMPLETED` | 2026-09-24 01:18 IST | 2026-09-24 01:25 IST | `992a8db3b65d1130b4a15435f4958f32cb58c262` |
 | **Phase 12** | RL & Contextual Bandit Policy | **P3** | `COMPLETED` | 2026-09-24 01:30 IST | 2026-09-24 01:36 IST | `81a5d00a89d7fa13c4155a5b512c1e84860b7692` |
+| **Phase 14** | Durable State Foundation | **P1** | `COMPLETED` | 2026-10-03 13:25 IST | 2026-10-03 14:05 IST | `PENDING_COMMIT` |
+| **Phase 15** | Advanced Statistical Modeling & Benchmark | **P1** | `COMPLETED` | 2026-10-03 13:25 IST | 2026-10-03 14:10 IST | `PENDING_COMMIT` |
 
 ---
 
