@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { fetchApiFootball, extract1xBetOdds, extractProviderForecast } from '@/lib/apiFootball'
 import { getDiskCache, setDiskCache } from '@/lib/diskCache'
 import { fetchSofaEvent, fetchSofaEventExtras, sofaStatus } from '@/lib/sofaScore'
+import { fetchEspnSummary } from '@/lib/espn'
 
 function sofaStatistics(raw: any[]) {
   const home: any[] = []
@@ -62,6 +63,19 @@ function sofaH2H(raw: any[]) {
 }
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
+  const rawId = params.id
+  const espnMatch = rawId.match(/^espn:([^:]+):(\d+)$/)
+  if (espnMatch) {
+    try {
+      const summary = await fetchEspnSummary(espnMatch[1], espnMatch[2])
+      const header = summary.header?.competitions?.[0] || summary.header?.competitions?.[0]
+      const competitors = Object.fromEntries((header?.competitors || []).map((c:any)=>[c.homeAway,c]))
+      const home = competitors.home?.team || {}
+      const away = competitors.away?.team || {}
+      const payload = { fixture: { id: Number(espnMatch[2]), kickoff: summary.header?.competitions?.[0]?.date || summary.header?.season?.startDate || new Date().toISOString(), venue: summary.gameInfo?.venue?.fullName || 'TBD', status: summary.header?.competitions?.[0]?.status?.type?.state === 'in' ? 'LIVE' : summary.header?.competitions?.[0]?.status?.type?.state === 'post' ? 'FT' : 'NS', statusLong: summary.header?.competitions?.[0]?.status?.type?.detail || 'Unknown', minute: null, referee: summary.gameInfo?.officials?.[0]?.fullName || null, league: { name: summary.header?.league?.name || espnMatch[1] }, teams: { home: { id: Number(home.id||0), name: home.displayName||home.name||'Home', logo: home.logo }, away: { id: Number(away.id||0), name: away.displayName||away.name||'Away', logo: away.logo } }, score: { home: Number(competitors.home?.score||0), away: Number(competitors.away?.score||0) }, events: summary.keyEvents || summary.plays || [], statistics: summary.boxscore?.teams || [], lineups: summary.rosters || [] }, odds1xBet: null, oddsUpdatedAt: null, forecast: null, forecastSource: null, history: (summary.seasonseries || []).slice(0,10).map((m:any)=>({id:Number(m.id||0),date:m.date||'',status:m.status?.type?.state||'unknown',homeTeam:m.competitions?.[0]?.competitors?.find((c:any)=>c.homeAway==='home')?.team?.displayName||'',awayTeam:m.competitions?.[0]?.competitors?.find((c:any)=>c.homeAway==='away')?.team?.displayName||'',homeScore:Number(m.competitions?.[0]?.competitors?.find((c:any)=>c.homeAway==='home')?.score||0),awayScore:Number(m.competitions?.[0]?.competitors?.find((c:any)=>c.homeAway==='away')?.score||0)})),generatedAt:new Date().toISOString(),fixtureSource:'ESPN' }
+      return NextResponse.json(payload)
+    } catch (error) { console.error('[MATCH DETAIL] ESPN fallback failed',error); return NextResponse.json({error:'Unable to fetch ESPN fixture detail.'},{status:502}) }
+  }
   const fixtureId = Number(params.id)
   if (!Number.isInteger(fixtureId) || fixtureId <= 0) return NextResponse.json({ error: 'Invalid fixture id.' }, { status: 400 })
   const cacheKey = `match_detail_${fixtureId}`
