@@ -136,7 +136,7 @@ function statLabel(value: any): string {
 }
 
 export default function MatchIntelligencePage({ params }: { params: { id: string } }) {
-  const matchId = params.id
+  const matchId = decodeURIComponent(params.id)
   const [detail, setDetail] = useState<MatchDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
