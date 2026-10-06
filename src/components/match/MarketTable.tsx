@@ -123,7 +123,7 @@ export default function MarketTable({ rows, className = '' }: MarketTableProps) 
         </table>
       </div>
       <div className="p-3 bg-[#0B0F17] border-t border-[#1E293B] text-[10px] text-[#64748B] flex flex-wrap items-center justify-between gap-2">
-        <span>Execution Target: 1xBet Fixed Odds (Bookmaker ID: 6)</span>
+        <span>Execution Target: 1xBet Fixed Odds (resolved by authoritative bookmaker name)</span>
         <span>Safety Gate Invariant: Min Edge +3.0 pp • Expected Value &gt; 0</span>
       </div>
     </TerminalCard>
