@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getDiskCache, setDiskCache } from '@/lib/diskCache'
 import { fetchApiFootball, extract1xBetOdds, resolve1xBetBookmakerId } from '@/lib/apiFootball'
 import { fetchSofaScheduled, isSofaAllowedEvent, sofaMappedFixture } from '@/lib/sofaScore'
+import { fetchEspnCurrentEvents, espnMappedFixture } from '@/lib/espn'
 
 const CACHE_TTL_MS = 15 * 60 * 1000
 const CACHE_KEY = 'upcoming_fixtures_v3'
@@ -14,6 +15,8 @@ function isEligibleFixture(m: any): boolean {
   const excluded = /\b(U17|U18|U19|U20|U21|U23|Youth|Women|Fem|Reserves)\b/i
   return !(excluded.test(m.teams?.home?.name || '') || excluded.test(m.teams?.away?.name || '') || excluded.test(m.league?.name || ''))
 }
+
+async function espnFallback(today: Date) { const dates = [today, new Date(today.getTime()+86400000)].map((d)=>d.toISOString().slice(0,10).replaceAll('-','')); const events=await fetchEspnCurrentEvents(dates); return events.filter(({event})=>String(event.status?.type?.state||'pre')==='pre').map(({event,league,name})=>espnMappedFixture(event,league,name)).slice(0,50) }
 
 async function sofaFallback(today: Date) {
   const dates = [today, new Date(today.getTime() + 24 * 60 * 60 * 1000)]
@@ -32,7 +35,9 @@ export async function GET() {
   const today = new Date()
   if (!process.env.API_FOOTBALL_KEY) {
     try {
-      const fallback = await sofaFallback(today)
+      const fallback = await espnFallback(today)
+      if (fallback.length > 0) { setDiskCache(CACHE_KEY, fallback); return NextResponse.json(fallback, { headers: { 'x-data-source': 'espn-fallback', 'x-primary-provider-warning': 'api-football-unavailable' } }) }
+      const fallbackSofa = await sofaFallback(today)
       setDiskCache(CACHE_KEY, fallback)
       return NextResponse.json(fallback, { headers: { 'x-data-source': 'sofascore-fallback' } })
     } catch (error) {
@@ -118,9 +123,9 @@ export async function GET() {
     console.error('API-Football unavailable, trying SofaScore fallback:', error)
     try {
       const fallback = await sofaFallback(today)
-      if (fallback.length > 0) {
-        setDiskCache(CACHE_KEY, fallback)
-        return NextResponse.json(fallback, { headers: { 'x-data-source': 'sofascore-fallback', 'x-primary-provider-warning': 'api-football-unavailable' } })
+      if (fallbackSofa.length > 0) {
+        setDiskCache(CACHE_KEY, fallbackSofa)
+        return NextResponse.json(fallbackSofa, { headers: { 'x-data-source': 'sofascore-fallback', 'x-primary-provider-warning': 'api-football-unavailable' } })
       }
     } catch (fallbackError) {
       console.error('SofaScore fallback failed:', fallbackError)
