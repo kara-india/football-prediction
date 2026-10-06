@@ -73,6 +73,18 @@ def decide(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not home or not away:
         return {**base, "action": "NO_BET", "reason": "TEAM_IDENTITIES_UNAVAILABLE"}
 
+    # Champion v3 is trained on club-league historical data. Never infer
+    # national-team strength by silently falling back to zero team effects.
+    trained_teams = set(str(team) for team in getattr(dc, "teams", []))
+    if home not in trained_teams or away not in trained_teams:
+        return {
+            **base,
+            "action": "NO_BET",
+            "reason": "TEAM_OUTSIDE_TRAINING_DOMAIN",
+            "trainingDomain": "club_leagues_only",
+            "missingTeams": [team for team in (home, away) if team not in trained_teams],
+        }
+
     try:
         pre_h, pre_a = dc.get_expected_goals(home, away)
     except Exception as exc:
