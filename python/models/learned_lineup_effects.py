@@ -69,13 +69,11 @@ class LearnedLineupEffectModel:
 
     def fit(self, observations: pd.DataFrame) -> "LearnedLineupEffectModel":
         df = self._prepare(observations)
-        players = sorted(
-            {
-                p
-                for row in df.itertuples(index=False)
-                for p in (row._own + row._opp)
-            }
-        )
+        players = sorted({
+            p
+            for own, opp in df[["_own", "_opp"]].itertuples(index=False, name=None)
+            for p in (own + opp)
+        })
         if len(players) < 2 or len(df) < 50:
             raise ValueError("At least 50 team-match observations and 2 players are required.")
 
@@ -84,11 +82,11 @@ class LearnedLineupEffectModel:
 
         own_matrix = np.zeros((len(df), n), dtype=float)
         opp_matrix = np.zeros((len(df), n), dtype=float)
-        for i, row in enumerate(df.itertuples(index=False)):
-            for p in row._own:
+        for i, (own, opp) in enumerate(df[["_own", "_opp"]].itertuples(index=False, name=None)):
+            for p in own:
                 if p in self.player_index:
                     own_matrix[i, self.player_index[p]] += 1.0
-            for p in row._opp:
+            for p in opp:
                 if p in self.player_index:
                     opp_matrix[i, self.player_index[p]] += 1.0
 

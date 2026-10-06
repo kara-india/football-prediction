@@ -131,8 +131,8 @@ def test_neutral_simulator_has_no_hidden_score_or_red_card_effect():
     # With no fitted hazard model, future goal increments must be identical
     # across these states. The starting score can change 1X2, but the simulator
     # must not silently encode a score-state/red-card multiplier.
-    assert res_even.goal_distribution == res_score.goal_distribution
     assert res_even.goal_distribution == res_red.goal_distribution
+    assert res_score.goal_distribution == {k + 2: v for k, v in res_even.goal_distribution.items()}
 
 def test_standard_error_matches_theoretical_formula():
     """Verify empirical standard error matches sqrt(p * (1 - p) / N) and decays with 1/sqrt(N)."""

@@ -182,6 +182,8 @@ class TestPrequentialUpdateInvariant:
         match = {
             "match_id": "prequential_match_t",
             "competition_name": "Premier League (England)",
+            "model_home_rate": 1.45,
+            "model_away_rate": 1.15,
         }
 
         # Generate prediction at time t
@@ -257,6 +259,8 @@ class TestLineupWatcherQuotaAndWindow:
             "away_team_name": "Barcelona",
             "kickoff_utc": (now + timedelta(minutes=55)).isoformat(),
             "lineup_confirmed": False,
+            "model_home_rate": 1.45,
+            "model_away_rate": 1.15,
         }
 
         # 1. Run watcher with match in window -> generates LINEUP_CONFIRMED
@@ -280,6 +284,8 @@ class TestAnalysisWorkerMultiCheckpoint:
         match = {
             "match_id": "test_match_liv",
             "competition_name": "Premier League (England)",
+            "model_home_rate": 1.45,
+            "model_away_rate": 1.15,
         }
 
         # 1. INITIAL Checkpoint (T-48h)

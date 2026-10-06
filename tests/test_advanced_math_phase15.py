@@ -150,7 +150,7 @@ def test_live_hazard_fits_and_changes_correction_from_observed_state():
 def test_dynamic_dixon_coles_fit_as_of_excludes_future_rows():
     base = pd.Timestamp("2025-01-01", tz="UTC")
     rows = []
-    for i in range(80):
+    for i in range(100):
         rows.append({
             "home_id": 1 if i % 2 == 0 else 2,
             "away_id": 2 if i % 2 == 0 else 1,
@@ -162,9 +162,9 @@ def test_dynamic_dixon_coles_fit_as_of_excludes_future_rows():
     df = pd.DataFrame(rows)
     model = ScoreDrivenDixonColes(
         DynamicDCConfig(max_iter=20)
-    ).fit_as_of(df, base + pd.Timedelta(days=40))
+    ).fit_as_of(df, base + pd.Timedelta(days=60))
 
-    assert model.metrics["n_matches"] == 40
+    assert model.metrics["n_matches"] == 60
 
 
 def test_analysis_worker_requires_real_rate_source():

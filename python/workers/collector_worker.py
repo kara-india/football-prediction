@@ -95,36 +95,13 @@ class CollectorWorker:
         logger.info(f"Starting CollectorWorker execution (dry_run={dry_run})...")
 
         if dry_run:
-            logger.info("Dry-run mode active. Simulating discovery without consuming external quota or writing DB.")
-            # Synthesize 1 mock fixture for dry-run verification
-            now = datetime.now(timezone.utc)
-            mock_match = CanonicalMatch(
-                match_id="dry_run_match_1001",
-                provider_id="api-football",
-                provider_fixture_id=1001,
-                competition_id=39,
-                competition_name="Premier League (England)",
-                season=2024,
-                round="Regular Season - 10",
-                kickoff_utc=now + timedelta(hours=24),
-                venue_name="Emirates Stadium",
-                referee="Michael Oliver",
-                home_team_id=42,
-                home_team_name="Arsenal",
-                away_team_id=49,
-                away_team_name="Chelsea",
-                status="NS",
-                is_eligible=True,
-                source_timestamp=now,
-                available_at=now,
-            )
-            preds = self.analysis_worker.run_match_prediction(mock_match, stage="INITIAL", dry_run=True)
+            logger.info("Dry-run mode active. No synthetic fixtures or forecasts are generated.")
             return {
-                "status": "success",
-                "matches_seen": 1,
-                "matches_inserted": 1,
+                "status": "skipped",
+                "matches_seen": 0,
+                "matches_inserted": 0,
                 "quota_used": 0,
-                "predictions_count": len(preds),
+                "predictions_count": 0,
                 "errors": [],
             }
 
