@@ -187,9 +187,9 @@ class WalkForwardValidator:
                 "folds": [],
             }
 
-        fold_summaries: List[Dict[str, Any]] = []
+        fold_summaries = []
         all_y_true = []
-        all_y_prob: List[float] = []
+        all_y_prob = []
         all_pnl = []
         all_clv = []
 

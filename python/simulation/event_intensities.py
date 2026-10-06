@@ -1,4 +1,4 @@
-from typing import Any, Optional, Tuple
+from typing import Optional, Tuple
 
 from .match_state import MatchState
 
@@ -45,8 +45,7 @@ class EventIntensityEstimator:
         sub_diff = float(state.substitutions_home - state.substitutions_away)
         knockout_context = float(getattr(state, "knockout_context", 0.0))
 
-        hazard: Any = self.live_hazard_model
-        home_multiplier = float(hazard.correction_multiplier(
+        home_multiplier = float(self.live_hazard_model.correction_multiplier(
             minute=float(state.minute),
             score_diff=diff,
             red_card_diff=red_diff,
@@ -57,7 +56,7 @@ class EventIntensityEstimator:
             home_indicator=1.0,
         )[0])
 
-        away_multiplier = float(hazard.correction_multiplier(
+        away_multiplier = float(self.live_hazard_model.correction_multiplier(
             minute=float(state.minute),
             score_diff=-diff,
             red_card_diff=-red_diff,

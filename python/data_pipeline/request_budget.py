@@ -1,12 +1,11 @@
 import json
 import os
 from datetime import datetime
-from typing import Any, Dict
 
 class RequestBudgetManager:
     def __init__(self, storage_path: str = "request_budget.json"):
         self.storage_path = storage_path
-        self.budgets: Dict[str, Dict[str, Any]] = {
+        self.budgets = {
             "api_football": {"daily_limit": 100, "used": 0, "last_reset": datetime.now().date().isoformat()},
         }
         self.priorities = ["P0", "P1", "P2", "P3"]

@@ -271,7 +271,7 @@ class ProbabilityCalibrator:
 
     def serialize(self) -> dict:
         """Serialize fitted calibrator parameters."""
-        data: dict[str, Any] = {"method": self.method, "calibrators": {}}
+        data = {"method": self.method, "calibrators": {}}
         for market, calibrator in self.calibrators.items():
             if isinstance(calibrator, IsotonicRegression):
                 data["calibrators"][market] = {

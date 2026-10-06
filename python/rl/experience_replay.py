@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 import numpy as np
 from collections import deque
-from typing import Deque
 import random
 from datetime import datetime
 
@@ -17,7 +16,7 @@ class Experience:
 
 class ExperienceReplay:
     def __init__(self, max_size: int = 100_000):
-        self.buffer: Deque[Experience] = deque(maxlen=max_size)
+        self.buffer = deque(maxlen=max_size)
     
     def add(self, experience: Experience) -> None:
         self.buffer.append(experience)

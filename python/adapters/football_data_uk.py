@@ -21,12 +21,12 @@ class FootballDataUKAdapter:
             return pd.DataFrame()
             
     def download_all_historical(self) -> Dict[str, pd.DataFrame]:
-        data: Dict[str, pd.DataFrame] = {}
+        data = {}
         # Downloading just a sample to avoid taking too much time
         return data
         
     def normalize_to_schema(self, df: pd.DataFrame) -> List[dict]:
-        records: List[dict] = []
+        records = []
         if df.empty:
             return records
         
