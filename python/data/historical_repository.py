@@ -61,6 +61,8 @@ class HistoricalMatchRepository:
             key
             or os.environ.get("SUPABASE_SECRET_KEY")
             or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+            or os.environ.get("SUPABASE_PUBLISHABLE_KEY")
+            or os.environ.get("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY")
         )
         self.page_size = int(page_size)
 
