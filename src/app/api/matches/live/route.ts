@@ -49,9 +49,9 @@ export async function GET() {
           kickoff: m.fixture?.date,
         }))
     )
-    for (const [fixtureId, odds] of fallbackOdds.entries()) {
+    fallbackOdds.forEach((odds, fixtureId) => {
       if (!liveOddsByFixture.get(fixtureId)) liveOddsByFixture.set(fixtureId, odds)
-    }
+    })
 
     const mapped = eligible.map((m: any) => ({
       id: m.fixture.id,
