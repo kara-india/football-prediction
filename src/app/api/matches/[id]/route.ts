@@ -7,7 +7,7 @@ import { fetchEspnSummaryWithForecast } from '@/lib/espn'
 
 async function computePythonChampionDecision(input: Record<string, unknown>) {
   try {
-    const host = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
+    const host = process.env.VERCEL_URL || process.env.NEXT_PUBLIC_APP_URL
     const url = host ? 'https://' + host + '/api/champion' : 'http://127.0.0.1:3000/api/champion'
     const response = await fetch(url, {
       method: 'POST',
