@@ -10,7 +10,7 @@ import httpx
 
 from python.calibration.calibrator import ProbabilityCalibrator
 from python.data.historical_repository import HistoricalMatchRepository
-from python.models.dynamic_dixon_coles import ScoreDrivenDixonColes
+from python.models.dynamic_dixon_coles import DynamicDCConfig, ScoreDrivenDixonColes
 
 OUT = Path("python/models/champion_artifact.json")
 MARKETS = [
@@ -23,6 +23,11 @@ def main() -> None:
     if len(df) < 1000:
         raise RuntimeError(f"Need at least 1000 real historical matches; found {len(df)}.")
     df = df.sort_values("date", kind="mergesort").reset_index(drop=True)
+    # Keep the most recent chronological window for operational retraining.
+    # The dynamic model already down-weights older observations; this cap keeps
+    # optimizer runtime bounded without introducing look-ahead.
+    if len(df) > 6000:
+        df = df.tail(6000).reset_index(drop=True)
 
     train_end = int(len(df) * 0.70)
     cal_end = int(len(df) * 0.85)
@@ -30,7 +35,7 @@ def main() -> None:
     calibration = df.iloc[train_end:cal_end].copy()
     test = df.iloc[cal_end:].copy()
 
-    model = ScoreDrivenDixonColes().fit(train)
+    model = ScoreDrivenDixonColes(config=DynamicDCConfig(max_iter=60)).fit(train)
     raw = {k: [] for k in MARKETS}
     truth = {k: [] for k in MARKETS}
 
