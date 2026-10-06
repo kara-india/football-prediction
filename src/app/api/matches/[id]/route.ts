@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { fetchApiFootball, extract1xBetOdds, extractProviderForecast } from '@/lib/apiFootball'
 import { getDiskCache, setDiskCache } from '@/lib/diskCache'
 import { fetchSofaEvent, fetchSofaEventExtras, sofaStatus } from '@/lib/sofaScore'
-import { fetchEspnSummaryWithForecast } from '@/lib/espn'
+import { fetchEspnSummaryWithForecast, fetchEspnPredictor } from '@/lib/espn'
 
 function sofaStatistics(raw: any[]) {
   const home: any[] = []
@@ -67,6 +67,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
   const espnMatch = rawId.match(/^espn:([^:]+):(\d+)$/)
   if (espnMatch) {
     try {
+      if (new URL(_request.url).searchParams.get('debug') === 'espn') return NextResponse.json(await fetchEspnPredictor(espnMatch[1], espnMatch[2]))
       const { summary, forecast } = await fetchEspnSummaryWithForecast(espnMatch[1], espnMatch[2])
       const header = summary.header?.competitions?.[0] || summary.header?.competitions?.[0]
       const competitors = Object.fromEntries((header?.competitors || []).map((c:any)=>[c.homeAway,c]))
