@@ -8,7 +8,7 @@ import sys
 import json
 import logging
 import urllib.request
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
 from ..adapters.quota_manager import CentralQuotaManager, QuotaExceededError
