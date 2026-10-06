@@ -441,8 +441,8 @@ class AnalysisWorker:
                 url,
                 data=payload,
                 headers={
-                    "apikey": self.supabase_key,
-                    "Authorization": f"Bearer {self.supabase_key}",
+                    "apikey": self.supabase_key or "",
+                    "Authorization": f"Bearer {self.supabase_key or ''}",
                     "Content-Type": "application/json",
                     "Prefer": "return=minimal",
                 },

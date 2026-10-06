@@ -101,8 +101,9 @@ class LearnerWorker:
 
             # Residual learning must use the actual model forecast. Never
             # substitute a population-average goal assumption.
-            if None in (h_score, a_score, pred_h, pred_a):
+            if any(value is None for value in (h_score, a_score, pred_h, pred_a)):
                 continue
+            assert h_score is not None and a_score is not None and pred_h is not None and pred_a is not None
 
             r_h = float(h_score) - float(pred_h)
             r_a = float(a_score) - float(pred_a)

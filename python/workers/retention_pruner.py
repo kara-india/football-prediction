@@ -174,7 +174,7 @@ class RetentionPruner:
         """
         Execute full retention pruning cycle across all transient tables.
         """
-        policies = policies or DEFAULT_RETENTION_POLICIES
+        policy_list: List[Dict[str, Any]] = policies if policies is not None else DEFAULT_RETENTION_POLICIES
         started_at = datetime.now(timezone.utc)
         pruned_counts: Dict[str, int] = {}
         total_pruned = 0
@@ -183,7 +183,7 @@ class RetentionPruner:
             f"Starting Data Retention Pruning cycle ({'DRY-RUN' if dry_run else 'ACTIVE PRUNE'})..."
         )
 
-        for pol in policies:
+        for pol in policy_list:
             tbl = str(pol["table"])
             col = str(pol.get("timestamp_col", "created_at"))
             days = int(pol.get("days_to_keep", 14))

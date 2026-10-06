@@ -227,13 +227,16 @@ class LearnedFormModel:
         if np.any(y < 0):
             raise ValueError("next_goals must be non-negative.")
 
-        self.mean_ = X.mean(axis=0)
-        self.scale_ = np.asarray(X.std(axis=0), dtype=float)
-        self.scale_[self.scale_ < 1e-8] = 1.0
-        Xs = (X - self.mean_) / self.scale_
+        mean = np.asarray(X.mean(axis=0), dtype=float)
+        scale = np.asarray(X.std(axis=0), dtype=float)
+        scale[scale < 1e-8] = 1.0
+        Xs = (X - mean) / scale
 
-        self.model = PoissonRegressor(alpha=self.l2, max_iter=500)
-        self.model.fit(Xs, y)
+        model = PoissonRegressor(alpha=self.l2, max_iter=500)
+        model.fit(Xs, y)
+        self.mean_ = mean
+        self.scale_ = scale
+        self.model = model
         self.fitted = True
         self.metrics = {
             "n_observations": int(len(observations)),

@@ -108,10 +108,10 @@ class PointInTimeReplayer:
         normalized_history: List[Dict[str, Any]] = []
         for m in prior_matches:
             if isinstance(m, CanonicalMatch):
-                home_id = m.home_team_id
-                away_id = m.away_team_id
+                home_id = str(m.home_team_id)
+                away_id = str(m.away_team_id)
                 # CanonicalMatch does not store goals directly; retrieve from metadata if dict
-                match_dt = m.kickoff_utc
+                match_dt = m.kickoff_utc or datetime.min.replace(tzinfo=timezone.utc)
                 h_goals = getattr(m, "home_goals", 0)
                 a_goals = getattr(m, "away_goals", 0)
             else:
@@ -119,7 +119,7 @@ class PointInTimeReplayer:
                 away_id = str(m.get("away_team_id") or m.get("away_id") or m.get("away_team"))
                 h_goals = m.get("home_goals") if m.get("home_goals") is not None else m.get("fthg", 0)
                 a_goals = m.get("away_goals") if m.get("away_goals") is not None else m.get("ftag", 0)
-                match_dt = _to_datetime_utc(m.get("kickoff_utc") or m.get("date") or m.get("match_date"))
+                match_dt = _to_datetime_utc(m.get("kickoff_utc") or m.get("date") or m.get("match_date")) or datetime.min.replace(tzinfo=timezone.utc)
 
             normalized_history.append({
                 "home_id": home_id,
@@ -204,6 +204,8 @@ class PointInTimeReplayer:
         """
         t = _to_datetime_utc(as_of_time)
         ko = _to_datetime_utc(kickoff_time)
+        if t is None or ko is None:
+            raise ValueError("kickoff_time and as_of_time must be valid datetimes")
 
         if lineup_data is None:
             return {
@@ -276,6 +278,8 @@ class PointInTimeReplayer:
         """
         t = _to_datetime_utc(as_of_time)
         ko = _to_datetime_utc(kickoff_time)
+        if t is None or ko is None:
+            raise ValueError("kickoff_time and as_of_time must be valid datetimes")
 
         valid_snapshots = []
         for snap in odds_snapshots:
@@ -403,11 +407,13 @@ class PointInTimeReplayer:
         """
         t = _to_datetime_utc(as_of_time)
         ko = _to_datetime_utc(match.get("kickoff_utc") or match.get("date"))
+        if t is None or ko is None:
+            raise ValueError("match kickoff and as_of_time must be valid datetimes")
 
         # 1. Elo and Form ratings as of T
         elo = self.compute_elo_at(historical_matches, t)
-        home_id = match.get("home_team_id") or match.get("home_id") or match.get("home_team")
-        away_id = match.get("away_team_id") or match.get("away_id") or match.get("away_team")
+        home_id = str(match.get("home_team_id") or match.get("home_id") or match.get("home_team"))
+        away_id = str(match.get("away_team_id") or match.get("away_id") or match.get("away_team"))
 
         home_form = self.compute_form_at(historical_matches, t, home_id)
         away_form = self.compute_form_at(historical_matches, t, away_id)
