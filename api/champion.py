@@ -251,27 +251,37 @@ def champion_decision(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def handler(request):
-    try:
-        if request.method != "POST":
-            return {"statusCode": 405, "headers": {"content-type": "application/json"}, "body": '{"error":"POST required"}'}
-        import json
-        body = request.body.decode("utf-8") if hasattr(request.body, "decode") else request.body
-        result = champion_decision(json.loads(body or "{}"))
-        return {
-            "statusCode": 200,
-            "headers": {"content-type": "application/json"},
-            "body": json.dumps(result),
-        }
-    except Exception as exc:
-        return {
-            "statusCode": 500,
-            "headers": {"content-type": "application/json"},
-            "body": json.dumps({
+from http.server import BaseHTTPRequestHandler
+import json
+
+
+class handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        try:
+            length = int(self.headers.get("content-length", "0"))
+            body = self.rfile.read(length).decode("utf-8")
+            result = champion_decision(json.loads(body or "{}"))
+            payload = json.dumps(result).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(payload)
+        except Exception as exc:
+            payload = json.dumps({
                 "model": "CHAMPION",
                 "version": "champion-python-v2.0",
                 "action": "NO_BET",
                 "reason": "CHAMPION_ENGINE_FAILURE",
                 "error": str(exc),
-            }),
-        }
+            }).encode("utf-8")
+            self.send_response(500)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(payload)
+
+    def do_GET(self):
+        payload = b'{"model":"CHAMPION","version":"champion-python-v2.0","status":"ready","action":"NO_BET"}'
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(payload)
