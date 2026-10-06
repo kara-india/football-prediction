@@ -86,7 +86,7 @@ export function extract1xBetOdds(bookmakers: any[]): {
   sourceTimestamp: string | null
 } | null {
   const bookmaker = (bookmakers || []).find(
-    (item: any) => Number(item?.id) === 6 || /1xBet/i.test(String(item?.name || '')),
+    (item: any) => /^1xBet$/i.test(String(item?.name || '').trim()),
   )
   if (!bookmaker) return null
 
@@ -161,4 +161,37 @@ export function extractTeamStatistic(statistics: any[], teamId: number, names: R
   if (stat?.value === null || stat?.value === undefined) return null
   const numeric = Number(String(stat.value).replace('%', '').trim())
   return Number.isFinite(numeric) ? numeric : null
+}
+
+
+export async function fetch1xBetOddsForFixture(fixtureId: number) {
+  if (!Number.isInteger(fixtureId) || fixtureId <= 0) return null
+  try {
+    const payload = await fetchApiFootball('/odds?fixture=' + fixtureId, true)
+    return extract1xBetOdds(payload?.response?.[0]?.bookmakers || [])
+  } catch (error) {
+    console.warn('[1XBET ODDS] Fixture lookup failed', fixtureId, error)
+    return null
+  }
+}
+
+function normalizeTeamName(value: unknown): string {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+export async function findApiFootballFixtureByTeams(homeTeam: string, awayTeam: string, date: string) {
+  try {
+    const payload = await fetchApiFootball('/fixtures?date=' + encodeURIComponent(date), true)
+    const home = normalizeTeamName(homeTeam)
+    const away = normalizeTeamName(awayTeam)
+    const matches = Array.isArray(payload?.response) ? payload.response : []
+    return matches.find((fixture: any) => {
+      const h = normalizeTeamName(fixture?.teams?.home?.name)
+      const a = normalizeTeamName(fixture?.teams?.away?.name)
+      return (h === home && a === away) || (h.includes(home) && a.includes(away))
+    }) || null
+  } catch (error) {
+    console.warn('[API-FOOTBALL FIXTURE RESOLUTION] Failed', error)
+    return null
+  }
 }
