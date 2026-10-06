@@ -133,7 +133,7 @@ function sofaH2H(raw: any[]) {
 }
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
-  const rawId = params.id
+  const rawId = decodeURIComponent(params.id)
   const espnMatch = rawId.match(/^espn:([^:]+):(\d+)$/)
   if (espnMatch) {
     try {
