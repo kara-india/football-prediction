@@ -214,32 +214,61 @@ export default function MatchIntelligencePage({ params }: { params: { id: string
   const markets: MarketRow[] = useMemo(() => {
     const rows: MarketRow[] = []
     const values = [
-      { id: 'home', label: `1 (${home?.name || 'Home'})`, odds: odds?.home, model: homeProb },
-      { id: 'draw', label: 'X (Draw)', odds: odds?.draw, model: drawProb },
-      { id: 'away', label: `2 (${away?.name || 'Away'})`, odds: odds?.away, model: awayProb },
+      { id: 'home', label: '1 (' + (home?.name || 'Home') + ')', selection: '1', odds: odds?.home, model: homeProb },
+      { id: 'draw', label: 'X (Draw)', selection: 'X', odds: odds?.draw, model: drawProb },
+      { id: 'away', label: '2 (' + (away?.name || 'Away') + ')', selection: '2', odds: odds?.away, model: awayProb },
     ]
 
     for (const item of values) {
+      const championMatch = champion?.market === 'MATCH_1X2' && champion.selection === item.selection
+      const model = championMatch && champion.modelProbability !== null ? champion.modelProbability : item.model
       const implied = item.odds && item.odds > 1 ? 1 / item.odds : null
-      const edge = implied !== null && Number.isFinite(item.model) ? (item.model - implied) * 100 : null
-      const ev = item.odds && Number.isFinite(item.model) ? (item.model * item.odds - 1) * 100 : null
+      const edge = championMatch && champion.edge !== null
+        ? champion.edge * 100
+        : implied !== null && Number.isFinite(model) ? (model - implied) * 100 : null
+      const ev = championMatch && champion.expectedValue !== null
+        ? champion.expectedValue * 100
+        : item.odds && Number.isFinite(model) ? (model * item.odds - 1) * 100 : null
       rows.push({
-        id: `1x2-${item.id}`,
+        id: '1x2-' + item.id,
         outcome: item.label,
         market: '1X2 Match Winner',
         odds1xBet: item.odds ?? null,
         impliedProb: implied,
-        deviggedProb: null,
-        modelProb: item.model,
+        deviggedProb: championMatch ? champion.devigProbability : null,
+        modelProb: model,
         edge,
         ev,
-        decisionCode: 'FORECAST_ONLY',
-        action: 'NO_BET',
+        decisionCode: championMatch ? 'CHAMPION_BET' : 'NO_BET',
+        action: championMatch ? 'CANDIDATE' : 'NO_BET',
+      })
+    }
+
+    const totals = [
+      { id: 'over25', label: 'Over 2.5 Goals', selection: 'OVER', odds: odds?.over25 },
+      { id: 'under25', label: 'Under 2.5 Goals', selection: 'UNDER', odds: odds?.under25 },
+    ]
+    for (const item of totals) {
+      const championMatch = champion?.market === 'TOTAL_GOALS_2_5' && champion.selection === item.selection
+      const model = championMatch && champion.modelProbability !== null ? champion.modelProbability : 0
+      const implied = item.odds && item.odds > 1 ? 1 / item.odds : null
+      rows.push({
+        id: 'ou-' + item.id,
+        outcome: item.label,
+        market: 'Total Goals 2.5',
+        odds1xBet: item.odds ?? null,
+        impliedProb: implied,
+        deviggedProb: championMatch ? champion.devigProbability : null,
+        modelProb: model,
+        edge: championMatch && champion.edge !== null ? champion.edge * 100 : null,
+        ev: championMatch && champion.expectedValue !== null ? champion.expectedValue * 100 : null,
+        decisionCode: championMatch ? 'CHAMPION_BET' : 'NO_BET',
+        action: championMatch ? 'CANDIDATE' : 'NO_BET',
       })
     }
 
     return rows
-  }, [away?.name, awayProb, drawProb, home?.name, homeProb, odds?.away, odds?.draw, odds?.home])
+  }, [away?.name, awayProb, champion, drawProb, home?.name, homeProb, odds?.away, odds?.draw, odds?.home, odds?.over25, odds?.under25])
 
   const matchStats = useMemo(() => {
     if (!fixture || !home || !away) return []
