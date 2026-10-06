@@ -205,7 +205,18 @@ class WorkerRunner:
             raise ValueError(f"Unknown worker job: '{job_name}'. Valid jobs are: {self.VALID_JOBS}")
 
         # Execute full sequence if job is 'all'
-        if dry_run:
+        if norm_job == "all" and dry_run:
+            return {
+                "status": "success",
+                "worker_name": "all",
+                "worker_type": "all",
+                "pipeline_results": {
+                    sub_job: {"status": "skipped", "worker_name": sub_job}
+                    for sub_job in ("discovery", "lineups", "analysis", "live", "evaluator", "learner")
+                },
+            }
+
+        if dry_run and norm_job != "prune":
             return {
                 "status": "skipped",
                 "worker_name": norm_job,
