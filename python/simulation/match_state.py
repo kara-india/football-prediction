@@ -48,7 +48,10 @@ class MatchState:
         if self.period in ('PREMATCH', 'prematch'):
             return 90.0 + max(0, self.added_time)
         if self.period == 'first_half':
-            return max(0, 45 - self.minute + self.added_time)
+            # A first-half live prediction still has the second half ahead.
+            # Return time remaining in the complete 90-minute match, not just
+            # time remaining until halftime.
+            return max(0, 90 - self.minute + self.added_time)
         elif self.period == 'second_half':
             return max(0, 90 - self.minute + self.added_time)
         return 0.0
