@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { fetchApiFootball, extract1xBetOdds, extractProviderForecast, findApiFootballFixtureByTeams, fetch1xBetOddsForFixture } from '@/lib/apiFootball'
+import { fetchApiFootball, extract1xBetOdds, extractProviderForecast, findApiFootballFixtureByTeams, fetch1xBetOddsForFixture, fetch1xBetLiveOddsFromPulseScore } from '@/lib/apiFootball'
 import { getDiskCache, setDiskCache } from '@/lib/diskCache'
 import { fetchSofaEvent, fetchSofaEventExtras, sofaStatus } from '@/lib/sofaScore'
 import { fetchEspnSummaryWithForecast } from '@/lib/espn'
@@ -106,7 +106,16 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       Number.isInteger(homeId) && Number.isInteger(awayId) ? fetchApiFootball(`/fixtures/headtohead?h2h=${homeId}-${awayId}`, true) : Promise.resolve({ response: [] }),
     ])
     const prematchOdds = oddsResult.status === 'fulfilled' ? extract1xBetOdds(oddsResult.value.response?.[0]?.bookmakers || []) : null
-    const odds = liveOdds || prematchOdds
+    let odds = liveOdds || prematchOdds
+    if (!odds && fixture.fixture?.status?.short && ['1H', '2H', 'ET', 'P'].includes(String(fixture.fixture.status.short))) {
+      const pulseScoreOdds = await fetch1xBetLiveOddsFromPulseScore([{
+        id: fixtureId,
+        home: String(fixture.teams?.home?.name || ''),
+        away: String(fixture.teams?.away?.name || ''),
+        kickoff: fixture.fixture?.date,
+      }])
+      odds = pulseScoreOdds.get(fixtureId) || null
+    }
     const providerForecast = predictionResult.status === 'fulfilled' ? extractProviderForecast(predictionResult.value) : null
     const history = h2hResult.status === 'fulfilled' ? (h2hResult.value.response || []).slice(0, 10).map((match: any) => ({ id: Number(match.fixture?.id), date: match.fixture?.date, status: match.fixture?.status?.short, homeTeam: match.teams?.home?.name, awayTeam: match.teams?.away?.name, homeScore: match.goals?.home, awayScore: match.goals?.away })) : []
     const payload = { fixture: { id: fixtureId, kickoff: fixture.fixture?.date, venue: fixture.fixture?.venue?.name || 'TBD', status: fixture.fixture?.status?.short || 'TBD', statusLong: fixture.fixture?.status?.long || 'Unknown', minute: fixture.fixture?.status?.elapsed ?? null, referee: fixture.fixture?.referee || null, league: fixture.league || null, teams: fixture.teams || null, score: fixture.goals || null, events: fixture.events || [], statistics: fixture.statistics || [], lineups: fixture.lineups || [] }, odds1xBet: odds ? { home: odds.home, draw: odds.draw, away: odds.away, over25: odds.over25, under25: odds.under25 } : null, oddsUpdatedAt: odds?.sourceTimestamp ?? null, forecast: providerForecast, forecastSource: providerForecast ? 'API-Football provider forecast' : null, history, generatedAt: new Date().toISOString(), fixtureSource: 'API-Football' }
