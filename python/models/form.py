@@ -203,9 +203,9 @@ class LearnedFormModel:
 
     def __init__(self, l2: float = 1.0):
         self.l2 = float(l2)
-        self.model = None
-        self.mean_ = None
-        self.scale_ = None
+        self.model: Optional[Any] = None
+        self.mean_: Optional[np.ndarray] = None
+        self.scale_: Optional[np.ndarray] = None
         self.fitted = False
         self.metrics: Dict[str, Any] = {}
 

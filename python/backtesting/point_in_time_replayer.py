@@ -108,15 +108,15 @@ class PointInTimeReplayer:
         normalized_history: List[Dict[str, Any]] = []
         for m in prior_matches:
             if isinstance(m, CanonicalMatch):
-                home_id = str(m.home_team_id)
-                away_id = str(m.away_team_id)
+                home_id = int(m.home_team_id)
+                away_id = int(m.away_team_id)
                 # CanonicalMatch does not store goals directly; retrieve from metadata if dict
                 match_dt = m.kickoff_utc or datetime.min.replace(tzinfo=timezone.utc)
                 h_goals = getattr(m, "home_goals", 0)
                 a_goals = getattr(m, "away_goals", 0)
             else:
-                home_id = str(m.get("home_team_id") or m.get("home_id") or m.get("home_team"))
-                away_id = str(m.get("away_team_id") or m.get("away_id") or m.get("away_team"))
+                home_id = int(m.get("home_team_id") or m.get("home_id") or m.get("home_team"))
+                away_id = int(m.get("away_team_id") or m.get("away_id") or m.get("away_team"))
                 h_goals = m.get("home_goals") if m.get("home_goals") is not None else m.get("fthg", 0)
                 a_goals = m.get("away_goals") if m.get("away_goals") is not None else m.get("ftag", 0)
                 match_dt = _to_datetime_utc(m.get("kickoff_utc") or m.get("date") or m.get("match_date")) or datetime.min.replace(tzinfo=timezone.utc)
@@ -396,7 +396,7 @@ class PointInTimeReplayer:
         self,
         as_of_time: datetime,
         match: Dict[str, Any],
-        historical_matches: List[Dict[str, Any]],
+        historical_matches: List[Union[CanonicalMatch, Dict[str, Any]]],
         lineup_data: Optional[Dict[str, Any]] = None,
         odds_snapshots: Optional[List[Dict[str, Any]]] = None,
         inplay_events: Optional[List[Dict[str, Any]]] = None,
@@ -412,8 +412,8 @@ class PointInTimeReplayer:
 
         # 1. Elo and Form ratings as of T
         elo = self.compute_elo_at(historical_matches, t)
-        home_id = str(match.get("home_team_id") or match.get("home_id") or match.get("home_team"))
-        away_id = str(match.get("away_team_id") or match.get("away_id") or match.get("away_team"))
+        home_id = int(match.get("home_team_id") or match.get("home_id") or match.get("home_team"))
+        away_id = int(match.get("away_team_id") or match.get("away_id") or match.get("away_team"))
 
         home_form = self.compute_form_at(historical_matches, t, home_id)
         away_form = self.compute_form_at(historical_matches, t, away_id)
