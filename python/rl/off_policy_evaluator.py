@@ -10,7 +10,7 @@ Provides statistically rigorous counterfactual policy evaluation using:
 
 from __future__ import annotations
 from dataclasses import dataclass, asdict
-from typing import Any, cast, Dict, List, Optional, Tuple, Union
+from typing import Any, cast, cast, Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import Ridge

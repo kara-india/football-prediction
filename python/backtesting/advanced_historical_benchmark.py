@@ -153,7 +153,10 @@ class AdvancedHistoricalBenchmark:
         probs: List[Tuple[float, float, float]] = []
         xg: List[Tuple[float, float]] = []
         for row in frame.itertuples(index=False):
-            p = tuple(float(v) for v in model.predict_1x2(row.home_id, row.away_id))
+            p_values = [float(v) for v in model.predict_1x2(row.home_id, row.away_id)]
+            if len(p_values) != 3:
+                raise ValueError("predict_1x2() must return exactly three probabilities.")
+            p = (p_values[0], p_values[1], p_values[2])
             h, a = self._dc_rates(model, row.home_id, row.away_id)
             probs.append(p)
             xg.append((h, a))

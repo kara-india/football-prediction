@@ -105,7 +105,7 @@ class PointInTimeReplayer:
         elo.K_FACTOR = self.default_elo_k
 
         # Normalize matches to list of dicts sorted chronologically
-        normalized_history = []
+        normalized_history: List[Dict[str, Any]] = []
         for m in prior_matches:
             if isinstance(m, CanonicalMatch):
                 home_id = m.home_team_id
@@ -115,8 +115,8 @@ class PointInTimeReplayer:
                 h_goals = getattr(m, "home_goals", 0)
                 a_goals = getattr(m, "away_goals", 0)
             else:
-                home_id = m.get("home_team_id") or m.get("home_id") or m.get("home_team")
-                away_id = m.get("away_team_id") or m.get("away_id") or m.get("away_team")
+                home_id = str(m.get("home_team_id") or m.get("home_id") or m.get("home_team"))
+                away_id = str(m.get("away_team_id") or m.get("away_id") or m.get("away_team"))
                 h_goals = m.get("home_goals") if m.get("home_goals") is not None else m.get("fthg", 0)
                 a_goals = m.get("away_goals") if m.get("away_goals") is not None else m.get("ftag", 0)
                 match_dt = _to_datetime_utc(m.get("kickoff_utc") or m.get("date") or m.get("match_date"))

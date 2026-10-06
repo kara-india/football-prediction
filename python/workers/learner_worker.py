@@ -104,8 +104,8 @@ class LearnerWorker:
             if None in (h_score, a_score, pred_h, pred_a):
                 continue
 
-            r_h = float(h_score - pred_h)
-            r_a = float(a_score - pred_a)
+            r_h = float(h_score) - float(pred_h)
+            r_a = float(a_score) - float(pred_a)
 
             team_diffs.setdefault(team_h, []).append(r_h)
             team_diffs.setdefault(team_a, []).append(r_a)

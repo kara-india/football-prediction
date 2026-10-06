@@ -68,6 +68,7 @@ class VectorizedMonteCarloSimulator:
                 knockout_context = float(getattr(state, "knockout_context", 0.0))
 
                 assert hazard is not None
+                assert hazard is not None
                 home_corr = hazard.correction_multiplier(
                     minute=np.full(n_simulations, float(minute)),
                     score_diff=diff,
