@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Tuple, Union, Any
 import numpy as np
 import scipy.stats as stats
 
-from .metrics_engine import MetricsEngine, BacktestMetricsSummary
+from .metrics_engine import MetricsEngine
 
 
 @dataclass

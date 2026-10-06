@@ -4,6 +4,7 @@ Integrates with PointInTimeReplayer while maintaining backwards compatibility
 for match timeline in-play simulation.
 """
 import pandas as pd
+from typing import Any
 
 from .point_in_time_replayer import PointInTimeReplayer
 

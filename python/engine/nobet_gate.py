@@ -3,7 +3,7 @@ Authoritative 10-Point NO-BET Gate Engine
 Strict risk filter enforcing algorithmic capital protection before any candidate
 wager can be considered actionable.
 """
-from typing import NamedTuple, List, Optional, Dict, Any, Union
+from typing import NamedTuple, List, Optional
 
 
 class NoBetGateResult(NamedTuple):

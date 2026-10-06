@@ -5,7 +5,6 @@ populates Supabase `lineups`, and strictly gates the prediction engine.
 """
 import os
 import logging
-import urllib.request
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 

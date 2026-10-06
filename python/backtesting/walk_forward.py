@@ -14,8 +14,8 @@ import pandas as pd
 from dateutil.relativedelta import relativedelta
 
 from python.calibration.calibrator import ProbabilityCalibrator
-from python.backtesting.metrics_engine import MetricsEngine, BacktestMetricsSummary
-from python.backtesting.model_comparator import ModelComparator, ComparisonResult
+from python.backtesting.metrics_engine import MetricsEngine
+from python.backtesting.model_comparator import ModelComparator
 
 logger = logging.getLogger(__name__)
 

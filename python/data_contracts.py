@@ -1,12 +1,13 @@
-from enum import Enum
 """
+
 Canonical Data Contracts & Schemas
 Authoritative Python dataclasses representing normalized domain entities.
 Adheres strictly to docs/DATA_CONTRACTS.md.
 """
 from dataclasses import dataclass
+from enum import Enum
 from datetime import datetime
-from typing import Optional, List, Any
+from typing import Optional, List
 
 
 @dataclass(frozen=True)
