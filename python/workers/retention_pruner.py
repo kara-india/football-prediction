@@ -8,12 +8,12 @@ import logging
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional, Set, List
+from typing import Dict, Any, Optional, FrozenSet, List
 
 logger = logging.getLogger("RetentionPruner")
 
 # Tables strictly protected by inviolable retention guarantee
-PROTECTED_TABLES: Set[str] = frozenset({
+PROTECTED_TABLES: FrozenSet[str] = frozenset({
     "matches",
     "lineups",
     "odds_snapshots",
@@ -184,9 +184,9 @@ class RetentionPruner:
         )
 
         for pol in policies:
-            tbl = pol["table"]
-            col = pol.get("timestamp_col", "created_at")
-            days = pol.get("days_to_keep", 14)
+            tbl = str(pol["table"])
+            col = str(pol.get("timestamp_col", "created_at"))
+            days = int(pol.get("days_to_keep", 14))
 
             # Defensive safety check before dispatching
             self.validate_table_safety(tbl)

@@ -104,10 +104,10 @@ class HistoricalMatchRepository:
         league_values = [str(value) for value in leagues] if leagues else None
         rows: List[dict] = []
         offset = 0
-        endpoint = f"{(self.url or '').rstrip('/')}/rest/v1/historical_matches"
+        endpoint = f"{self.url.rstrip('/')}/rest/v1/historical_matches"
         headers = {
-            "apikey": self.key or "",
-            "Authorization": f"Bearer {self.key or ''}",
+            "apikey": self.key,
+            "Authorization": f"Bearer {self.key}",
             "Accept": "application/json",
         }
 

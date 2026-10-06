@@ -271,10 +271,9 @@ class AnalysisWorker:
 
         for market, sel, line, raw_p, o_key in markets:
             raw_p = float(max(0.0, min(1.0, raw_p)))
-            calibrator = self.calibrator
-            calibration_applied = calibrator is not None
-            if calibration_applied and calibrator is not None:
-                calibrated_p = float(np.ravel(calibrator.calibrate(raw_p))[0])
+            calibration_applied = self.calibrator is not None
+            if calibration_applied:
+                calibrated_p = float(np.ravel(self.calibrator.calibrate(raw_p))[0])
                 calibrated_p = float(max(0.01, min(0.99, calibrated_p)))
                 calibration_version = "validated_calibrator"
             else:
@@ -354,7 +353,7 @@ class AnalysisWorker:
                 "recommended_action": gate_res.action,
                 "no_bet_reasons": gate_res.reasons,
                 "simulation_count": int(simulation_count),
-                "simulation_seed": int(getattr(self.simulator, "seed", 0) or 0),
+                "simulation_seed": int(self.simulator.seed) if getattr(self.simulator, "seed", None) is not None else None,
                 "simulation_version": "3.0-learned-hazard",
                 "model_version": (
                     "score_driven_dixon_coles_v1"
@@ -441,8 +440,8 @@ class AnalysisWorker:
                 url,
                 data=payload,
                 headers={
-                    "apikey": self.supabase_key or "",
-                    "Authorization": f"Bearer {self.supabase_key or ''}",
+                    "apikey": self.supabase_key,
+                    "Authorization": f"Bearer {self.supabase_key}",
                     "Content-Type": "application/json",
                     "Prefer": "return=minimal",
                 },

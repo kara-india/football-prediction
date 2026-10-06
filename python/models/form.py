@@ -228,7 +228,7 @@ class LearnedFormModel:
             raise ValueError("next_goals must be non-negative.")
 
         self.mean_ = X.mean(axis=0)
-        self.scale_ = X.std(axis=0)
+        self.scale_ = np.asarray(X.std(axis=0), dtype=float)
         self.scale_[self.scale_ < 1e-8] = 1.0
         Xs = (X - self.mean_) / self.scale_
 

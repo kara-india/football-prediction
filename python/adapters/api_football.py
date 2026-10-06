@@ -85,7 +85,7 @@ class APIFootballAdapter:
         return data
 
     def get_fixtures(self, league_id: int, season: int, date: str = None, live: bool = False, status: str = None) -> List[Dict]:
-        params = {"league": league_id, "season": season}
+        params: Dict[str, Any] = {"league": league_id, "season": season}
         if date:
             params["date"] = date
         if live:
@@ -95,7 +95,7 @@ class APIFootballAdapter:
         return self._make_request('fixtures', params, ttl=300)
         
     def get_fixture(self, fixture_id: int) -> Dict:
-        params = {"id": fixture_id, "statistics": "true", "events": "true", "lineups": "true"}
+        params: Dict[str, Any] = {"id": fixture_id, "statistics": "true", "events": "true", "lineups": "true"}
         res = self._make_request('fixtures', params, ttl=300)
         if not res:
             raise DataNotAvailableError(f"Fixture {fixture_id} not found")
