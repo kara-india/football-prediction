@@ -91,12 +91,15 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     if (!fixture) return NextResponse.json({ error: 'Fixture not found.' }, { status: 404 })
     const homeId = Number(fixture.teams?.home?.id)
     const awayId = Number(fixture.teams?.away?.id)
-    const [oddsResult, predictionResult, h2hResult] = await Promise.allSettled([
+    const [liveOddsResult, oddsResult, predictionResult, h2hResult] = await Promise.allSettled([
+      fetchApiFootball(`/odds/live?fixture=${fixtureId}`, true),
       fetchApiFootball(`/odds?fixture=${fixtureId}`, true),
       fetchApiFootball(`/predictions?fixture=${fixtureId}`, true),
       Number.isInteger(homeId) && Number.isInteger(awayId) ? fetchApiFootball(`/fixtures/headtohead?h2h=${homeId}-${awayId}`, true) : Promise.resolve({ response: [] }),
     ])
-    const odds = oddsResult.status === 'fulfilled' ? extract1xBetOdds(oddsResult.value.response?.[0]?.bookmakers || []) : null
+    const liveOdds = liveOddsResult.status === 'fulfilled' ? extract1xBetOdds(liveOddsResult.value.response?.[0]?.bookmakers || []) : null
+    const prematchOdds = oddsResult.status === 'fulfilled' ? extract1xBetOdds(oddsResult.value.response?.[0]?.bookmakers || []) : null
+    const odds = liveOdds || prematchOdds
     const providerForecast = predictionResult.status === 'fulfilled' ? extractProviderForecast(predictionResult.value) : null
     const history = h2hResult.status === 'fulfilled' ? (h2hResult.value.response || []).slice(0, 10).map((match: any) => ({ id: Number(match.fixture?.id), date: match.fixture?.date, status: match.fixture?.status?.short, homeTeam: match.teams?.home?.name, awayTeam: match.teams?.away?.name, homeScore: match.goals?.home, awayScore: match.goals?.away })) : []
     const payload = { fixture: { id: fixtureId, kickoff: fixture.fixture?.date, venue: fixture.fixture?.venue?.name || 'TBD', status: fixture.fixture?.status?.short || 'TBD', statusLong: fixture.fixture?.status?.long || 'Unknown', minute: fixture.fixture?.status?.elapsed ?? null, referee: fixture.fixture?.referee || null, league: fixture.league || null, teams: fixture.teams || null, score: fixture.goals || null, events: fixture.events || [], statistics: fixture.statistics || [], lineups: fixture.lineups || [] }, odds1xBet: odds ? { home: odds.home, draw: odds.draw, away: odds.away, over25: odds.over25, under25: odds.under25 } : null, oddsUpdatedAt: odds?.sourceTimestamp ?? null, forecast: providerForecast, forecastSource: providerForecast ? 'API-Football provider forecast' : null, history, generatedAt: new Date().toISOString(), fixtureSource: 'API-Football' }
