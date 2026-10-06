@@ -3,6 +3,7 @@ import { fetchApiFootball, extract1xBetOdds, extractProviderForecast, findApiFoo
 import { getDiskCache, setDiskCache } from '@/lib/diskCache'
 import { fetchSofaEvent, fetchSofaEventExtras, sofaStatus } from '@/lib/sofaScore'
 import { fetchEspnSummaryWithForecast } from '@/lib/espn'
+import { computeChampionDecision } from '@/lib/championDecision'
 
 function sofaStatistics(raw: any[]) {
   const home: any[] = []
@@ -117,8 +118,20 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       odds = pulseScoreOdds.get(fixtureId) || null
     }
     const providerForecast = predictionResult.status === 'fulfilled' ? extractProviderForecast(predictionResult.value) : null
+    const championDecision = computeChampionDecision({
+      fixtureId,
+      minute: Number(fixture.fixture?.status?.elapsed || 0),
+      scoreHome: Number(fixture.goals?.home || 0),
+      scoreAway: Number(fixture.goals?.away || 0),
+      status: String(fixture.fixture?.status?.short || ''),
+      homeTeam: String(fixture.teams?.home?.name || 'Home'),
+      awayTeam: String(fixture.teams?.away?.name || 'Away'),
+      forecast: providerForecast ? { home: providerForecast.home, draw: providerForecast.draw, away: providerForecast.away } : null,
+      odds: odds ? { home: odds.home, draw: odds.draw, away: odds.away, over25: odds.over25, under25: odds.under25 } : null,
+      oddsUpdatedAt: odds?.sourceTimestamp ?? null,
+    })
     const history = h2hResult.status === 'fulfilled' ? (h2hResult.value.response || []).slice(0, 10).map((match: any) => ({ id: Number(match.fixture?.id), date: match.fixture?.date, status: match.fixture?.status?.short, homeTeam: match.teams?.home?.name, awayTeam: match.teams?.away?.name, homeScore: match.goals?.home, awayScore: match.goals?.away })) : []
-    const payload = { fixture: { id: fixtureId, kickoff: fixture.fixture?.date, venue: fixture.fixture?.venue?.name || 'TBD', status: fixture.fixture?.status?.short || 'TBD', statusLong: fixture.fixture?.status?.long || 'Unknown', minute: fixture.fixture?.status?.elapsed ?? null, referee: fixture.fixture?.referee || null, league: fixture.league || null, teams: fixture.teams || null, score: fixture.goals || null, events: fixture.events || [], statistics: fixture.statistics || [], lineups: fixture.lineups || [] }, odds1xBet: odds ? { home: odds.home, draw: odds.draw, away: odds.away, over25: odds.over25, under25: odds.under25 } : null, oddsUpdatedAt: odds?.sourceTimestamp ?? null, forecast: providerForecast, forecastSource: providerForecast ? 'API-Football provider forecast' : null, history, generatedAt: new Date().toISOString(), fixtureSource: 'API-Football' }
+    const payload = { fixture: { id: fixtureId, kickoff: fixture.fixture?.date, venue: fixture.fixture?.venue?.name || 'TBD', status: fixture.fixture?.status?.short || 'TBD', statusLong: fixture.fixture?.status?.long || 'Unknown', minute: fixture.fixture?.status?.elapsed ?? null, referee: fixture.fixture?.referee || null, league: fixture.league || null, teams: fixture.teams || null, score: fixture.goals || null, events: fixture.events || [], statistics: fixture.statistics || [], lineups: fixture.lineups || [] }, odds1xBet: odds ? { home: odds.home, draw: odds.draw, away: odds.away, over25: odds.over25, under25: odds.under25 } : null, oddsUpdatedAt: odds?.sourceTimestamp ?? null, forecast: providerForecast, forecastSource: providerForecast ? 'API-Football provider forecast' : null, championDecision, history, generatedAt: new Date().toISOString(), fixtureSource: 'API-Football' }
     setDiskCache(cacheKey, payload)
     return NextResponse.json(payload)
   } catch (error) {
