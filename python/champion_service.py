@@ -1,9 +1,10 @@
 """Authoritative live Champion inference using the validated Python research stack."""
 from __future__ import annotations
-import json, math
+import json, math, os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
+import httpx
 from python.calibration.calibrator import ProbabilityCalibrator
 from python.engine.edge_calculator import EdgeCalculator
 from python.engine.nobet_gate import NoBetGate
@@ -27,10 +28,20 @@ def _age_seconds(value: Optional[str]) -> float:
         return float("inf")
 
 def _load_artifact() -> Dict[str, Any]:
-    if not ARTIFACT_PATH.exists():
+    if ARTIFACT_PATH.exists():
+        with ARTIFACT_PATH.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    url = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SECRET_KEY") or os.environ.get("SUPABASE_PUBLISHABLE_KEY") or os.environ.get("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY")
+    if not url or not key:
         raise RuntimeError("CHAMPION_ARTIFACT_UNAVAILABLE")
-    with ARTIFACT_PATH.open("r", encoding="utf-8") as f:
-        return json.load(f)
+    endpoint = f"{url.rstrip('/')}/rest/v1/champion_artifacts?select=artifact&is_active=eq.true&order=created_at.desc&limit=1"
+    response = httpx.get(endpoint, headers={"apikey": key, "Authorization": "Bearer " + key}, timeout=10.0)
+    response.raise_for_status()
+    rows = response.json()
+    if not rows:
+        raise RuntimeError("CHAMPION_ARTIFACT_UNAVAILABLE")
+    return rows[0]["artifact"]
 
 def _calibrate(cal: ProbabilityCalibrator, market: str, p: float) -> float:
     if market not in cal.calibrators:
