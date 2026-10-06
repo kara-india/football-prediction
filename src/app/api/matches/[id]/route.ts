@@ -101,22 +101,27 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       console.warn('[MATCH DETAIL] Live 1xBet odds lookup failed', fixtureId, error)
     }
 
-    const [oddsResult, predictionResult, h2hResult] = await Promise.allSettled([
-      fetchApiFootball(`/odds?fixture=${fixtureId}`, true),
-      fetchApiFootball(`/predictions?fixture=${fixtureId}`, true),
-      Number.isInteger(homeId) && Number.isInteger(awayId) ? fetchApiFootball(`/fixtures/headtohead?h2h=${homeId}-${awayId}`, true) : Promise.resolve({ response: [] }),
-    ])
-    const prematchOdds = oddsResult.status === 'fulfilled' ? extract1xBetOdds(oddsResult.value.response?.[0]?.bookmakers || []) : null
-    let odds = liveOdds || prematchOdds
-    if (!odds && fixture.fixture?.status?.short && ['1H', '2H', 'ET', 'P'].includes(String(fixture.fixture.status.short))) {
+    const isLiveFixture = ['1H', '2H', 'ET', 'P', 'LIVE'].includes(String(fixture.fixture?.status?.short || ''))
+    let pulseScoreLiveOdds: any = null
+    if (isLiveFixture && !liveOdds) {
       const pulseScoreOdds = await fetch1xBetLiveOddsFromPulseScore([{
         id: fixtureId,
         home: String(fixture.teams?.home?.name || ''),
         away: String(fixture.teams?.away?.name || ''),
         kickoff: fixture.fixture?.date,
       }])
-      odds = pulseScoreOdds.get(fixtureId) || null
+      pulseScoreLiveOdds = pulseScoreOdds.get(fixtureId) || null
     }
+
+    const [oddsResult, predictionResult, h2hResult] = await Promise.allSettled([
+      fetchApiFootball(`/odds?fixture=${fixtureId}`, true),
+      fetchApiFootball(`/predictions?fixture=${fixtureId}`, true),
+      Number.isInteger(homeId) && Number.isInteger(awayId) ? fetchApiFootball(`/fixtures/headtohead?h2h=${homeId}-${awayId}`, true) : Promise.resolve({ response: [] }),
+    ])
+    const prematchOdds = oddsResult.status === 'fulfilled' ? extract1xBetOdds(oddsResult.value.response?.[0]?.bookmakers || []) : null
+    // Never use a pre-match price as a live execution price. For live fixtures,
+    // only the current API-Football/PulseScore live 1xBet board is actionable.
+    const odds = isLiveFixture ? (liveOdds || pulseScoreLiveOdds) : prematchOdds
     const providerForecast = predictionResult.status === 'fulfilled' ? extractProviderForecast(predictionResult.value) : null
     const championDecision = computeChampionDecision({
       fixtureId,
