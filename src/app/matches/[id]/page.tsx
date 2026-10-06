@@ -162,6 +162,20 @@ export default function MatchIntelligencePage({ params }: { params: { id: string
     loadDetail()
   }, [matchId])
 
+  useEffect(() => {
+    if (!detail || !['1H', '2H', 'HT', 'ET', 'LIVE'].includes(detail.fixture.status)) return
+    const timer = window.setInterval(async () => {
+      try {
+        const response = await fetch('/api/matches/' + encodeURIComponent(matchId), { cache: 'no-store' })
+        const payload = await response.json()
+        if (response.ok) setDetail(payload)
+      } catch {
+        // Keep the last verified terminal state if a refresh temporarily fails.
+      }
+    }, 15000)
+    return () => window.clearInterval(timer)
+  }, [detail?.fixture.status, matchId])
+
   const fixture = detail?.fixture
   const home = fixture?.teams?.home
   const away = fixture?.teams?.away
