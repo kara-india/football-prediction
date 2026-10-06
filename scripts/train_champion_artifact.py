@@ -26,8 +26,8 @@ def main() -> None:
     # Keep the most recent chronological window for operational retraining.
     # The dynamic model already down-weights older observations; this cap keeps
     # optimizer runtime bounded without introducing look-ahead.
-    if len(df) > 6000:
-        df = df.tail(6000).reset_index(drop=True)
+    if len(df) > 2500:
+        df = df.tail(2500).reset_index(drop=True)
 
     train_end = int(len(df) * 0.70)
     cal_end = int(len(df) * 0.85)
@@ -35,7 +35,7 @@ def main() -> None:
     calibration = df.iloc[train_end:cal_end].copy()
     test = df.iloc[cal_end:].copy()
 
-    model = ScoreDrivenDixonColes(config=DynamicDCConfig(max_iter=60)).fit(train)
+    model = ScoreDrivenDixonColes(config=DynamicDCConfig(max_iter=20)).fit(train)
     raw = {k: [] for k in MARKETS}
     truth = {k: [] for k in MARKETS}
 
