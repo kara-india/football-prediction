@@ -3,7 +3,25 @@ import { fetchApiFootball, extract1xBetOdds, extractProviderForecast, findApiFoo
 import { getDiskCache, setDiskCache } from '@/lib/diskCache'
 import { fetchSofaEvent, fetchSofaEventExtras, sofaStatus } from '@/lib/sofaScore'
 import { fetchEspnSummaryWithForecast } from '@/lib/espn'
-import { computeChampionDecision } from '@/lib/championDecision'
+
+
+async function computePythonChampionDecision(input: Record<string, unknown>) {
+  try {
+    const host = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
+    const url = host ? 'https://' + host + '/api/champion' : 'http://127.0.0.1:3000/api/champion'
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input),
+      cache: 'no-store',
+    })
+    if (!response.ok) throw new Error('Python Champion HTTP ' + response.status)
+    return await response.json()
+  } catch (error) {
+    console.error('[MATCH DETAIL] Python Champion failed', error)
+    return { model: 'CHAMPION', version: 'champion-python-v2.0', action: 'NO_BET', reason: 'CHAMPION_ENGINE_FAILURE' }
+  }
+}
 
 function sofaStatistics(raw: any[]) {
   const home: any[] = []
@@ -123,17 +141,15 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     // only the current API-Football/PulseScore live 1xBet board is actionable.
     const odds = isLiveFixture ? (liveOdds || pulseScoreLiveOdds) : prematchOdds
     const providerForecast = predictionResult.status === 'fulfilled' ? extractProviderForecast(predictionResult.value) : null
-    const championDecision = computeChampionDecision({
-      fixtureId,
+    const championDecision = await computePythonChampionDecision({
+      fixture_id: fixtureId,
       minute: Number(fixture.fixture?.status?.elapsed || 0),
-      scoreHome: Number(fixture.goals?.home || 0),
-      scoreAway: Number(fixture.goals?.away || 0),
-      status: String(fixture.fixture?.status?.short || ''),
-      homeTeam: String(fixture.teams?.home?.name || 'Home'),
-      awayTeam: String(fixture.teams?.away?.name || 'Away'),
+      score_home: Number(fixture.goals?.home || 0),
+      score_away: Number(fixture.goals?.away || 0),
+      is_live: isLiveFixture,
       forecast: providerForecast ? { home: providerForecast.home, draw: providerForecast.draw, away: providerForecast.away } : null,
       odds: odds ? { home: odds.home, draw: odds.draw, away: odds.away, over25: odds.over25, under25: odds.under25 } : null,
-      oddsUpdatedAt: odds?.sourceTimestamp ?? null,
+      odds_updated_at: odds?.sourceTimestamp ?? null,
     })
     const history = h2hResult.status === 'fulfilled' ? (h2hResult.value.response || []).slice(0, 10).map((match: any) => ({ id: Number(match.fixture?.id), date: match.fixture?.date, status: match.fixture?.status?.short, homeTeam: match.teams?.home?.name, awayTeam: match.teams?.away?.name, homeScore: match.goals?.home, awayScore: match.goals?.away })) : []
     const payload = { fixture: { id: fixtureId, kickoff: fixture.fixture?.date, venue: fixture.fixture?.venue?.name || 'TBD', status: fixture.fixture?.status?.short || 'TBD', statusLong: fixture.fixture?.status?.long || 'Unknown', minute: fixture.fixture?.status?.elapsed ?? null, referee: fixture.fixture?.referee || null, league: fixture.league || null, teams: fixture.teams || null, score: fixture.goals || null, events: fixture.events || [], statistics: fixture.statistics || [], lineups: fixture.lineups || [] }, odds1xBet: odds ? { home: odds.home, draw: odds.draw, away: odds.away, over25: odds.over25, under25: odds.under25 } : null, oddsUpdatedAt: odds?.sourceTimestamp ?? null, forecast: providerForecast, forecastSource: providerForecast ? 'API-Football provider forecast' : null, championDecision, history, generatedAt: new Date().toISOString(), fixtureSource: 'API-Football' }
