@@ -1,19 +1,32 @@
 import { NextResponse } from 'next/server'
 import { getDiskCache, setDiskCache } from '@/lib/diskCache'
-import { fetchApiFootball, extract1xBetOdds, fetch1xBetLiveOddsFromOddsApi } from '@/lib/apiFootball'
+import {
+  fetchApiFootball,
+  extract1xBetOdds,
+  fetch1xBetLiveOddsFromPulseScore,
+  fetch1xBetLiveOddsFromOddsApi,
+} from '@/lib/apiFootball'
 import { fetchSofaLive, isSofaAllowedEvent, sofaMappedFixture } from '@/lib/sofaScore'
 import { fetchEspnLiveEvents, espnMappedFixture } from '@/lib/espn'
 
 const CACHE_TTL_MS = 60 * 1000
 const CACHE_KEY = 'live_matches_cache'
+
 function isEligibleFixture(m: any): boolean {
   // Live mode mirrors all senior provider fixtures so available 1xBet live
   // markets can be matched to the exact same terminal fixture.
-  const excluded = /\\b(U17|U18|U19|U20|U21|U23|Youth|Women|Fem|W|Reserves)\\b/i
-  return !(excluded.test(m.teams?.home?.name || '') || excluded.test(m.teams?.away?.name || '') || excluded.test(m.league?.name || ''))
+  const excluded = /\b(U17|U18|U19|U20|U21|U23|Youth|Women|Fem|W|Reserves)\b/i
+  return !(
+    excluded.test(m.teams?.home?.name || '') ||
+    excluded.test(m.teams?.away?.name || '') ||
+    excluded.test(m.league?.name || '')
+  )
 }
 
-async function espnFallback() { const events=await fetchEspnLiveEvents(); return events.map(({event,league,name})=>espnMappedFixture(event,league,name)) }
+async function espnFallback() {
+  const events = await fetchEspnLiveEvents()
+  return events.map(({ event, league, name }) => espnMappedFixture(event, league, name))
+}
 
 async function sofaFallback() {
   const events = (await fetchSofaLive()).filter(isSofaAllowedEvent)
@@ -28,27 +41,41 @@ export async function GET() {
     const json = await fetchApiFootball('/fixtures?live=all', true)
     const eligible = (json.response || []).filter((f: any) => isEligibleFixture(f))
     const liveOddsByFixture = new Map<number, any>()
+
     if (eligible.length > 0) {
       try {
         const oddsJson = await fetchApiFootball('/odds/live', true)
         for (const event of oddsJson.response || []) {
           const fixtureId = Number(event.fixture?.id)
-          if (Number.isFinite(fixtureId)) liveOddsByFixture.set(fixtureId, extract1xBetOdds(event.bookmakers || []))
+          if (Number.isFinite(fixtureId)) {
+            liveOddsByFixture.set(fixtureId, extract1xBetOdds(event.bookmakers || []))
+          }
         }
       } catch (error) {
-        console.warn('[1XBET LIVE ODDS] Unavailable', error)
+        console.warn('[1XBET LIVE ODDS] API-Football unavailable', error)
       }
     }
-    const fallbackOdds = await fetch1xBetLiveOddsFromOddsApi(
-      eligible
-        .filter((m: any) => !liveOddsByFixture.get(Number(m.fixture.id)))
-        .map((m: any) => ({
-          id: Number(m.fixture.id),
-          home: String(m.teams?.home?.name || ''),
-          away: String(m.teams?.away?.name || ''),
-          kickoff: m.fixture?.date,
-        }))
+
+    const unresolvedFixtures = eligible
+      .filter((m: any) => !liveOddsByFixture.get(Number(m.fixture.id)))
+      .map((m: any) => ({
+        id: Number(m.fixture.id),
+        home: String(m.teams?.home?.name || ''),
+        away: String(m.teams?.away?.name || ''),
+        kickoff: m.fixture?.date,
+      }))
+
+    // PulseScore is a direct 1xBet live feed and is preferred over generic
+    // bookmaker aggregation because it covers the full 1xBet live soccer board.
+    const pulseScoreOdds = await fetch1xBetLiveOddsFromPulseScore(unresolvedFixtures)
+    pulseScoreOdds.forEach((odds, fixtureId) => {
+      if (!liveOddsByFixture.get(fixtureId)) liveOddsByFixture.set(fixtureId, odds)
+    })
+
+    const stillUnresolved = unresolvedFixtures.filter(
+      (fixture) => !liveOddsByFixture.get(Number(fixture.id)),
     )
+    const fallbackOdds = await fetch1xBetLiveOddsFromOddsApi(stillUnresolved)
     fallbackOdds.forEach((odds, fixtureId) => {
       if (!liveOddsByFixture.get(fixtureId)) liveOddsByFixture.set(fixtureId, odds)
     })
@@ -69,13 +96,17 @@ export async function GET() {
       events: m.events || [],
       fixtureSource: 'API-Football',
     }))
+
     setDiskCache(CACHE_KEY, mapped)
     return NextResponse.json(mapped)
   } catch (error) {
     console.error('API-Football live feed unavailable, trying SofaScore:', error)
     try {
       const fallback = await espnFallback()
-      if (fallback.length > 0) { setDiskCache(CACHE_KEY, fallback); return NextResponse.json(fallback, { headers: { 'x-data-source': 'espn-fallback' } }) }
+      if (fallback.length > 0) {
+        setDiskCache(CACHE_KEY, fallback)
+        return NextResponse.json(fallback, { headers: { 'x-data-source': 'espn-fallback' } })
+      }
       const fallbackSofa = await sofaFallback()
       setDiskCache(CACHE_KEY, fallbackSofa)
       return NextResponse.json(fallbackSofa, { headers: { 'x-data-source': 'sofascore-fallback' } })
