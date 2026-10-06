@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 import datetime
 from .base import OddsProvider, OddsEvent, OddsMarket, ProviderHealth
 

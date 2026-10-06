@@ -1,7 +1,5 @@
-from typing import Optional
 import datetime
 from .base import OddsProvider, OddsEvent, OddsMarket, ProviderHealth
-from .market_normalizer import normalize_market_name
 
 class APIFootballOddsAdapter(OddsProvider):
     def __init__(self, api_client=None):

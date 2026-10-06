@@ -1,11 +1,12 @@
+from enum import Enum
 """
 Canonical Data Contracts & Schemas
 Authoritative Python dataclasses representing normalized domain entities.
 Adheres strictly to docs/DATA_CONTRACTS.md.
 """
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Any
 
 
 @dataclass(frozen=True)
@@ -166,9 +167,6 @@ class CanonicalSettlement:
     def actual_score_away(self) -> Optional[int]:
         """Alias for actual_away_goals."""
         return self.actual_away_goals
-
-
-from enum import Enum
 
 
 class ErrorCategory(str, Enum):

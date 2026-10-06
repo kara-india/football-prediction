@@ -4,12 +4,11 @@ Adheres strictly to the Anti-Fabrication Rule: if genuine 1xBet prices cannot be
 retrieved or validated, triggers OddsUnavailableException rather than generating
 synthetic, mocked, or fabricated lines.
 """
-import sys
 import logging
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 from ..data_contracts import CanonicalOddsMarket, CanonicalOddsSelection
 from ..odds.devig import DeVIgEngine

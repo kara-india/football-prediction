@@ -4,7 +4,6 @@ Enforces free-tier storage limits (< 500 MB) by safely pruning transient logs
 while strictly defending inviolable analytical tables.
 """
 import os
-import json
 import logging
 import urllib.request
 import urllib.error

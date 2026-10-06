@@ -21,7 +21,7 @@ import logging
 import argparse
 import tempfile
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 
 from python.adapters.quota_manager import CentralQuotaManager
 from python.workers.collector_worker import CollectorWorker

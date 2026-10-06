@@ -9,7 +9,7 @@ import sys
 import json
 import logging
 import urllib.request
-from datetime import datetime, timezone
+
 from typing import Dict, Any, List, Optional, Set, Union, Tuple
 
 from python.engine.settlement import SettlementEngine
