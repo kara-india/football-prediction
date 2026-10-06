@@ -26,8 +26,8 @@ jobs:
       - name: Train validated Champion artifact
         env:
           SUPABASE_URL: https://qqcxjjkgvqknesrtnwal.supabase.co
-          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
-          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_SECRET_KEY: ''
+          SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_MWK1XOnTtdc4MsagVnYHHw_qJUNnqsh'
         run: python scripts/train_champion_artifact.py
       - name: Commit artifact
         run: |
