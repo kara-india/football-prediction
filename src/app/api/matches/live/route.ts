@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getDiskCache, setDiskCache } from '@/lib/diskCache'
-import { fetchApiFootball, extract1xBetOdds } from '@/lib/apiFootball'
+import { fetchApiFootball, extract1xBetOdds, fetch1xBetLiveOddsFromOddsApi } from '@/lib/apiFootball'
 import { fetchSofaLive, isSofaAllowedEvent, sofaMappedFixture } from '@/lib/sofaScore'
 import { fetchEspnLiveEvents, espnMappedFixture } from '@/lib/espn'
 
@@ -39,6 +39,20 @@ export async function GET() {
         console.warn('[1XBET LIVE ODDS] Unavailable', error)
       }
     }
+    const fallbackOdds = await fetch1xBetLiveOddsFromOddsApi(
+      eligible
+        .filter((m: any) => !liveOddsByFixture.get(Number(m.fixture.id)))
+        .map((m: any) => ({
+          id: Number(m.fixture.id),
+          home: String(m.teams?.home?.name || ''),
+          away: String(m.teams?.away?.name || ''),
+          kickoff: m.fixture?.date,
+        }))
+    )
+    for (const [fixtureId, odds] of fallbackOdds.entries()) {
+      if (!liveOddsByFixture.get(fixtureId)) liveOddsByFixture.set(fixtureId, odds)
+    }
+
     const mapped = eligible.map((m: any) => ({
       id: m.fixture.id,
       kickoff: m.fixture.date,
