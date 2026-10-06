@@ -91,16 +91,20 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     if (!fixture) return NextResponse.json({ error: 'Fixture not found.' }, { status: 404 })
     const homeId = Number(fixture.teams?.home?.id)
     const awayId = Number(fixture.teams?.away?.id)
-    const [liveOddsResult, oddsResult, predictionResult, h2hResult] = await Promise.allSettled([
-      fetchApiFootball('/odds/live', true),
+    let liveOdds: any = null
+    try {
+      const liveOddsPayload = await fetchApiFootball('/odds/live', true)
+      const liveOddsEvent = (liveOddsPayload.response || []).find((event: any) => Number(event.fixture?.id) === fixtureId)
+      liveOdds = liveOddsEvent ? extract1xBetOdds(liveOddsEvent.bookmakers || []) : null
+    } catch (error) {
+      console.warn('[MATCH DETAIL] Live 1xBet odds lookup failed', fixtureId, error)
+    }
+
+    const [oddsResult, predictionResult, h2hResult] = await Promise.allSettled([
       fetchApiFootball(`/odds?fixture=${fixtureId}`, true),
       fetchApiFootball(`/predictions?fixture=${fixtureId}`, true),
       Number.isInteger(homeId) && Number.isInteger(awayId) ? fetchApiFootball(`/fixtures/headtohead?h2h=${homeId}-${awayId}`, true) : Promise.resolve({ response: [] }),
     ])
-    const liveOddsEvent = liveOddsResult.status === 'fulfilled'
-      ? (liveOddsResult.value.response || []).find((event: any) => Number(event.fixture?.id) === fixtureId)
-      : null
-    const liveOdds = liveOddsEvent ? extract1xBetOdds(liveOddsEvent.bookmakers || []) : null
     const prematchOdds = oddsResult.status === 'fulfilled' ? extract1xBetOdds(oddsResult.value.response?.[0]?.bookmakers || []) : null
     const odds = liveOdds || prematchOdds
     const providerForecast = predictionResult.status === 'fulfilled' ? extractProviderForecast(predictionResult.value) : null
