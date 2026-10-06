@@ -1,6 +1,8 @@
 """Authoritative live Champion inference using the validated Python research stack."""
 from __future__ import annotations
-import json, math, os
+import json
+import math
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
