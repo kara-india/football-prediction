@@ -29,6 +29,25 @@ async function computePythonChampionDecision(input: Record<string, unknown>) {
 }
 
 
+function espnLiveModelState(summary: any, competitors: Record<string, any>) {
+  const teams = Array.isArray(summary?.boxscore?.teams) ? summary.boxscore.teams : []
+  const findTeam = (side: 'home' | 'away') => teams.find((t: any) => String(t?.homeAway || '').toLowerCase() === side || Number(t?.team?.id || t?.id) === Number(competitors?.[side]?.team?.id))
+  const numericStat = (team: any, names: RegExp[]) => {
+    const rows = Array.isArray(team?.statistics) ? team.statistics : []
+    const row = rows.find((s: any) => names.some((p) => p.test(String(s?.name || s?.label || s?.displayName || '').toLowerCase())))
+    const n = Number(String(row?.value ?? row?.displayValue ?? '').replace('%', ''))
+    return Number.isFinite(n) ? n : 0
+  }
+  const home = findTeam('home')
+  const away = findTeam('away')
+  return {
+    possession_home: numericStat(home, [/possession/]), possession_away: numericStat(away, [/possession/]),
+    shots_home: numericStat(home, [/^shots?$/, /total shots/]), shots_away: numericStat(away, [/^shots?$/, /total shots/]),
+    shots_on_target_home: numericStat(home, [/shots on target/, /shots on goal/]), shots_on_target_away: numericStat(away, [/shots on target/, /shots on goal/]),
+    xg_home: numericStat(home, [/expected goals/, /^xg$/]), xg_away: numericStat(away, [/expected goals/, /^xg$/]),
+  }
+}
+
 function liveModelState(fixture: any) {
   const stats = fixture?.statistics || []
   const read = (teamId: number, names: string[]) => {
@@ -124,20 +143,25 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       const home = competitors.home?.team || {}
       const away = competitors.away?.team || {}
       const kickoff = summary.header?.competitions?.[0]?.date || summary.header?.season?.startDate || new Date().toISOString()
-      const apiFixture = await findApiFootballFixtureByTeams(home.displayName || home.name || '', away.displayName || away.name || '', kickoff.slice(0,10))
-      const apiOdds = apiFixture?.fixture?.id ? await fetch1xBetOddsForFixture(Number(apiFixture.fixture.id)) : null
-      const espnLive = summary.header?.competitions?.[0]?.status?.type?.state === 'in'
+      const espnStatus = summary.header?.competitions?.[0]?.status?.type || {}
+      const espnLive = espnStatus.state === 'in'
+      const displayClock = String(espnStatus.displayClock || '')
+      const clockMinute = Number(displayClock.match(/^(\d+)/)?.[1] || 0)
+      const pulseScoreOdds = await fetch1xBetLiveOddsFromPulseScore([{ id: Number(espnMatch[2]), home: String(home.displayName || home.name || ''), away: String(away.displayName || away.name || ''), kickoff }])
+      const apiOdds = pulseScoreOdds.get(Number(espnMatch[2])) || null
+      const liveState = espnLiveModelState(summary, competitors)
       const championDecision = await computePythonChampionDecision({
         fixture_id: Number(espnMatch[2]),
-        minute: Number(summary.header?.competitions?.[0]?.status?.type?.clock?.value || 0),
-        score_home: Number(competitors.home?.score || 0),
-        score_away: Number(competitors.away?.score || 0),
-        is_live: espnLive,
+        home_team: String(home.displayName || home.name || ''),
+        away_team: String(away.displayName || away.name || ''),
+        minute: clockMinute,
+        score_home: Number(competitors.home?.score || 0), score_away: Number(competitors.away?.score || 0),
+        is_live: espnLive, ...liveState,
         forecast: forecast ? { home: forecast.home, draw: forecast.draw, away: forecast.away } : null,
         odds: apiOdds ? { home: apiOdds.home, draw: apiOdds.draw, away: apiOdds.away, over25: apiOdds.over25, under25: apiOdds.under25 } : null,
         odds_updated_at: apiOdds?.sourceTimestamp ?? null,
       })
-      const payload = { fixture: { id: Number(espnMatch[2]), kickoff, venue: summary.gameInfo?.venue?.fullName || 'TBD', status: summary.header?.competitions?.[0]?.status?.type?.state === 'in' ? 'LIVE' : summary.header?.competitions?.[0]?.status?.type?.state === 'post' ? 'FT' : 'NS', statusLong: summary.header?.competitions?.[0]?.status?.type?.detail || 'Unknown', minute: null, referee: summary.gameInfo?.officials?.[0]?.fullName || null, league: { name: summary.header?.league?.name || espnMatch[1] }, teams: { home: { id: Number(home.id||0), name: home.displayName||home.name||'Home', logo: home.logo }, away: { id: Number(away.id||0), name: away.displayName||away.name||'Away', logo: away.logo } }, score: { home: Number(competitors.home?.score||0), away: Number(competitors.away?.score||0) }, events: summary.keyEvents || summary.plays || [], statistics: summary.boxscore?.teams || [], lineups: summary.rosters || [] }, odds1xBet: apiOdds ? { home: apiOdds.home, draw: apiOdds.draw, away: apiOdds.away, over25: apiOdds.over25, under25: apiOdds.under25 } : null, oddsUpdatedAt: apiOdds?.sourceTimestamp ?? null, forecast, forecastSource, championDecision, history: (summary.seasonseries || []).filter((m:any)=>m?.id || m?.competitions?.length).slice(0,10).map((m:any)=>({id:Number(m.id||0),date:m.date||'',status:m.status?.type?.state||'unknown',homeTeam:m.competitions?.[0]?.competitors?.find((c:any)=>c.homeAway==='home')?.team?.displayName||'',awayTeam:m.competitions?.[0]?.competitors?.find((c:any)=>c.homeAway==='away')?.team?.displayName||'',homeScore:Number(m.competitions?.[0]?.competitors?.find((c:any)=>c.homeAway==='home')?.score||0),awayScore:Number(m.competitions?.[0]?.competitors?.find((c:any)=>c.homeAway==='away')?.score||0)})),generatedAt:new Date().toISOString(),fixtureSource:'ESPN' }
+      const payload = { fixture: { id: Number(espnMatch[2]), kickoff, venue: summary.gameInfo?.venue?.fullName || 'TBD', status: espnLive ? 'LIVE' : summary.header?.competitions?.[0]?.status?.type?.state === 'post' ? 'FT' : 'NS', statusLong: summary.header?.competitions?.[0]?.status?.type?.detail || 'Unknown', minute: clockMinute || null, referee: summary.gameInfo?.officials?.[0]?.fullName || null, league: { name: summary.header?.league?.name || espnMatch[1] }, teams: { home: { id: Number(home.id||0), name: home.displayName||home.name||'Home', logo: home.logo }, away: { id: Number(away.id||0), name: away.displayName||away.name||'Away', logo: away.logo } }, score: { home: Number(competitors.home?.score||0), away: Number(competitors.away?.score||0) }, events: summary.keyEvents || summary.plays || [], statistics: summary.boxscore?.teams || [], lineups: summary.rosters || [] }, odds1xBet: apiOdds ? { home: apiOdds.home, draw: apiOdds.draw, away: apiOdds.away, over25: apiOdds.over25, under25: apiOdds.under25 } : null, oddsUpdatedAt: apiOdds?.sourceTimestamp ?? null, forecast, forecastSource, championDecision, history: (summary.seasonseries || []).filter((m:any)=>m?.id || m?.competitions?.length).slice(0,10).map((m:any)=>({id:Number(m.id||0),date:m.date||'',status:m.status?.type?.state||'unknown',homeTeam:m.competitions?.[0]?.competitors?.find((c:any)=>c.homeAway==='home')?.team?.displayName||'',awayTeam:m.competitions?.[0]?.competitors?.find((c:any)=>c.homeAway==='away')?.team?.displayName||'',homeScore:Number(m.competitions?.[0]?.competitors?.find((c:any)=>c.homeAway==='home')?.score||0),awayScore:Number(m.competitions?.[0]?.competitors?.find((c:any)=>c.homeAway==='away')?.score||0)})),generatedAt:new Date().toISOString(),fixtureSource:'ESPN' }
       return NextResponse.json(payload)
     } catch (error) { console.error('[MATCH DETAIL] ESPN fallback failed',error); return NextResponse.json({error:'Unable to fetch ESPN fixture detail.'},{status:502}) }
   }
