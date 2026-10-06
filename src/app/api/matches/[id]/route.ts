@@ -23,6 +23,33 @@ async function computePythonChampionDecision(input: Record<string, unknown>) {
   }
 }
 
+
+function liveModelState(fixture: any) {
+  const stats = fixture?.statistics || []
+  const read = (teamId: number, names: string[]) => {
+    const block = stats.find((s: any) => Number(s.team?.id) === teamId)
+    const item = (block?.statistics || []).find((x: any) => names.some(n => String(x.type || '').toLowerCase() === n.toLowerCase()))
+    const value = item?.value
+    if (value == null) return 0
+    const parsed = Number(String(value).replace('%', ''))
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+  const events = Array.isArray(fixture?.events) ? fixture.events : []
+  const red = events.filter((e: any) => String(e.type || '').toLowerCase() === 'card' && /red/i.test(String(e.detail || '')))
+  const redHome = red.filter((e: any) => Number(e.team?.id) === Number(fixture?.teams?.home?.id)).length
+  const redAway = red.filter((e: any) => Number(e.team?.id) === Number(fixture?.teams?.away?.id)).length
+  return {
+    shots_on_target_home: read(Number(fixture?.teams?.home?.id), ['Shots on Goal', 'Shots on Target']),
+    shots_on_target_away: read(Number(fixture?.teams?.away?.id), ['Shots on Goal', 'Shots on Target']),
+    xg_home: read(Number(fixture?.teams?.home?.id), ['Expected Goals', 'xG']),
+    xg_away: read(Number(fixture?.teams?.away?.id), ['Expected Goals', 'xG']),
+    red_cards_home: redHome,
+    red_cards_away: redAway,
+    substitutions_home: events.filter((e: any) => String(e.type || '').toLowerCase() === 'subst' && Number(e.team?.id) === Number(fixture?.teams?.home?.id)).length,
+    substitutions_away: events.filter((e: any) => String(e.type || '').toLowerCase() === 'subst' && Number(e.team?.id) === Number(fixture?.teams?.away?.id)).length,
+  }
+}
+
 function sofaStatistics(raw: any[]) {
   const home: any[] = []
   const away: any[] = []
@@ -154,6 +181,9 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     const providerForecast = predictionResult.status === 'fulfilled' ? extractProviderForecast(predictionResult.value) : null
     const championDecision = await computePythonChampionDecision({
       fixture_id: fixtureId,
+      home_team: String(fixture.teams?.home?.name || ''),
+      away_team: String(fixture.teams?.away?.name || ''),
+      ...liveModelState(fixture),
       minute: Number(fixture.fixture?.status?.elapsed || 0),
       score_home: Number(fixture.goals?.home || 0),
       score_away: Number(fixture.goals?.away || 0),
