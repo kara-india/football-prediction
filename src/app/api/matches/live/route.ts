@@ -73,7 +73,8 @@ export async function GET() {
     })
 
     const stillUnresolved = unresolvedFixtures.filter(
-      (fixture) => !liveOddsByFixture.get(Number(fixture.id)),
+      (fixture: { id: number; home: string; away: string; kickoff?: string }) =>
+        !liveOddsByFixture.get(Number(fixture.id)),
     )
     const fallbackOdds = await fetch1xBetLiveOddsFromOddsApi(stillUnresolved)
     fallbackOdds.forEach((odds, fixtureId) => {
