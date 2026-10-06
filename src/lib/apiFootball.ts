@@ -39,7 +39,6 @@ export async function fetchApiFootball(path: string, isUserDemand = false): Prom
   return payload
 }
 
-
 let cached1xBetBookmakerId: number | null | undefined
 
 export async function resolve1xBetBookmakerId(): Promise<number | null> {
@@ -163,7 +162,6 @@ export function extractTeamStatistic(statistics: any[], teamId: number, names: R
   return Number.isFinite(numeric) ? numeric : null
 }
 
-
 export async function fetch1xBetOddsForFixture(fixtureId: number) {
   if (!Number.isInteger(fixtureId) || fixtureId <= 0) return null
   try {
@@ -174,7 +172,6 @@ export async function fetch1xBetOddsForFixture(fixtureId: number) {
     return null
   }
 }
-
 
 function normalizeOddsTeamName(value: unknown): string {
   return String(value || '')
@@ -190,6 +187,99 @@ function oddsApiTeamMatch(a: unknown, b: unknown): boolean {
   const y = normalizeOddsTeamName(b)
   if (!x || !y) return false
   return x === y || x.includes(y) || y.includes(x)
+}
+
+function pulseScoreTeamMatch(a: unknown, b: unknown): boolean {
+  const x = normalizeOddsTeamName(a)
+  const y = normalizeOddsTeamName(b)
+  if (!x || !y) return false
+  return x === y || x.includes(y) || y.includes(x)
+}
+
+function extractPulseScore1xBetOdds(event: any): any | null {
+  const markets = Array.isArray(event?.markets) ? event.markets : []
+  const result = markets.find((m: any) =>
+    m?.isActive !== false &&
+    /^(MATCH_RESULT|1X2)$/i.test(String(m?.canonicalMarket || m?.type || '')),
+  )
+  const totals = markets.find((m: any) =>
+    m?.isActive !== false &&
+    /^(OVER_UNDER|TOTALS)$/i.test(String(m?.canonicalMarket || m?.type || '')),
+  )
+
+  const selections = (market: any) => Array.isArray(market?.selections) ? market.selections : []
+  const findOutcome = (market: any, names: string[], predicate?: (selection: any) => boolean) => {
+    const selection = selections(market).find((item: any) => {
+      if (item?.isActive === false) return false
+      if (predicate && !predicate(item)) return false
+      const value = String(item?.canonicalOutcome || item?.outcome || item?.name || '').toLowerCase()
+      const raw = String(item?.rawName || '').toLowerCase()
+      return names.some((name) => value === name || raw === name)
+    })
+    const odd = Number(selection?.odds ?? selection?.price)
+    return Number.isFinite(odd) && odd > 1 ? odd : null
+  }
+
+  const odds = {
+    home: findOutcome(result, ['home', '1']),
+    draw: findOutcome(result, ['draw', 'x']),
+    away: findOutcome(result, ['away', '2']),
+    over25: findOutcome(totals, ['over'], (item) => Number(item?.line ?? item?.point) === 2.5),
+    under25: findOutcome(totals, ['under'], (item) => Number(item?.line ?? item?.point) === 2.5),
+    sourceTimestamp:
+      typeof event?.updatedAt === 'string'
+        ? event.updatedAt
+        : typeof event?.lastUpdate === 'string'
+          ? event.lastUpdate
+          : new Date().toISOString(),
+  }
+
+  return Object.values(odds).some((value) => value !== null && value !== '')
+    ? odds
+    : null
+}
+
+export async function fetch1xBetLiveOddsFromPulseScore(fixtures: Array<{
+  id: number
+  home: string
+  away: string
+  kickoff?: string
+}>) {
+  const apiKey = process.env.PULSESCORE_API_KEY
+  if (!apiKey || !fixtures.length) return new Map<number, any>()
+
+  try {
+    const url = new URL('https://api.pulsescore.net/api/onexbet/live-events')
+    url.searchParams.set('sport', 'soccer')
+    url.searchParams.set('limit', '30')
+    const response = await fetch(url.toString(), {
+      headers: {
+        'X-Secret': apiKey,
+        Accept: 'application/json',
+      },
+      cache: 'no-store',
+    })
+    if (!response.ok) throw new Error(`PulseScore HTTP ${response.status}`)
+    const payload = await response.json()
+    const events = Array.isArray(payload) ? payload : Array.isArray(payload?.events) ? payload.events : []
+    const result = new Map<number, any>()
+
+    for (const fixture of fixtures) {
+      const event = events.find((item: any) =>
+        pulseScoreTeamMatch(item?.home, fixture.home) &&
+        pulseScoreTeamMatch(item?.away, fixture.away),
+      )
+      if (!event) continue
+
+      const odds = extractPulseScore1xBetOdds(event)
+      if (odds) result.set(Number(fixture.id), odds)
+    }
+
+    return result
+  } catch (error) {
+    console.warn('[PULSESCORE 1XBET LIVE] Lookup failed', error)
+    return new Map<number, any>()
+  }
 }
 
 export async function fetch1xBetLiveOddsFromOddsApi(fixtures: Array<{
