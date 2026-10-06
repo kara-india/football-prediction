@@ -1,16 +1,69 @@
 import { NextResponse } from 'next/server'
 import { fetchApiFootball, extract1xBetOdds, extractProviderForecast } from '@/lib/apiFootball'
 import { getDiskCache, setDiskCache } from '@/lib/diskCache'
+import { fetchSofaEvent, fetchSofaEventExtras, sofaStatus } from '@/lib/sofaScore'
 
-export async function GET(
-  _request: Request,
-  { params }: { params: { id: string } },
-) {
-  const fixtureId = Number(params.id)
-  if (!Number.isInteger(fixtureId) || fixtureId <= 0) {
-    return NextResponse.json({ error: 'Invalid fixture id.' }, { status: 400 })
+function sofaStatistics(raw: any[]) {
+  const home: any[] = []
+  const away: any[] = []
+  for (const period of raw || []) {
+    for (const group of period.groups || []) {
+      for (const item of group.statisticsItems || []) {
+        const type = item.name || item.key
+        if (item.homeValue !== undefined) home.push({ type, value: item.homeValue })
+        else if (item.home !== undefined) home.push({ type, value: item.home })
+        if (item.awayValue !== undefined) away.push({ type, value: item.awayValue })
+        else if (item.away !== undefined) away.push({ type, value: item.away })
+      }
+    }
   }
+  return [
+    { team: { id: Number(raw?.[0]?.homeTeam?.id || 0) }, statistics: home },
+    { team: { id: Number(raw?.[0]?.awayTeam?.id || 0) }, statistics: away },
+  ]
+}
 
+function sofaLineups(raw: any, homeTeam: any, awayTeam: any) {
+  if (!raw?.home || !raw?.away) return []
+  const map = (side: any, team: any) => ({
+    team: { id: Number(team.id), name: team.name },
+    formation: side.formation || 'TBD',
+    startXI: (side.players || []).filter((p: any) => p.substitute !== true).slice(0, 11).map((p: any) => ({
+      player: { id: p.player?.id, name: p.player?.name, number: p.shirtNumber, pos: p.position },
+    })),
+    substitutes: (side.substitutes || []).map((p: any) => ({
+      player: { id: p.player?.id, name: p.player?.name, number: p.shirtNumber, pos: p.position },
+    })),
+  })
+  return [map(raw.home, homeTeam), map(raw.away, awayTeam)]
+}
+
+function sofaEvents(raw: any[]) {
+  return (raw || []).map((event: any) => ({
+    time: { elapsed: event.time || event.timeSeconds ? Math.floor(Number(event.time || 0)) : null },
+    team: { id: event.isHome ? undefined : undefined, name: event.isHome ? undefined : undefined },
+    player: { id: event.player?.id, name: event.player?.name || event.playerName },
+    type: event.incidentType || 'event',
+    detail: event.incidentClass || event.incidentType || 'event',
+    comments: event.reason || '',
+  }))
+}
+
+function sofaH2H(raw: any[]) {
+  return (raw || []).slice(0, 10).map((match: any) => ({
+    id: Number(match.id),
+    date: match.startTimestamp ? new Date(match.startTimestamp * 1000).toISOString() : '',
+    status: match.status?.type || 'unknown',
+    homeTeam: match.homeTeam?.name || 'Home',
+    awayTeam: match.awayTeam?.name || 'Away',
+    homeScore: match.homeScore?.current ?? match.homeScore?.display ?? null,
+    awayScore: match.awayScore?.current ?? match.awayScore?.display ?? null,
+  }))
+}
+
+export async function GET(_request: Request, { params }: { params: { id: string } }) {
+  const fixtureId = Number(params.id)
+  if (!Number.isInteger(fixtureId) || fixtureId <= 0) return NextResponse.json({ error: 'Invalid fixture id.' }, { status: 400 })
   const cacheKey = `match_detail_${fixtureId}`
   const cached = getDiskCache<any>(cacheKey, 60 * 1000)
   if (cached) return NextResponse.json(cached)
@@ -18,83 +71,58 @@ export async function GET(
   try {
     const fixtureJson = await fetchApiFootball(`/fixtures?id=${fixtureId}`, true)
     const fixture = fixtureJson.response?.[0]
-    if (!fixture) {
-      return NextResponse.json({ error: 'Fixture not found.' }, { status: 404 })
-    }
-
+    if (!fixture) return NextResponse.json({ error: 'Fixture not found.' }, { status: 404 })
     const homeId = Number(fixture.teams?.home?.id)
     const awayId = Number(fixture.teams?.away?.id)
-
     const [oddsResult, predictionResult, h2hResult] = await Promise.allSettled([
       fetchApiFootball(`/odds?fixture=${fixtureId}`, true),
       fetchApiFootball(`/predictions?fixture=${fixtureId}`, true),
-      Number.isInteger(homeId) && Number.isInteger(awayId)
-        ? fetchApiFootball(`/fixtures/headtohead?h2h=${homeId}-${awayId}`, true)
-        : Promise.resolve({ response: [] }),
+      Number.isInteger(homeId) && Number.isInteger(awayId) ? fetchApiFootball(`/fixtures/headtohead?h2h=${homeId}-${awayId}`, true) : Promise.resolve({ response: [] }),
     ])
-
-    const odds =
-      oddsResult.status === 'fulfilled'
-        ? extract1xBetOdds(oddsResult.value.response?.[0]?.bookmakers || [])
-        : null
-
-    const providerForecast =
-      predictionResult.status === 'fulfilled'
-        ? extractProviderForecast(predictionResult.value)
-        : null
-
-    const history =
-      h2hResult.status === 'fulfilled'
-        ? (h2hResult.value.response || []).slice(0, 10).map((match: any) => ({
-            id: Number(match.fixture?.id),
-            date: match.fixture?.date,
-            status: match.fixture?.status?.short,
-            homeTeam: match.teams?.home?.name,
-            awayTeam: match.teams?.away?.name,
-            homeScore: match.goals?.home,
-            awayScore: match.goals?.away,
-          }))
-        : []
-
-    const payload = {
-      fixture: {
-        id: fixtureId,
-        kickoff: fixture.fixture?.date,
-        venue: fixture.fixture?.venue?.name || 'TBD',
-        status: fixture.fixture?.status?.short || 'TBD',
-        statusLong: fixture.fixture?.status?.long || 'Unknown',
-        minute: fixture.fixture?.status?.elapsed ?? null,
-        referee: fixture.fixture?.referee || null,
-        league: fixture.league || null,
-        teams: fixture.teams || null,
-        score: fixture.goals || null,
-        events: fixture.events || [],
-        statistics: fixture.statistics || [],
-        lineups: fixture.lineups || [],
-      },
-      odds1xBet: odds
-        ? {
-            home: odds.home,
-            draw: odds.draw,
-            away: odds.away,
-            over25: odds.over25,
-            under25: odds.under25,
-          }
-        : null,
-      oddsUpdatedAt: odds?.sourceTimestamp ?? null,
-      forecast: providerForecast,
-      forecastSource: providerForecast ? 'API-Football provider forecast' : null,
-      history,
-      generatedAt: new Date().toISOString(),
-    }
-
+    const odds = oddsResult.status === 'fulfilled' ? extract1xBetOdds(oddsResult.value.response?.[0]?.bookmakers || []) : null
+    const providerForecast = predictionResult.status === 'fulfilled' ? extractProviderForecast(predictionResult.value) : null
+    const history = h2hResult.status === 'fulfilled' ? (h2hResult.value.response || []).slice(0, 10).map((match: any) => ({ id: Number(match.fixture?.id), date: match.fixture?.date, status: match.fixture?.status?.short, homeTeam: match.teams?.home?.name, awayTeam: match.teams?.away?.name, homeScore: match.goals?.home, awayScore: match.goals?.away })) : []
+    const payload = { fixture: { id: fixtureId, kickoff: fixture.fixture?.date, venue: fixture.fixture?.venue?.name || 'TBD', status: fixture.fixture?.status?.short || 'TBD', statusLong: fixture.fixture?.status?.long || 'Unknown', minute: fixture.fixture?.status?.elapsed ?? null, referee: fixture.fixture?.referee || null, league: fixture.league || null, teams: fixture.teams || null, score: fixture.goals || null, events: fixture.events || [], statistics: fixture.statistics || [], lineups: fixture.lineups || [] }, odds1xBet: odds ? { home: odds.home, draw: odds.draw, away: odds.away, over25: odds.over25, under25: odds.under25 } : null, oddsUpdatedAt: odds?.sourceTimestamp ?? null, forecast: providerForecast, forecastSource: providerForecast ? 'API-Football provider forecast' : null, history, generatedAt: new Date().toISOString(), fixtureSource: 'API-Football' }
     setDiskCache(cacheKey, payload)
     return NextResponse.json(payload)
   } catch (error) {
-    console.error(`[MATCH DETAIL] Failed for fixture ${fixtureId}`, error)
-    return NextResponse.json(
-      { error: 'Unable to fetch live match detail from the upstream provider.' },
-      { status: 502 },
-    )
+    console.error(`[MATCH DETAIL] API-Football failed for fixture ${fixtureId}, trying SofaScore`, error)
+    try {
+      const event = await fetchSofaEvent(fixtureId)
+      const extras = await fetchSofaEventExtras(fixtureId)
+      const home = event.homeTeam || {}
+      const away = event.awayTeam || {}
+      const homeTeam = { id: Number(home.id), name: home.name || 'Home', logo: undefined }
+      const awayTeam = { id: Number(away.id), name: away.name || 'Away', logo: undefined }
+      const payload = {
+        fixture: {
+          id: fixtureId,
+          kickoff: event.startTimestamp ? new Date(event.startTimestamp * 1000).toISOString() : new Date().toISOString(),
+          venue: event.venue?.name || 'TBD',
+          status: sofaStatus(event),
+          statusLong: event.status?.description || event.status?.type || 'Unknown',
+          minute: event.status?.type === 'inprogress' && event.time?.currentPeriodStartTimestamp ? Math.max(0, Math.floor((Date.now() - event.time.currentPeriodStartTimestamp * 1000) / 60000)) : null,
+          referee: event.referee?.name || null,
+          league: { id: Number(event.tournament?.uniqueTournament?.id || 0), name: event.tournament?.uniqueTournament?.name || event.tournament?.name || 'Competition', country: event.tournament?.category?.name },
+          teams: { home: homeTeam, away: awayTeam },
+          score: { home: event.homeScore?.current ?? event.homeScore?.display ?? null, away: event.awayScore?.current ?? event.awayScore?.display ?? null },
+          events: sofaEvents(extras.incidents),
+          statistics: sofaStatistics(extras.statistics),
+          lineups: sofaLineups(extras.lineups, homeTeam, awayTeam),
+        },
+        odds1xBet: null,
+        oddsUpdatedAt: null,
+        forecast: null,
+        forecastSource: null,
+        history: sofaH2H(extras.h2h),
+        generatedAt: new Date().toISOString(),
+        fixtureSource: 'SofaScore',
+      }
+      setDiskCache(cacheKey, payload)
+      return NextResponse.json(payload)
+    } catch (fallbackError) {
+      console.error('[MATCH DETAIL] SofaScore fallback failed', fallbackError)
+      return NextResponse.json({ error: 'Unable to fetch live match detail from available providers.' }, { status: 502 })
+    }
   }
 }
