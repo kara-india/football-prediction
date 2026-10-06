@@ -108,6 +108,8 @@ class PointInTimeReplayer:
         normalized_history: List[Dict[str, Any]] = []
         for m in prior_matches:
             if isinstance(m, CanonicalMatch):
+                if m.home_team_id is None or m.away_team_id is None:
+                    raise ValueError("Canonical match is missing team IDs")
                 home_id = int(m.home_team_id)
                 away_id = int(m.away_team_id)
                 # CanonicalMatch does not store goals directly; retrieve from metadata if dict
@@ -115,8 +117,12 @@ class PointInTimeReplayer:
                 h_goals = getattr(m, "home_goals", 0)
                 a_goals = getattr(m, "away_goals", 0)
             else:
-                home_id = int(m.get("home_team_id") or m.get("home_id") or m.get("home_team"))
-                away_id = int(m.get("away_team_id") or m.get("away_id") or m.get("away_team"))
+                home_raw = m.get("home_team_id") or m.get("home_id") or m.get("home_team")
+                away_raw = m.get("away_team_id") or m.get("away_id") or m.get("away_team")
+                if home_raw is None or away_raw is None:
+                    raise ValueError("Historical match is missing team IDs")
+                home_id = int(home_raw)
+                away_id = int(away_raw)
                 h_goals = m.get("home_goals") if m.get("home_goals") is not None else m.get("fthg", 0)
                 a_goals = m.get("away_goals") if m.get("away_goals") is not None else m.get("ftag", 0)
                 match_dt = _to_datetime_utc(m.get("kickoff_utc") or m.get("date") or m.get("match_date")) or datetime.min.replace(tzinfo=timezone.utc)
@@ -412,8 +418,12 @@ class PointInTimeReplayer:
 
         # 1. Elo and Form ratings as of T
         elo = self.compute_elo_at(historical_matches, t)
-        home_id = int(match.get("home_team_id") or match.get("home_id") or match.get("home_team"))
-        away_id = int(match.get("away_team_id") or match.get("away_id") or match.get("away_team"))
+        home_raw = match.get("home_team_id") or match.get("home_id") or match.get("home_team")
+        away_raw = match.get("away_team_id") or match.get("away_id") or match.get("away_team")
+        if home_raw is None or away_raw is None:
+            raise ValueError("Match is missing team IDs")
+        home_id = int(home_raw)
+        away_id = int(away_raw)
 
         home_form = self.compute_form_at(historical_matches, t, home_id)
         away_form = self.compute_form_at(historical_matches, t, away_id)

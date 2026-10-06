@@ -258,6 +258,8 @@ class LearnedFormModel:
     def serialize(self) -> Dict[str, Any]:
         if not self.fitted or self.model is None:
             raise RuntimeError("Model is not fitted.")
+        if self.mean_ is None or self.scale_ is None:
+            raise RuntimeError("LearnedFormModel scaling parameters are missing.")
         return {
             "model_type": "LearnedFormModel",
             "version": "1.0.0",
