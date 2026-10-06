@@ -318,8 +318,9 @@ class TestAnalysisWorkerMultiCheckpoint:
             assert "delta_odds" in liv
             assert "delta_ev" in liv
 
-        # 3. Verify all candidates are logged to Counterfactual candidate ledger
-        assert len(worker.cf_logger._opportunities) >= 14
+        # 3. Missing odds/calibration must fail closed: predictions remain auditable,
+        # but policy observations are not logged without a complete validated market.
+        assert len(worker.cf_logger._opportunities) == 0
 
 
 class TestLearnerWorkerPromotionGate:

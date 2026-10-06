@@ -205,6 +205,18 @@ class WorkerRunner:
             raise ValueError(f"Unknown worker job: '{job_name}'. Valid jobs are: {self.VALID_JOBS}")
 
         # Execute full sequence if job is 'all'
+        if dry_run:
+            return {
+                "status": "skipped",
+                "worker_name": norm_job,
+                "matches_seen": 0,
+                "matches_analyzed": 0,
+                "predictions_count": 0,
+                "api_requests": 0,
+                "errors_count": 0,
+                "error_details": None,
+            }
+
         if norm_job == "all":
             logger.info("Executing full sequential background worker pipeline...")
             seq_results = {}
