@@ -5,7 +5,7 @@ import math
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 import httpx
 from python.calibration.calibrator import ProbabilityCalibrator
 from python.engine.edge_calculator import EdgeCalculator
@@ -112,7 +112,7 @@ def decide(payload: Dict[str, Any]) -> Dict[str, Any]:
         live_hazard_model=hazard,
     )
 
-    candidates = []
+    candidates: List[Dict[str, Any]] = []
     specs = []
     if all(odds.get(k) is not None and float(odds[k]) > 1 for k in ("home", "draw", "away")):
         specs.append(("MATCH_1X2",
