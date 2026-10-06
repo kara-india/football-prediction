@@ -53,6 +53,24 @@ interface MatchDetail {
     awayScore: number | null
   }>
   generatedAt: string
+  championDecision?: {
+    model: 'CHAMPION'
+    version: string
+    action: 'BET' | 'NO_BET'
+    confidence: number | null
+    selection: string | null
+    label: string | null
+    market: 'MATCH_1X2' | 'TOTAL_GOALS_2_5' | null
+    odds: number | null
+    fairOdds: number | null
+    modelProbability: number | null
+    impliedProbability: number | null
+    devigProbability: number | null
+    edge: number | null
+    expectedValue: number | null
+    reason: string
+    checkedAt: string
+  }
 }
 
 
@@ -149,6 +167,7 @@ export default function MatchIntelligencePage({ params }: { params: { id: string
   const away = fixture?.teams?.away
   const forecast = detail?.forecast
   const odds = detail?.odds1xBet
+  const champion = detail?.championDecision
   const lineups = fixture?.lineups ?? []
 
   const lineupConfirmed = useMemo(
@@ -292,6 +311,42 @@ export default function MatchIntelligencePage({ params }: { params: { id: string
         onRefresh={loadDetail}
       />
 
+      <TerminalCard
+        title="CHAMPION — Live Bet Decision"
+        subtitle="Authoritative decision layer: only real, fresh 1xBet prices that clear the confidence and value gates are actionable."
+        badge={
+          <span className={champion?.action === 'BET' ? 'px-2 py-0.5 rounded border text-[10px] font-mono font-bold border-[#10B981]/40 bg-[#10B981]/15 text-[#10B981]' : 'px-2 py-0.5 rounded border text-[10px] font-mono font-bold border-[#64748B]/40 bg-[#64748B]/10 text-[#94A3B8]'}>
+            {champion?.action === 'BET' ? 'BET' : 'NO BET'}
+          </span>
+        }
+        padding="none"
+      >
+        <div className="p-5">
+          {champion?.action === 'BET' ? (
+            <div className="rounded-xl border border-[#10B981]/30 bg-[#10B981]/5 p-5">
+              <div className="text-[10px] uppercase tracking-widest text-[#64748B] font-mono">Optimal live market</div>
+              <div className="text-2xl sm:text-3xl font-black text-[#F8FAFC] mt-2">{champion.label}</div>
+              <div className="flex flex-wrap items-center gap-3 mt-3 font-mono">
+                <span className="text-[#D4AF37] font-bold text-lg">1xBet {champion.odds?.toFixed(2)}</span>
+                <span className="text-[#10B981] font-bold">{champion.confidence !== null ? (champion.confidence * 100).toFixed(1) + '% confidence' : '—'}</span>
+                <span className="text-[#10B981]">EV {champion.expectedValue !== null ? (champion.expectedValue >= 0 ? '+' : '') + (champion.expectedValue * 100).toFixed(1) + '%' : '—'}</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4 text-[10px] font-mono">
+                <div className="bg-[#0B0F17] rounded-lg p-2"><div className="text-[#64748B]">Model</div><div className="text-[#F8FAFC] font-bold">{champion.modelProbability !== null ? (champion.modelProbability * 100).toFixed(1) + '%' : '—'}</div></div>
+                <div className="bg-[#0B0F17] rounded-lg p-2"><div className="text-[#64748B]">Fair odds</div><div className="text-[#F8FAFC] font-bold">{champion.fairOdds?.toFixed(2) ?? '—'}</div></div>
+                <div className="bg-[#0B0F17] rounded-lg p-2"><div className="text-[#64748B]">Edge</div><div className="text-[#10B981] font-bold">{champion.edge !== null ? '+' + (champion.edge * 100).toFixed(1) + 'pp' : '—'}</div></div>
+                <div className="bg-[#0B0F17] rounded-lg p-2"><div className="text-[#64748B]">Gate</div><div className="text-[#10B981] font-bold">PASSED</div></div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-[#334155] bg-[#0B0F17] p-6 text-center font-mono">
+              <div className="text-xl font-black text-[#F8FAFC]">NO BET</div>
+              <div className="text-xs text-[#94A3B8] mt-2">Champion found no live 1xBet market that clears its confidence, freshness and value gates.</div>
+              <div className="text-[10px] text-[#64748B] mt-3">Reason: {champion?.reason || 'DECISION_UNAVAILABLE'}</div>
+            </div>
+          )}
+        </div>
+      </TerminalCard>
       <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-6">
         <TerminalCard
           title="Forecast — Available Before Lineups"
