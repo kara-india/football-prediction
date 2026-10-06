@@ -108,7 +108,16 @@ def main() -> None:
             "test_end": str(test.date.max()),
         },
     }
-    OUT.write_text(json.dumps(artifact, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    serialized = json.dumps(artifact, indent=2, sort_keys=True) + "\n"
+    OUT.write_text(serialized, encoding="utf-8")
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SECRET_KEY") or os.environ.get("SUPABASE_PUBLISHABLE_KEY")
+    if url and key:
+        endpoint = f"{url.rstrip('/')}/rest/v1/champion_artifacts"
+        headers = {"apikey": key, "Authorization": "Bearer " + key, "Content-Type": "application/json", "Prefer": "return=minimal"}
+        row = {"version": artifact["champion_version"], "artifact": artifact, "validation": artifact["validation"], "is_active": True}
+        response = httpx.post(endpoint, headers=headers, json=row, timeout=30.0)
+        response.raise_for_status()
     print(json.dumps(artifact["validation"], indent=2))
 
 if __name__ == "__main__":
