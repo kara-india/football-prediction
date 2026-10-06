@@ -25,6 +25,7 @@ jobs:
       - run: pip install -r python/requirements.txt
       - name: Train validated Champion artifact
         env:
+          PYTHONPATH: ${{ github.workspace }}
           SUPABASE_URL: https://qqcxjjkgvqknesrtnwal.supabase.co
           SUPABASE_SECRET_KEY: ''
           SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_MWK1XOnTtdc4MsagVnYHHw_qJUNnqsh'
