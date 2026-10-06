@@ -24,8 +24,19 @@ function isEligibleFixture(m: any): boolean {
 }
 
 async function espnFallback() {
-  const events = await fetchEspnLiveEvents()
-  return events.map(({ event, league, name }) => espnMappedFixture(event, league, name))
+  const fixtures = (await fetchEspnLiveEvents()).map(({ event, league, name }) => espnMappedFixture(event, league, name))
+  const pulseFixtures = fixtures.map((fixture: any) => ({
+    id: Number(fixture.providerEventId),
+    home: String(fixture.teams?.home?.name || ''),
+    away: String(fixture.teams?.away?.name || ''),
+    kickoff: fixture.kickoff,
+  })).filter((fixture: any) => Number.isFinite(fixture.id))
+  const pulseOdds = await fetch1xBetLiveOddsFromPulseScore(pulseFixtures)
+  return fixtures.map((fixture: any) => ({
+    ...fixture,
+    odds1xBet: pulseOdds.get(Number(fixture.providerEventId)) || null,
+    oddsUpdatedAt: pulseOdds.get(Number(fixture.providerEventId))?.sourceTimestamp || null,
+  }))
 }
 
 async function sofaFallback() {
