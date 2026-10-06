@@ -120,9 +120,18 @@ export async function GET() {
     setDiskCache(CACHE_KEY, formatted)
     return NextResponse.json(formatted, { headers: fixtureErrors.length ? { 'x-data-warning': 'one-or-more-competition-queries-failed' } : undefined })
   } catch (error) {
-    console.error('API-Football unavailable, trying SofaScore fallback:', error)
+    console.error('API-Football unavailable, trying current-data fallbacks:', error)
     try {
-      const fallback = await sofaFallback(today)
+      const fallback = await espnFallback(today)
+      if (fallback.length > 0) {
+        setDiskCache(CACHE_KEY, fallback)
+        return NextResponse.json(fallback, { headers: { 'x-data-source': 'espn-fallback', 'x-primary-provider-warning': 'api-football-unavailable' } })
+      }
+    } catch (fallbackError) {
+      console.error('ESPN fallback failed:', fallbackError)
+    }
+    try {
+      const fallbackSofa = await sofaFallback(today)
       if (fallbackSofa.length > 0) {
         setDiskCache(CACHE_KEY, fallbackSofa)
         return NextResponse.json(fallbackSofa, { headers: { 'x-data-source': 'sofascore-fallback', 'x-primary-provider-warning': 'api-football-unavailable' } })
