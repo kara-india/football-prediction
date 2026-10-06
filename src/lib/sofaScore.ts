@@ -1,4 +1,4 @@
-const BASE_URL = 'https://www.sofascore.com/api/v1'
+const BASE_URL = 'https://api.sofascore.com/api/v1'
 async function fetchSofa<T>(path: string): Promise<T> { const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 10000); try { const response = await fetch(`${BASE_URL}${path}`, { headers: { 'User-Agent': 'football-prediction/1.0' }, cache: 'no-store', signal: controller.signal }); if (!response.ok) throw new Error(`SofaScore HTTP ${response.status}`); return (await response.json()) as T } finally { clearTimeout(timeout) } }
 export interface SofaEvent { id:number; startTimestamp?:number; homeTeam?:any; awayTeam?:any; tournament?:any; status?:any; homeScore?:any; awayScore?:any; time?:any; venue?:any; referee?:any; roundInfo?:any }
 export async function fetchSofaScheduled(date:string){ const data=await fetchSofa<{events?:SofaEvent[]}>(`/sport/football/scheduled-events/${date}`); return data.events||[] }
