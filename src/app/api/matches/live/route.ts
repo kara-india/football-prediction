@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getDiskCache, setDiskCache } from '@/lib/diskCache'
 import { fetchApiFootball, extract1xBetOdds } from '@/lib/apiFootball'
 import { fetchSofaLive, isSofaAllowedEvent, sofaMappedFixture } from '@/lib/sofaScore'
+import { fetchEspnLiveEvents, espnMappedFixture } from '@/lib/espn'
 
 const CACHE_TTL_MS = 60 * 1000
 const CACHE_KEY = 'live_matches_cache'
@@ -12,6 +13,8 @@ function isEligibleFixture(m: any): boolean {
   const excluded = /\b(U17|U18|U19|U20|U21|U23|Youth|Women|Fem|W|Reserves)\b/i
   return !(excluded.test(m.teams?.home?.name || '') || excluded.test(m.teams?.away?.name || '') || excluded.test(m.league?.name || ''))
 }
+
+async function espnFallback() { const events=await fetchEspnLiveEvents(); return events.map(({event,league,name})=>espnMappedFixture(event,league,name)) }
 
 async function sofaFallback() {
   const events = (await fetchSofaLive()).filter(isSofaAllowedEvent)
@@ -58,9 +61,11 @@ export async function GET() {
   } catch (error) {
     console.error('API-Football live feed unavailable, trying SofaScore:', error)
     try {
-      const fallback = await sofaFallback()
-      setDiskCache(CACHE_KEY, fallback)
-      return NextResponse.json(fallback, { headers: { 'x-data-source': 'sofascore-fallback' } })
+      const fallback = await espnFallback()
+      if (fallback.length > 0) { setDiskCache(CACHE_KEY, fallback); return NextResponse.json(fallback, { headers: { 'x-data-source': 'espn-fallback' } }) }
+      const fallbackSofa = await sofaFallback()
+      setDiskCache(CACHE_KEY, fallbackSofa)
+      return NextResponse.json(fallbackSofa, { headers: { 'x-data-source': 'sofascore-fallback' } })
     } catch (fallbackError) {
       console.error('SofaScore live fallback failed:', fallbackError)
       const stale = getDiskCache<any[]>(CACHE_KEY, Infinity)
