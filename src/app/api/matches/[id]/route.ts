@@ -48,6 +48,18 @@ function espnLiveModelState(summary: any, competitors: Record<string, any>) {
   }
 }
 
+function lineupContract(rows: any[]) {
+  const sheets = Array.isArray(rows) ? rows : []
+  const home = sheets.find((r: any) => String(r?.homeAway || '').toLowerCase() === 'home') || sheets[0]
+  const away = sheets.find((r: any) => String(r?.homeAway || '').toLowerCase() === 'away') || sheets[1]
+  const starters = (sheet: any) => Array.isArray(sheet?.startXI) ? sheet.startXI : Array.isArray(sheet?.roster) ? sheet.roster.filter((p: any) => p?.starter === true) : []
+  const homeStarters = starters(home)
+  const awayStarters = starters(away)
+  const validCount = homeStarters.length === 11 && awayStarters.length === 11
+  const playerIdsPresent = validCount && homeStarters.every((p: any) => p?.player?.id != null || p?.athlete?.id != null) && awayStarters.every((p: any) => p?.player?.id != null || p?.athlete?.id != null)
+  return { lineup_confirmed: validCount, home_starters_count: homeStarters.length || null, away_starters_count: awayStarters.length || null, player_starter_confirmed: playerIdsPresent, player_minutes_uncertain: !playerIdsPresent }
+}
+
 function liveModelState(fixture: any) {
   const stats = fixture?.statistics || []
   const read = (teamId: number, names: string[]) => {
@@ -156,7 +168,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
         away_team: String(away.displayName || away.name || ''),
         minute: clockMinute,
         score_home: Number(competitors.home?.score || 0), score_away: Number(competitors.away?.score || 0),
-        is_live: espnLive, ...liveState,
+        is_live: espnLive, ...liveState, ...lineupContract(summary.rosters || []),
         forecast: forecast ? { home: forecast.home, draw: forecast.draw, away: forecast.away } : null,
         odds: apiOdds ? { home: apiOdds.home, draw: apiOdds.draw, away: apiOdds.away, over25: apiOdds.over25, under25: apiOdds.under25 } : null,
         odds_updated_at: apiOdds?.sourceTimestamp ?? null,
@@ -217,6 +229,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       score_home: Number(fixture.goals?.home || 0),
       score_away: Number(fixture.goals?.away || 0),
       is_live: isLiveFixture,
+      ...lineupContract(fixture.lineups || []),
       forecast: providerForecast ? { home: providerForecast.home, draw: providerForecast.draw, away: providerForecast.away } : null,
       odds: odds ? { home: odds.home, draw: odds.draw, away: odds.away, over25: odds.over25, under25: odds.under25 } : null,
       odds_updated_at: odds?.sourceTimestamp ?? null,
