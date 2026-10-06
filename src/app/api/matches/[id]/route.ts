@@ -11,7 +11,12 @@ async function computePythonChampionDecision(input: Record<string, unknown>) {
     const url = host ? 'https://' + host + '/api/champion' : 'http://127.0.0.1:3000/api/champion'
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+        ...(process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+          ? { 'x-vercel-protection-bypass': process.env.VERCEL_AUTOMATION_BYPASS_SECRET }
+          : {}),
+      },
       body: JSON.stringify(input),
       cache: 'no-store',
     })
