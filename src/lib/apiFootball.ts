@@ -175,6 +175,104 @@ export async function fetch1xBetOddsForFixture(fixtureId: number) {
   }
 }
 
+
+function normalizeOddsTeamName(value: unknown): string {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\b(fc|cf|sc|afc|fk|club|calcio)\b/g, '')
+    .replace(/[^a-z0-9]/g, '')
+}
+
+function oddsApiTeamMatch(a: unknown, b: unknown): boolean {
+  const x = normalizeOddsTeamName(a)
+  const y = normalizeOddsTeamName(b)
+  if (!x || !y) return false
+  return x === y || x.includes(y) || y.includes(x)
+}
+
+export async function fetch1xBetLiveOddsFromOddsApi(fixtures: Array<{
+  id: number
+  home: string
+  away: string
+  kickoff?: string
+}>) {
+  const apiKey = process.env.ODDS_API_KEY
+  if (!apiKey || !fixtures.length) return new Map<number, any>()
+
+  try {
+    const url = new URL('https://api.the-odds-api.com/v4/sports/upcoming/odds')
+    url.searchParams.set('apiKey', apiKey)
+    url.searchParams.set('regions', 'eu')
+    url.searchParams.set('markets', 'h2h,totals')
+    url.searchParams.set('bookmakers', 'onexbet')
+    url.searchParams.set('oddsFormat', 'decimal')
+    const response = await fetch(url.toString(), { cache: 'no-store' })
+    if (!response.ok) throw new Error(`Odds API HTTP ${response.status}`)
+    const events = await response.json()
+    const result = new Map<number, any>()
+
+    for (const fixture of fixtures) {
+      const event = (Array.isArray(events) ? events : []).find((item: any) =>
+        oddsApiTeamMatch(item?.home_team, fixture.home) &&
+        oddsApiTeamMatch(item?.away_team, fixture.away)
+      )
+      if (!event) continue
+
+      const bookmaker = (event.bookmakers || []).find((b: any) =>
+        String(b?.key || '').toLowerCase() === 'onexbet' ||
+        /1xBet/i.test(String(b?.title || ''))
+      )
+      if (!bookmaker) continue
+
+      const h2h = (bookmaker.markets || []).find((m: any) => m?.key === 'h2h')
+      const totals = (bookmaker.markets || []).find((m: any) => m?.key === 'totals')
+      const outcomeOdd = (market: any, names: string[]) => {
+        const outcome = (market?.outcomes || []).find((o: any) =>
+          names.some((name) => String(o?.name || '').toLowerCase() === name.toLowerCase())
+        )
+        const odd = Number(outcome?.price)
+        return Number.isFinite(odd) && odd > 1 ? odd : null
+      }
+
+      const odds = {
+        home: outcomeOdd(h2h, [event.home_team]),
+        draw: outcomeOdd(h2h, ['Draw']),
+        away: outcomeOdd(h2h, [event.away_team]),
+        over25: (() => {
+          const outcome = (totals?.outcomes || []).find((o: any) =>
+            String(o?.name || '').toLowerCase() === 'over' && Number(o?.point) === 2.5
+          )
+          const odd = Number(outcome?.price)
+          return Number.isFinite(odd) && odd > 1 ? odd : null
+        })(),
+        under25: (() => {
+          const outcome = (totals?.outcomes || []).find((o: any) =>
+            String(o?.name || '').toLowerCase() === 'under' && Number(o?.point) === 2.5
+          )
+          const odd = Number(outcome?.price)
+          return Number.isFinite(odd) && odd > 1 ? odd : null
+        })(),
+        sourceTimestamp: typeof bookmaker?.last_update === 'string'
+          ? bookmaker.last_update
+          : typeof event?.last_update === 'string'
+            ? event.last_update
+            : null,
+      }
+
+      if (Object.values(odds).some((value) => value !== null && value !== '')) {
+        result.set(Number(fixture.id), odds)
+      }
+    }
+
+    return result
+  } catch (error) {
+    console.warn('[1XBET ODDS API FALLBACK] Live lookup failed', error)
+    return new Map<number, any>()
+  }
+}
+
 function normalizeTeamName(value: unknown): string {
   return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '')
 }
