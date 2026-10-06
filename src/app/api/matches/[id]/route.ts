@@ -92,7 +92,7 @@ export async function GET(_request: Request, { params }: { params: { id: string 
     const homeId = Number(fixture.teams?.home?.id)
     const awayId = Number(fixture.teams?.away?.id)
     const [liveOddsResult, oddsResult, predictionResult, h2hResult] = await Promise.allSettled([
-      fetchApiFootball(`/odds/live?fixture=${fixtureId}`, true),
+      fetchApiFootball('/odds/live', true),
       fetchApiFootball(`/odds?fixture=${fixtureId}`, true),
       fetchApiFootball(`/predictions?fixture=${fixtureId}`, true),
       Number.isInteger(homeId) && Number.isInteger(awayId) ? fetchApiFootball(`/fixtures/headtohead?h2h=${homeId}-${awayId}`, true) : Promise.resolve({ response: [] }),
