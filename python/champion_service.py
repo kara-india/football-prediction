@@ -19,6 +19,7 @@ from python.models.live_hazard import LearnedLiveHazard
 ARTIFACT_PATH = Path(__file__).resolve().parent / "models" / "champion_artifact.json"
 VERSION = "champion-python-v3.0"
 MIN_CONFIDENCE = 0.55
+MAX_ARTIFACT_AGE_DAYS = 365
 
 def _age_seconds(value: Optional[str]) -> float:
     if not value:
@@ -69,6 +70,18 @@ def decide(payload: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as exc:
         return {**base, "action": "NO_BET", "reason": str(exc)}
 
+    artifact_test_end = artifact.get("validation", {}).get("test_end")
+    artifact_age = _age_seconds(artifact_test_end)
+    if artifact_age > MAX_ARTIFACT_AGE_DAYS * 86400:
+        return {
+            **base,
+            "action": "NO_BET",
+            "reason": "MODEL_ARTIFACT_STALE",
+            "artifactTestEnd": artifact_test_end,
+            "artifactAgeDays": None if math.isinf(artifact_age) else round(artifact_age / 86400, 1),
+            "maxArtifactAgeDays": MAX_ARTIFACT_AGE_DAYS,
+        }
+
     home, away = str(payload.get("home_team") or ""), str(payload.get("away_team") or "")
     if not home or not away:
         return {**base, "action": "NO_BET", "reason": "TEAM_IDENTITIES_UNAVAILABLE"}
@@ -112,7 +125,7 @@ def decide(payload: Dict[str, Any]) -> Dict[str, Any]:
         offsides_home=0, offsides_away=0,
         substitutions_home=int(payload.get("substitutions_home") or 0),
         substitutions_away=int(payload.get("substitutions_away") or 0),
-        is_live=True, lineup_confirmed=True,
+        is_live=True, lineup_confirmed=bool(payload.get("lineup_confirmed", False)),
         knockout_context=float(payload.get("knockout_context") or 0),
     )
 
@@ -140,26 +153,54 @@ def decide(payload: Dict[str, Any]) -> Dict[str, Any]:
     historical = int(artifact.get("validation", {}).get("training_sample_size", 0))
     gate = NoBetGate()
 
+    lineup_confirmed = bool(payload.get("lineup_confirmed", False))
+    home_starters_count = payload.get("home_starters_count")
+    away_starters_count = payload.get("away_starters_count")
+    player_starter_confirmed = payload.get("player_starter_confirmed")
+    player_minutes_uncertain = bool(payload.get("player_minutes_uncertain", False))
+
     for market, prices, selections, raw_probs, method in specs:
         fair = DeVIgEngine.devig_market(prices, method=method)
-        for idx, (selection, raw_p, price) in enumerate(zip(selections, raw_probs, prices)):
+        calibrated_probs: List[float] = []
+        calibration_flags: List[bool] = []
+        for selection, raw_p in zip(selections, raw_probs):
             try:
-                p = _calibrate(cal, f"{market}:{selection}", float(raw_p))
+                p = float(_calibrate(cal, f"{market}:{selection}", float(raw_p)))
                 calibrated = True
             except Exception:
                 p = float(raw_p)
                 calibrated = False
+            calibrated_probs.append(p)
+            calibration_flags.append(calibrated)
+
+        # Independent binary calibration of 1/X/2 can violate the probability
+        # simplex. Normalize the three calibrated probabilities before EV/edge.
+        if market == "MATCH_1X2":
+            total = sum(max(0.0, p) for p in calibrated_probs)
+            if total <= 0.0:
+                calibrated_probs = [1.0 / len(calibrated_probs)] * len(calibrated_probs)
+            else:
+                calibrated_probs = [max(0.0, p) / total for p in calibrated_probs]
+
+        for idx, (selection, price) in enumerate(zip(selections, prices)):
+            p = float(calibrated_probs[idx])
+            calibrated = calibration_flags[idx]
             lower = max(0.0, p - 1.96 * float(dist["std_error"]))
             upper = min(1.0, p + 1.96 * float(dist["std_error"]))
             ev = EdgeCalculator.compute_ev(p, price)
             edge = EdgeCalculator.compute_edge(p, fair[idx])
             gate_res = gate.evaluate(
-                ev=ev, edge=edge, lineup_confirmed=True,
+                ev=ev, edge=edge,
+                lineup_confirmed=lineup_confirmed,
+                home_starters_count=int(home_starters_count) if home_starters_count is not None else None,
+                away_starters_count=int(away_starters_count) if away_starters_count is not None else None,
                 odds_age_seconds=age, is_live=True, is_market_suspended=False,
                 odds_available=True, odds_1xbet=price,
                 monte_carlo_se=float(dist["std_error"]),
                 prob_lower=lower, prob_upper=upper,
                 model_calibrated=calibrated,
+                player_starter_confirmed=player_starter_confirmed,
+                player_minutes_uncertain=player_minutes_uncertain,
                 historical_sample_size=historical,
             )
             candidates.append({
