@@ -97,7 +97,10 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       fetchApiFootball(`/predictions?fixture=${fixtureId}`, true),
       Number.isInteger(homeId) && Number.isInteger(awayId) ? fetchApiFootball(`/fixtures/headtohead?h2h=${homeId}-${awayId}`, true) : Promise.resolve({ response: [] }),
     ])
-    const liveOdds = liveOddsResult.status === 'fulfilled' ? extract1xBetOdds(liveOddsResult.value.response?.[0]?.bookmakers || []) : null
+    const liveOddsEvent = liveOddsResult.status === 'fulfilled'
+      ? (liveOddsResult.value.response || []).find((event: any) => Number(event.fixture?.id) === fixtureId)
+      : null
+    const liveOdds = liveOddsEvent ? extract1xBetOdds(liveOddsEvent.bookmakers || []) : null
     const prematchOdds = oddsResult.status === 'fulfilled' ? extract1xBetOdds(oddsResult.value.response?.[0]?.bookmakers || []) : null
     const odds = liveOdds || prematchOdds
     const providerForecast = predictionResult.status === 'fulfilled' ? extractProviderForecast(predictionResult.value) : null
