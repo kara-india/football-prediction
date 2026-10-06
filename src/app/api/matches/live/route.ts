@@ -6,11 +6,10 @@ import { fetchEspnLiveEvents, espnMappedFixture } from '@/lib/espn'
 
 const CACHE_TTL_MS = 60 * 1000
 const CACHE_KEY = 'live_matches_cache'
-const ALLOWED_LEAGUES = new Set([39, 71, 135, 140, 78, 61, 94, 88, 128, 144, 2, 3, 1, 4, 5, 9, 6, 7, 10])
-
 function isEligibleFixture(m: any): boolean {
-  if (!ALLOWED_LEAGUES.has(m.league?.id)) return false
-  const excluded = /\b(U17|U18|U19|U20|U21|U23|Youth|Women|Fem|W|Reserves)\b/i
+  // Live mode mirrors all senior provider fixtures so available 1xBet live
+  // markets can be matched to the exact same terminal fixture.
+  const excluded = /\\b(U17|U18|U19|U20|U21|U23|Youth|Women|Fem|W|Reserves)\\b/i
   return !(excluded.test(m.teams?.home?.name || '') || excluded.test(m.teams?.away?.name || '') || excluded.test(m.league?.name || ''))
 }
 
