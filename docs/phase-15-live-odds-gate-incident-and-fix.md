@@ -29,6 +29,7 @@ The deployed `/api/providers/status` endpoint reported `authenticated: false`, `
 8. **The UI obscured decision-stage outcomes.** It displayed a generic no-bet sentence and reason code but not which decision gates passed, failed, or were skipped.
 9. **Basic fixture lookup was treated as though it contained live detail subresources.** Events, statistics, and lineups are separate API-Football endpoints; reading only `/fixtures?id=...` can leave the Champion input without the data its live-state and lineup gates require.
 10. **Repeated terminal refreshes could exhaust the daily API quota.** The page polls live fixtures frequently while the detail handler performed multiple uncached requests for odds, predictions, H2H and other data.
+11. **The active Champion artifact's validated holdout cutoff is stale.** The production artifact was refreshed on 2026-10-10, but its `validation.test_end` is still `2024-06-02`. `python/champion_service.py` correctly checks the validation cutoff (not only `trained_at`) and rejects artifacts older than `MAX_ARTIFACT_AGE_DAYS = 365`. Once real fresh odds are restored, this artifact will still hit `MODEL_ARTIFACT_STALE` until the training/validation pipeline is refreshed with newer real results and a new chronological holdout. Changing only the artifact timestamp or loosening this guard would hide stale evidence, not fix it.
 
 ## Changes made in the fix branch
 
@@ -51,7 +52,9 @@ A BET outcome still requires a real supported 1xBet market, a parseable source u
 
 Missing odds or timestamps fail closed. No synthetic odds or synthetic "fresh" timestamps are used to make a wager actionable. If a provider has no eligible market, no bet is the correct outcome; the UI now exposes that reason rather than mislabeling it.
 
-Forecast availability remains separate from bet eligibility: a pre-lineup forecast can be shown without authorizing a bet.
+**Outstanding data-dependent launch blockers:** (1) restore the suspended API-Football account or configure an authorized provider that supplies exact-fixture 1xBet prices and source timestamps; (2) rebuild and chronologically validate the Champion artifact with recent real match results so `validation.test_end` falls within the supported age limit. Until both are met, a live BET is correctly prevented. The gate must not be weakened to manufacture a bet.
+
+Forecast availability remains separate from bet eligibility: a pre-lineup forecast can be shown without authorizing a bet. When ESPN supplies no predictor/boxscore and API-Football is suspended, the terminal may have no trustworthy forecast or H2H data for that fixture; show it as unavailable rather than fabricating statistics.
 
 ## Verification checklist
 
