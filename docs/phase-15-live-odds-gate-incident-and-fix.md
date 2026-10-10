@@ -13,6 +13,10 @@ Fix branch: `fix/phase-15-live-odds-gate-diagnostics-20261011`
 
 A no-bet response is not proof that each downstream gate ran. The engine's early returns skipped the model and value calculations in these examples.
 
+## External provider blocker confirmed during repair
+
+The deployed `/api/providers/status` endpoint reported `authenticated: false`, `reachable: true`, with API-Football's error stating that the account is suspended. This is an external provider-account state, not a code defect that a repository change can reactivate. The user/account owner must restore API-Football access for its live odds, fixture details, statistics and lineups feeds to resume. ESPN can continue to provide real fixture/status information; the fallback must not synthesize missing 1xBet prices or price timestamps. PulseScore may return actual odds values but without a source timestamp those prices are not actionable and should fail Champion's freshness gate.
+
 ## Root causes found
 
 1. **Champion was hard-coded to live mode.** `python/champion_service.py` returned `LIVE_ONLY_DECISION_ENGINE` for every `is_live=false` request, including eligible upcoming fixtures. Its `MatchState` and `NoBetGate` invocation also hard-coded `is_live=True`.
@@ -30,7 +34,7 @@ A no-bet response is not proof that each downstream gate ran. The engine's early
 
 - Champion now distinguishes an eligible live fixture from a confirmed future pre-match fixture. Finished, unknown, or otherwise unsupported states remain non-actionable.
 - Odds freshness limits are mode-specific: 60 seconds live and 900 seconds pre-match, matching `NoBetGate`.
-- Odds are validated before freshness. The response reason distinguishes missing live/pre-match markets, incomplete markets, missing/invalid timestamps, and genuinely stale prices.
+- Odds are validated before freshness. The response reason distinguishes missing live/pre-match markets, incomplete markets, missing/invalid timestamps, and genuinely stale prices. Provider errors such as a suspended API-Football account are propagated into the relevant gate detail with a concise, non-secret diagnostic.
 - Odds extraction requires at least one actual decimal price greater than 1.0. Provider timestamps are normalized only when supplied and parseable; no source timestamp is synthesized.
 - The live fixture list no longer promotes The Odds API's upcoming/pre-match prices to live odds.
 - For ESPN-backed fixtures, the terminal first checks PulseScore only for in-play events; when needed, it resolves the event by exact home/away names and date to an API-Football fixture, then requests live or pre-match 1xBet odds from the correct endpoint.
@@ -71,4 +75,4 @@ npm run lint
 NEXT_TELEMETRY_DISABLED=1 npm run build
 ```
 
-Live odds availability is provider-dependent and cannot be guaranteed for every fixture. A successful build does not prove an upstream bookmaker market exists; verify terminal API payloads and the deployed gate diagnostics against real fixtures after deployment.
+Live odds availability is provider-dependent and cannot be guaranteed for every fixture. The API-Football account-suspension issue is an external remediation item: restore the account or configure an authorized replacement provider before expecting API-Football prices, detailed statistics, and lineups to populate again. A successful build does not prove an upstream bookmaker market exists; verify terminal API payloads and the deployed gate diagnostics against real fixtures after deployment.
