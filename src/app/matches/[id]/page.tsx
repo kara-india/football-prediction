@@ -43,6 +43,7 @@ interface MatchDetail {
     goalsAway: number | null
   } | null
   forecastSource: string | null
+  forecastUnavailableReason?: string | null
   history: Array<{
     id: number
     date: string
@@ -449,7 +450,9 @@ export default function MatchIntelligencePage({ params }: { params: { id: string
       <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr] gap-6">
         <TerminalCard
           title="Forecast — Available Before Lineups"
-          subtitle={detail?.forecastSource || 'Provider forecast unavailable'}
+          subtitle={forecast
+            ? detail?.forecastSource || 'Provider forecast'
+            : detail?.forecastUnavailableReason || detail?.forecastSource || 'Provider forecast unavailable'}
           badge={
             <span className="px-2 py-0.5 rounded border border-[#334155] bg-[#1E293B] text-[10px] font-mono text-[#F8FAFC]">
               {lineupConfirmed ? 'LINEUP-REFINED VIEW' : 'PRE-LINEUP FORECAST'}
