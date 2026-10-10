@@ -29,7 +29,9 @@ The deployed `/api/providers/status` endpoint reported `authenticated: false`, `
 8. **The UI obscured decision-stage outcomes.** It displayed a generic no-bet sentence and reason code but not which decision gates passed, failed, or were skipped.
 9. **Basic fixture lookup was treated as though it contained live detail subresources.** Events, statistics, and lineups are separate API-Football endpoints; reading only `/fixtures?id=...` can leave the Champion input without the data its live-state and lineup gates require.
 10. **Repeated terminal refreshes could exhaust the daily API quota.** The page polls live fixtures frequently while the detail handler performed multiple uncached requests for odds, predictions, H2H and other data.
-11. **The active Champion artifact's validated holdout cutoff is stale.** The production artifact was refreshed on 2026-10-10, but its `validation.test_end` is still `2024-06-02`. `python/champion_service.py` correctly checks the validation cutoff (not only `trained_at`) and rejects artifacts older than `MAX_ARTIFACT_AGE_DAYS = 365`. Once real fresh odds are restored, this artifact will still hit `MODEL_ARTIFACT_STALE` until the training/validation pipeline is refreshed with newer real results and a new chronological holdout. Changing only the artifact timestamp or loosening this guard would hide stale evidence, not fix it.
+11. **The no-API-key upcoming fallback returned the wrong provider result.** When ESPN returned no fixtures, the endpoint fetched SofaScore but cached and returned the empty ESPN array. It now caches and returns the actual SofaScore fallback response.
+12. **Forecast fallback gaps were not explained in the Terminal.** When ESPN had no predictor/usable season statistics, or the alternate detail provider had no compatible forecast, the subtitle only said `Provider forecast unavailable`. The API now returns a specific `forecastUnavailableReason` and the UI displays that diagnostic instead of making the absence opaque.
+13. **The active Champion artifact's validated holdout cutoff is stale.** The production artifact was refreshed on 2026-10-10, but its `validation.test_end` is still `2024-06-02`. `python/champion_service.py` correctly checks the validation cutoff (not only `trained_at`) and rejects artifacts older than `MAX_ARTIFACT_AGE_DAYS = 365`. Once real fresh odds are restored, this artifact will still hit `MODEL_ARTIFACT_STALE` until the training/validation pipeline is refreshed with newer real results and a new chronological holdout. Changing only the artifact timestamp or loosening this guard would hide stale evidence, not fix it.
 
 ## Changes made in the fix branch
 
@@ -45,6 +47,8 @@ The deployed `/api/providers/status` endpoint reported `authenticated: false`, `
 - Endpoint-level response caching is used for live odds, statistics/events, lineups, predictions and H2H, with longer TTLs for slow-changing data. The complete terminal response has a short cache so the 15-second UI polling does not repeat every upstream request.
 - The pre-match Monte Carlo path no longer applies the learned in-play hazard correction.
 - Near-kickoff pages refresh automatically every 15 seconds, as live terminals already did.
+- The upcoming-fixture fallback now returns the actual SofaScore results when ESPN is empty.
+- The Terminal shows a concise reason when no trustworthy forecast can be produced by the configured providers.
 
 ## Decision contract and safety
 
@@ -63,7 +67,8 @@ Automated contract tests are added in `tests/test_champion_odds_gate_contract.py
 - real prices with no source timestamp;
 - live (60-second) versus pre-match (900-second) freshness limits;
 - upcoming pre-match requests reaching model readiness rather than the live-only guard;
-- ineligible/finished fixture status remaining blocked.
+- ineligible/finished fixture status remaining blocked;
+- a refreshed artifact timestamp not bypassing the stale validation holdout guard.
 
 Run from the repository root:
 
