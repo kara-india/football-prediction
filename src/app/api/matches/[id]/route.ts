@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { fetchApiFootball, extract1xBetOdds, extractProviderForecast, findApiFootballFixtureByTeams, fetch1xBetOddsForFixture, fetch1xBetLiveOddsFromPulseScore } from '@/lib/apiFootball'
+import { fetchApiFootball, fetchCachedApiFootball, extract1xBetOdds, extractProviderForecast, findApiFootballFixtureByTeams, fetch1xBetOddsForFixture, fetch1xBetLiveOddsFromPulseScore } from '@/lib/apiFootball'
 import { getDiskCache, setDiskCache } from '@/lib/diskCache'
 import { fetchSofaEvent, fetchSofaEventExtras, sofaStatus } from '@/lib/sofaScore'
 import { fetchEspnSummaryWithForecast } from '@/lib/espn'
@@ -146,6 +146,10 @@ function sofaH2H(raw: any[]) {
 
 export async function GET(_request: Request, { params }: { params: { id: string } }) {
   const rawId = decodeURIComponent(params.id)
+  const cacheKey = `match_detail_${rawId}`
+  const cached = getDiskCache<any>(cacheKey, 5 * 1000)
+  if (cached) return NextResponse.json(cached)
+
   const espnMatch = rawId.match(/^espn:([^:]+):(\d+)$/)
   if (espnMatch) {
     try {
@@ -157,50 +161,91 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       const kickoff = summary.header?.competitions?.[0]?.date || summary.header?.season?.startDate || new Date().toISOString()
       const espnStatus = summary.header?.competitions?.[0]?.status?.type || {}
       const espnLive = espnStatus.state === 'in'
+      const kickoffMs = Date.parse(kickoff)
+      const espnPrematch = espnStatus.state === 'pre' && Number.isFinite(kickoffMs) && kickoffMs > Date.now()
       const displayClock = String(espnStatus.displayClock || '')
       const clockMinute = Number(displayClock.match(/^(\d+)/)?.[1] || 0)
-      const pulseScoreOdds = await fetch1xBetLiveOddsFromPulseScore([{ id: Number(espnMatch[2]), home: String(home.displayName || home.name || ''), away: String(away.displayName || away.name || ''), kickoff }])
-      const apiOdds = pulseScoreOdds.get(Number(espnMatch[2])) || null
+      const homeName = String(home.displayName || home.name || '')
+      const awayName = String(away.displayName || away.name || '')
+      let apiOdds: any = null
+
+      // PulseScore is an in-play feed only. Never use it as a pre-match board.
+      if (espnLive) {
+        const pulseScoreOdds = await fetch1xBetLiveOddsFromPulseScore([{
+          id: Number(espnMatch[2]), home: homeName, away: awayName, kickoff,
+        }])
+        apiOdds = pulseScoreOdds.get(Number(espnMatch[2])) || null
+      }
+
+      // ESPN IDs are not API-Football fixture IDs. Resolve the event by exact team
+      // identity/date before asking API-Football for the corresponding 1xBet market.
+      // This fallback is deliberately used when PulseScore has no price or no
+      // source timestamp, never to silently relabel another match's odds.
+      if ((!apiOdds || !apiOdds.sourceTimestamp) && (espnLive || espnPrematch)) {
+        try {
+          const providerFixture = await findApiFootballFixtureByTeams(homeName, awayName, kickoff.slice(0, 10))
+          const providerFixtureId = Number(providerFixture?.fixture?.id)
+          if (Number.isInteger(providerFixtureId) && providerFixtureId > 0) {
+            if (espnLive) {
+              const liveOddsPayload = await fetchCachedApiFootball('/odds/live', 20 * 1000, true)
+              const liveOddsEvent = (liveOddsPayload.response || []).find(
+                (event: any) => Number(event.fixture?.id) === providerFixtureId,
+              )
+              const resolved = liveOddsEvent ? extract1xBetOdds(liveOddsEvent.bookmakers || []) : null
+              if (resolved && (resolved.sourceTimestamp || !apiOdds)) apiOdds = resolved
+            } else {
+              const resolved = await fetch1xBetOddsForFixture(providerFixtureId)
+              if (resolved) apiOdds = resolved
+            }
+          }
+        } catch (oddsError) {
+          console.warn('[MATCH DETAIL] API-Football 1xBet odds resolution failed for ESPN event', espnMatch[2], oddsError)
+        }
+      }
+
       const liveState = espnLiveModelState(summary, competitors)
+      const lineup = lineupContract(summary.rosters || [])
       const championDecision = await computePythonChampionDecision({
         fixture_id: Number(espnMatch[2]),
-        home_team: String(home.displayName || home.name || ''),
-        away_team: String(away.displayName || away.name || ''),
+        home_team: homeName,
+        away_team: awayName,
         minute: clockMinute,
         score_home: Number(competitors.home?.score || 0), score_away: Number(competitors.away?.score || 0),
-        is_live: espnLive, ...liveState, ...lineupContract(summary.rosters || []),
+        is_live: espnLive, is_prematch: espnPrematch, ...liveState, ...lineup,
         forecast: forecast ? { home: forecast.home, draw: forecast.draw, away: forecast.away } : null,
         odds: apiOdds ? { home: apiOdds.home, draw: apiOdds.draw, away: apiOdds.away, over25: apiOdds.over25, under25: apiOdds.under25 } : null,
         odds_updated_at: apiOdds?.sourceTimestamp ?? null,
       })
       const payload = { fixture: { id: Number(espnMatch[2]), kickoff, venue: summary.gameInfo?.venue?.fullName || 'TBD', status: espnLive ? 'LIVE' : summary.header?.competitions?.[0]?.status?.type?.state === 'post' ? 'FT' : 'NS', statusLong: summary.header?.competitions?.[0]?.status?.type?.detail || 'Unknown', minute: clockMinute || null, referee: summary.gameInfo?.officials?.[0]?.fullName || null, league: { name: summary.header?.league?.name || espnMatch[1] }, teams: { home: { id: Number(home.id||0), name: home.displayName||home.name||'Home', logo: home.logo }, away: { id: Number(away.id||0), name: away.displayName||away.name||'Away', logo: away.logo } }, score: { home: Number(competitors.home?.score||0), away: Number(competitors.away?.score||0) }, events: summary.keyEvents || summary.plays || [], statistics: summary.boxscore?.teams || [], lineups: summary.rosters || [] }, odds1xBet: apiOdds ? { home: apiOdds.home, draw: apiOdds.draw, away: apiOdds.away, over25: apiOdds.over25, under25: apiOdds.under25 } : null, oddsUpdatedAt: apiOdds?.sourceTimestamp ?? null, forecast, forecastSource, championDecision, history: (summary.seasonseries || []).filter((m:any)=>m?.id || m?.competitions?.length).slice(0,10).map((m:any)=>({id:Number(m.id||0),date:m.date||'',status:m.status?.type?.state||'unknown',homeTeam:m.competitions?.[0]?.competitors?.find((c:any)=>c.homeAway==='home')?.team?.displayName||'',awayTeam:m.competitions?.[0]?.competitors?.find((c:any)=>c.homeAway==='away')?.team?.displayName||'',homeScore:Number(m.competitions?.[0]?.competitors?.find((c:any)=>c.homeAway==='home')?.score||0),awayScore:Number(m.competitions?.[0]?.competitors?.find((c:any)=>c.homeAway==='away')?.score||0)})),generatedAt:new Date().toISOString(),fixtureSource:'ESPN' }
+      setDiskCache(cacheKey, payload)
       return NextResponse.json(payload)
     } catch (error) { console.error('[MATCH DETAIL] ESPN fallback failed',error); return NextResponse.json({error:'Unable to fetch ESPN fixture detail.'},{status:502}) }
   }
   const fixtureId = Number(params.id)
   if (!Number.isInteger(fixtureId) || fixtureId <= 0) return NextResponse.json({ error: 'Invalid fixture id.' }, { status: 400 })
-  const cacheKey = `match_detail_${fixtureId}`
-  const cached = getDiskCache<any>(cacheKey, 10 * 1000)
-  if (cached) return NextResponse.json(cached)
-
   try {
-    const fixtureJson = await fetchApiFootball(`/fixtures?id=${fixtureId}`, true)
+    const fixtureJson = await fetchCachedApiFootball(`/fixtures?id=${fixtureId}`, 15 * 1000, true)
     const fixture = fixtureJson.response?.[0]
     if (!fixture) return NextResponse.json({ error: 'Fixture not found.' }, { status: 404 })
     const homeId = Number(fixture.teams?.home?.id)
     const awayId = Number(fixture.teams?.away?.id)
+    const fixtureStatus = String(fixture.fixture?.status?.short || '')
+    const isLiveFixture = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'SUSP', 'INT', 'LIVE'].includes(fixtureStatus)
+    const kickoffMs = Date.parse(String(fixture.fixture?.date || ''))
+    const isPrematchFixture = ['NS', 'TBD'].includes(fixtureStatus) && Number.isFinite(kickoffMs) && kickoffMs > Date.now()
     let liveOdds: any = null
-    try {
-      const liveOddsPayload = await fetchApiFootball('/odds/live', true)
-      const liveOddsEvent = (liveOddsPayload.response || []).find((event: any) => Number(event.fixture?.id) === fixtureId)
-      liveOdds = liveOddsEvent ? extract1xBetOdds(liveOddsEvent.bookmakers || []) : null
-    } catch (error) {
-      console.warn('[MATCH DETAIL] Live 1xBet odds lookup failed', fixtureId, error)
+    if (isLiveFixture) {
+      try {
+        const liveOddsPayload = await fetchCachedApiFootball('/odds/live', 20 * 1000, true)
+        const liveOddsEvent = (liveOddsPayload.response || []).find((event: any) => Number(event.fixture?.id) === fixtureId)
+        liveOdds = liveOddsEvent ? extract1xBetOdds(liveOddsEvent.bookmakers || []) : null
+      } catch (error) {
+        console.warn('[MATCH DETAIL] Live 1xBet odds lookup failed', fixtureId, error)
+      }
     }
 
-    const isLiveFixture = ['1H', '2H', 'ET', 'P', 'LIVE'].includes(String(fixture.fixture?.status?.short || ''))
     let pulseScoreLiveOdds: any = null
-    if (isLiveFixture && !liveOdds) {
+    if (isLiveFixture && (!liveOdds || !liveOdds.sourceTimestamp)) {
       const pulseScoreOdds = await fetch1xBetLiveOddsFromPulseScore([{
         id: fixtureId,
         home: String(fixture.teams?.home?.name || ''),
@@ -210,32 +255,46 @@ export async function GET(_request: Request, { params }: { params: { id: string 
       pulseScoreLiveOdds = pulseScoreOdds.get(fixtureId) || null
     }
 
-    const [oddsResult, predictionResult, h2hResult] = await Promise.allSettled([
-      fetchApiFootball(`/odds?fixture=${fixtureId}`, true),
-      fetchApiFootball(`/predictions?fixture=${fixtureId}`, true),
-      Number.isInteger(homeId) && Number.isInteger(awayId) ? fetchApiFootball(`/fixtures/headtohead?h2h=${homeId}-${awayId}`, true) : Promise.resolve({ response: [] }),
+    const isNearKickoff = isPrematchFixture && kickoffMs - Date.now() <= 90 * 60 * 1000
+    const shouldFetchLineups = isLiveFixture || isNearKickoff
+    const [oddsResult, predictionResult, h2hResult, eventsResult, statisticsResult, lineupsResult] = await Promise.allSettled([
+      isLiveFixture ? Promise.resolve({ response: [] }) : fetchCachedApiFootball(`/odds?fixture=${fixtureId}`, 30 * 1000, true),
+      fetchCachedApiFootball(`/predictions?fixture=${fixtureId}`, 15 * 60 * 1000, true),
+      Number.isInteger(homeId) && Number.isInteger(awayId) ? fetchCachedApiFootball(`/fixtures/headtohead?h2h=${homeId}-${awayId}`, 12 * 60 * 60 * 1000, true) : Promise.resolve({ response: [] }),
+      isLiveFixture ? fetchCachedApiFootball(`/fixtures/events?fixture=${fixtureId}`, 20 * 1000, true) : Promise.resolve({ response: [] }),
+      isLiveFixture ? fetchCachedApiFootball(`/fixtures/statistics?fixture=${fixtureId}`, 20 * 1000, true) : Promise.resolve({ response: [] }),
+      shouldFetchLineups ? fetchCachedApiFootball(`/fixtures/lineups?fixture=${fixtureId}`, 30 * 1000, true) : Promise.resolve({ response: [] }),
     ])
     const prematchOdds = oddsResult.status === 'fulfilled' ? extract1xBetOdds(oddsResult.value.response?.[0]?.bookmakers || []) : null
+    const events = eventsResult.status === 'fulfilled' ? eventsResult.value.response || [] : []
+    const statistics = statisticsResult.status === 'fulfilled' ? statisticsResult.value.response || [] : []
+    const lineups = lineupsResult.status === 'fulfilled' ? lineupsResult.value.response || [] : []
+    const decisionFixture = { ...fixture, events, statistics, lineups }
     // Never use a pre-match price as a live execution price. For live fixtures,
     // only the current API-Football/PulseScore live 1xBet board is actionable.
-    const odds = isLiveFixture ? (liveOdds || pulseScoreLiveOdds) : prematchOdds
+    // Prefer the market with verifiable source time. If neither feed supplies
+    // one, preserve a real price for display, but Champion will fail freshness closed.
+    const odds = isLiveFixture
+      ? (liveOdds?.sourceTimestamp ? liveOdds : pulseScoreLiveOdds?.sourceTimestamp ? pulseScoreLiveOdds : liveOdds || pulseScoreLiveOdds)
+      : prematchOdds
     const providerForecast = predictionResult.status === 'fulfilled' ? extractProviderForecast(predictionResult.value) : null
     const championDecision = await computePythonChampionDecision({
       fixture_id: fixtureId,
       home_team: String(fixture.teams?.home?.name || ''),
       away_team: String(fixture.teams?.away?.name || ''),
-      ...liveModelState(fixture),
+      ...liveModelState(decisionFixture),
       minute: Number(fixture.fixture?.status?.elapsed || 0),
       score_home: Number(fixture.goals?.home || 0),
       score_away: Number(fixture.goals?.away || 0),
       is_live: isLiveFixture,
-      ...lineupContract(fixture.lineups || []),
+      is_prematch: isPrematchFixture,
+      ...lineupContract(lineups),
       forecast: providerForecast ? { home: providerForecast.home, draw: providerForecast.draw, away: providerForecast.away } : null,
       odds: odds ? { home: odds.home, draw: odds.draw, away: odds.away, over25: odds.over25, under25: odds.under25 } : null,
       odds_updated_at: odds?.sourceTimestamp ?? null,
     })
     const history = h2hResult.status === 'fulfilled' ? (h2hResult.value.response || []).slice(0, 10).map((match: any) => ({ id: Number(match.fixture?.id), date: match.fixture?.date, status: match.fixture?.status?.short, homeTeam: match.teams?.home?.name, awayTeam: match.teams?.away?.name, homeScore: match.goals?.home, awayScore: match.goals?.away })) : []
-    const payload = { fixture: { id: fixtureId, kickoff: fixture.fixture?.date, venue: fixture.fixture?.venue?.name || 'TBD', status: fixture.fixture?.status?.short || 'TBD', statusLong: fixture.fixture?.status?.long || 'Unknown', minute: fixture.fixture?.status?.elapsed ?? null, referee: fixture.fixture?.referee || null, league: fixture.league || null, teams: fixture.teams || null, score: fixture.goals || null, events: fixture.events || [], statistics: fixture.statistics || [], lineups: fixture.lineups || [] }, odds1xBet: odds ? { home: odds.home, draw: odds.draw, away: odds.away, over25: odds.over25, under25: odds.under25 } : null, oddsUpdatedAt: odds?.sourceTimestamp ?? null, forecast: providerForecast, forecastSource: providerForecast ? 'API-Football provider forecast' : null, championDecision, history, generatedAt: new Date().toISOString(), fixtureSource: 'API-Football' }
+    const payload = { fixture: { id: fixtureId, kickoff: fixture.fixture?.date, venue: fixture.fixture?.venue?.name || 'TBD', status: fixture.fixture?.status?.short || 'TBD', statusLong: fixture.fixture?.status?.long || 'Unknown', minute: fixture.fixture?.status?.elapsed ?? null, referee: fixture.fixture?.referee || null, league: fixture.league || null, teams: fixture.teams || null, score: fixture.goals || null, events, statistics, lineups }, odds1xBet: odds ? { home: odds.home, draw: odds.draw, away: odds.away, over25: odds.over25, under25: odds.under25 } : null, oddsUpdatedAt: odds?.sourceTimestamp ?? null, forecast: providerForecast, forecastSource: providerForecast ? 'API-Football provider forecast' : null, championDecision, history, generatedAt: new Date().toISOString(), fixtureSource: 'API-Football' }
     setDiskCache(cacheKey, payload)
     return NextResponse.json(payload)
   } catch (error) {

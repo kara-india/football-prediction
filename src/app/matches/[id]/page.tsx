@@ -70,9 +70,34 @@ interface MatchDetail {
     expectedValue: number | null
     reason: string
     checkedAt: string
+    gateDiagnostics?: Array<{
+      id: string
+      label: string
+      status: 'PASS' | 'FAIL' | 'SKIPPED'
+      detail?: string
+    }>
   }
 }
 
+
+
+function championReasonDescription(reason?: string): string {
+  const descriptions: Record<string, string> = {
+    LIVE_1XBET_ODDS_UNAVAILABLE: 'No valid live 1xBet prices were returned for this exact fixture. Confidence and value checks were skipped.',
+    PREMATCH_1XBET_ODDS_UNAVAILABLE: 'No valid pre-match 1xBet prices were returned for this exact fixture. Confidence and value checks were skipped.',
+    INCOMPLETE_LIVE_1XBET_MARKET: 'The live feed returned prices, but not a complete supported market.',
+    INCOMPLETE_PREMATCH_1XBET_MARKET: 'The pre-match feed returned prices, but not a complete supported market.',
+    ODDS_TIMESTAMP_UNAVAILABLE: 'The bookmaker supplied prices without a verifiable source timestamp. No freshness pass was assumed.',
+    STALE_ODDS: 'The source odds timestamp exceeds the permitted freshness window.',
+    LIVE_ONLY_DECISION_ENGINE: 'This deployed engine did not accept the supplied fixture status. Confirmed upcoming fixtures are supported by the updated pre-match path.',
+    NO_MARKET_PASSES_CHAMPION_GATE: 'The model ran, but no candidate passed all confidence, expected-value, and risk checks.',
+    MODEL_ARTIFACT_STALE: 'The active Champion model artifact exceeded its allowed age.',
+    CHAMPION_ARTIFACT_UNAVAILABLE: 'No active Champion model artifact was available.',
+    TEAM_OUTSIDE_TRAINING_DOMAIN: 'One or both teams are outside the validated model training domain.',
+    FIXTURE_STATUS_NOT_ELIGIBLE: 'The fixture is neither confirmed live nor a confirmed future pre-match event.',
+  }
+  return reason ? descriptions[reason] || 'Champion declined the decision; inspect the gate details below.' : 'Champion decision is unavailable.'
+}
 
 function extractTeamStatistic(statistics: any[], teamId: number, names: RegExp[]): number | null {
   const teamBlock = (statistics || []).find((item: any) => Number(item?.team?.id) === Number(teamId))
@@ -163,7 +188,13 @@ export default function MatchIntelligencePage({ params }: { params: { id: string
   }, [matchId])
 
   useEffect(() => {
-    if (!detail || !['1H', '2H', 'HT', 'ET', 'LIVE'].includes(detail.fixture.status)) return
+    if (!detail) return
+    const status = detail.fixture.status
+    const isLive = ['1H', '2H', 'HT', 'ET', 'BT', 'P', 'SUSP', 'INT', 'LIVE'].includes(status)
+    const kickoffMs = Date.parse(detail.fixture.kickoff)
+    const isNearKickoff = ['NS', 'TBD'].includes(status) &&
+      Number.isFinite(kickoffMs) && kickoffMs > Date.now() && kickoffMs - Date.now() <= 10 * 60 * 1000
+    if (!isLive && !isNearKickoff) return
     const timer = window.setInterval(async () => {
       try {
         const response = await fetch('/api/matches/' + encodeURIComponent(matchId), { cache: 'no-store' })
@@ -174,7 +205,7 @@ export default function MatchIntelligencePage({ params }: { params: { id: string
       }
     }, 15000)
     return () => window.clearInterval(timer)
-  }, [detail?.fixture.status, matchId])
+  }, [detail?.fixture.status, detail?.fixture.kickoff, matchId])
 
   const fixture = detail?.fixture
   const home = fixture?.teams?.home
@@ -182,6 +213,7 @@ export default function MatchIntelligencePage({ params }: { params: { id: string
   const forecast = detail?.forecast
   const odds = detail?.odds1xBet
   const champion = detail?.championDecision
+  const gateDiagnostics = champion?.gateDiagnostics ?? []
   const lineups = fixture?.lineups ?? []
 
   const lineupConfirmed = useMemo(
@@ -331,7 +363,7 @@ export default function MatchIntelligencePage({ params }: { params: { id: string
     )
   }
 
-  const live = ['1H', '2H', 'HT', 'ET', 'LIVE'].includes(fixture.status)
+  const live = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'SUSP', 'INT', 'LIVE'].includes(fixture.status)
   const isFinished = ['FT', 'AET', 'PEN'].includes(fixture.status)
 
   return (
@@ -355,7 +387,7 @@ export default function MatchIntelligencePage({ params }: { params: { id: string
       />
 
       <TerminalCard
-        title="CHAMPION — Live Bet Decision"
+        title="CHAMPION — Bet Decision"
         subtitle="Authoritative decision layer: only real, fresh 1xBet prices that clear the confidence and value gates are actionable."
         badge={
           <span className={champion?.action === 'BET' ? 'px-2 py-0.5 rounded border text-[10px] font-mono font-bold border-[#10B981]/40 bg-[#10B981]/15 text-[#10B981]' : 'px-2 py-0.5 rounded border text-[10px] font-mono font-bold border-[#64748B]/40 bg-[#64748B]/10 text-[#94A3B8]'}>
@@ -367,7 +399,7 @@ export default function MatchIntelligencePage({ params }: { params: { id: string
         <div className="p-5">
           {champion?.action === 'BET' ? (
             <div className="rounded-xl border border-[#10B981]/30 bg-[#10B981]/5 p-5">
-              <div className="text-[10px] uppercase tracking-widest text-[#64748B] font-mono">Optimal live market</div>
+              <div className="text-[10px] uppercase tracking-widest text-[#64748B] font-mono">Optimal market decision</div>
               <div className="text-2xl sm:text-3xl font-black text-[#F8FAFC] mt-2">{champion.label}</div>
               <div className="flex flex-wrap items-center gap-3 mt-3 font-mono">
                 <span className="text-[#D4AF37] font-bold text-lg">1xBet {champion.odds?.toFixed(2)}</span>
@@ -384,8 +416,32 @@ export default function MatchIntelligencePage({ params }: { params: { id: string
           ) : (
             <div className="rounded-xl border border-[#334155] bg-[#0B0F17] p-6 text-center font-mono">
               <div className="text-xl font-black text-[#F8FAFC]">NO BET</div>
-              <div className="text-xs text-[#94A3B8] mt-2">Champion found no live 1xBet market that clears its confidence, freshness and value gates.</div>
-              <div className="text-[10px] text-[#64748B] mt-3">Reason: {champion?.reason || 'DECISION_UNAVAILABLE'}</div>
+              <div className="text-xs text-[#94A3B8] mt-2">{championReasonDescription(champion?.reason)}</div>
+              <div className="text-[10px] text-[#64748B] mt-3">Reason code: {champion?.reason || 'DECISION_UNAVAILABLE'}</div>
+            </div>
+          )}
+          {gateDiagnostics.length > 0 && (
+            <div className="mt-4 rounded-xl border border-[#1E293B] overflow-hidden">
+              <div className="px-3 py-2 bg-[#0F172A] text-[10px] uppercase tracking-wider font-mono text-[#94A3B8]">
+                Champion gate diagnostics
+              </div>
+              <div className="divide-y divide-[#1E293B]">
+                {gateDiagnostics.map((gate) => (
+                  <div key={gate.id} className="px-3 py-2.5 flex items-start gap-3">
+                    <span className={gate.status === 'PASS'
+                      ? 'shrink-0 rounded border border-[#10B981]/30 bg-[#10B981]/10 px-1.5 py-0.5 text-[9px] font-mono font-bold text-[#10B981]'
+                      : gate.status === 'FAIL'
+                        ? 'shrink-0 rounded border border-[#F87171]/30 bg-[#F87171]/10 px-1.5 py-0.5 text-[9px] font-mono font-bold text-[#F87171]'
+                        : 'shrink-0 rounded border border-[#64748B]/30 bg-[#64748B]/10 px-1.5 py-0.5 text-[9px] font-mono font-bold text-[#94A3B8]'}>
+                      {gate.status}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="text-xs text-[#F8FAFC]">{gate.label}</div>
+                      {gate.detail && <div className="mt-1 text-[10px] leading-relaxed text-[#94A3B8]">{gate.detail}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

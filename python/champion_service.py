@@ -30,6 +30,15 @@ def _age_seconds(value: Optional[str]) -> float:
     except Exception:
         return float("inf")
 
+def _is_valid_decimal_odd(value: Any) -> bool:
+    """Return true only for finite decimal odds greater than 1.0."""
+    try:
+        odd = float(value)
+        return math.isfinite(odd) and odd > 1.0
+    except (TypeError, ValueError):
+        return False
+
+
 def _load_artifact() -> Dict[str, Any]:
     if ARTIFACT_PATH.exists():
         with ARTIFACT_PATH.open("r", encoding="utf-8") as f:
@@ -51,57 +60,205 @@ def _calibrate(cal: ProbabilityCalibrator, market: str, p: float) -> float:
         raise RuntimeError(f"CALIBRATION_UNAVAILABLE:{market}")
     return float(cal.calibrate(float(p), market=market))
 
+def _gate_diagnostics(
+    fixture_status: str,
+    odds_status: str = "SKIPPED",
+    freshness_status: str = "SKIPPED",
+    model_status: str = "SKIPPED",
+    value_status: str = "SKIPPED",
+    details: Optional[Dict[str, str]] = None,
+) -> List[Dict[str, str]]:
+    """Consistent five-stage decision trace; SKIPPED means that input prerequisites were absent."""
+    details = details or {}
+    gates = [
+        ("FIXTURE_STATUS", "Fixture status supports a decision", fixture_status),
+        ("REAL_1XBET_ODDS", "Real 1xBet market available", odds_status),
+        ("ODDS_FRESHNESS", "Odds timestamp within applicable freshness limit", freshness_status),
+        ("MODEL_READY", "Champion model and forecast ready", model_status),
+        ("CONFIDENCE_AND_VALUE", "Confidence and value thresholds passed", value_status),
+    ]
+    return [
+        {"id": gate_id, "label": label, "status": status, "detail": details.get(gate_id, "")}
+        for gate_id, label, status in gates
+    ]
+
+
+def _preflight_no_bet(
+    base: Dict[str, Any],
+    reason: str,
+    gates: List[Dict[str, str]],
+    **extra: Any,
+) -> Dict[str, Any]:
+    return {**base, "action": "NO_BET", "reason": reason, "gateDiagnostics": gates, **extra}
+
+
 def decide(payload: Dict[str, Any]) -> Dict[str, Any]:
     checked = datetime.now(timezone.utc).isoformat()
     base = {"model": "CHAMPION", "version": VERSION, "checkedAt": checked}
-    if not payload.get("is_live"):
-        return {**base, "action": "NO_BET", "reason": "LIVE_ONLY_DECISION_ENGINE"}
+    is_live = bool(payload.get("is_live"))
+    is_prematch = bool(payload.get("is_prematch"))
+    mode = "live" if is_live else "pre-match" if is_prematch else "unsupported"
+    if mode == "unsupported":
+        return _preflight_no_bet(
+            base,
+            "FIXTURE_STATUS_NOT_ELIGIBLE",
+            _gate_diagnostics(
+                "FAIL",
+                details={"FIXTURE_STATUS": "Fixture is neither confirmed live nor a confirmed future pre-match fixture."},
+            ),
+        )
 
     odds = payload.get("odds") or {}
-    age = _age_seconds(payload.get("odds_updated_at"))
-    if age > 60:
-        return {**base, "action": "NO_BET", "reason": "STALE_ODDS",
-                "oddsAgeSeconds": None if math.isinf(age) else round(age, 1)}
+    required_prices = ("home", "draw", "away", "over25", "under25")
+    available_prices = {
+        key: float(odds[key])
+        for key in required_prices
+        if odds.get(key) is not None
+        and _is_valid_decimal_odd(odds.get(key))
+    }
+    has_complete_1x2 = all(key in available_prices for key in ("home", "draw", "away"))
+    has_complete_totals = all(key in available_prices for key in ("over25", "under25"))
+    if not available_prices:
+        return _preflight_no_bet(
+            base,
+            "LIVE_1XBET_ODDS_UNAVAILABLE" if is_live else "PREMATCH_1XBET_ODDS_UNAVAILABLE",
+            _gate_diagnostics(
+                "PASS", "FAIL", "SKIPPED", "SKIPPED", "SKIPPED",
+                {
+                    "FIXTURE_STATUS": "Provider confirms the fixture is live." if is_live else "Provider confirms this is an upcoming pre-match fixture.",
+                    "REAL_1XBET_ODDS": "No verified 1xBet prices were supplied by the configured feed.",
+                    "ODDS_FRESHNESS": "Skipped because no usable price was supplied.",
+                    "MODEL_READY": "Skipped because no usable market is available to evaluate.",
+                    "CONFIDENCE_AND_VALUE": "Skipped; confidence and expected value were not calculated.",
+                },
+            ),
+        )
+    if not (has_complete_1x2 or has_complete_totals):
+        return _preflight_no_bet(
+            base,
+            "INCOMPLETE_LIVE_1XBET_MARKET" if is_live else "INCOMPLETE_PREMATCH_1XBET_MARKET",
+            _gate_diagnostics(
+                "PASS", "FAIL", "SKIPPED", "SKIPPED", "SKIPPED",
+                {
+                    "FIXTURE_STATUS": f"Provider confirms the fixture is {mode}.",
+                    "REAL_1XBET_ODDS": "Some prices exist, but no supported market has all required outcomes.",
+                    "ODDS_FRESHNESS": "Skipped until a complete market is available.",
+                    "MODEL_READY": "Skipped because no complete market can be evaluated.",
+                    "CONFIDENCE_AND_VALUE": "Skipped; candidate probabilities and expected value were not calculated.",
+                },
+            ),
+        )
+
+    odds_timestamp = payload.get("odds_updated_at")
+    age = _age_seconds(odds_timestamp)
+    if not odds_timestamp or not math.isfinite(age):
+        return _preflight_no_bet(
+            base,
+            "ODDS_TIMESTAMP_UNAVAILABLE",
+            _gate_diagnostics(
+                "PASS", "PASS", "FAIL", "SKIPPED", "SKIPPED",
+                {
+                    "FIXTURE_STATUS": f"Provider confirms the fixture is {mode}.",
+                    "REAL_1XBET_ODDS": "A complete supported market is present.",
+                    "ODDS_FRESHNESS": "The feed did not provide a parseable source update timestamp; freshness cannot be verified.",
+                    "MODEL_READY": "Skipped until market freshness is verified.",
+                    "CONFIDENCE_AND_VALUE": "Skipped; no actionable decision is allowed without verified freshness.",
+                },
+            ),
+        )
+    max_odds_age = 60 if is_live else 900
+    if age > max_odds_age:
+        return _preflight_no_bet(
+            base,
+            "STALE_ODDS",
+            _gate_diagnostics(
+                "PASS", "PASS", "FAIL", "SKIPPED", "SKIPPED",
+                {
+                    "FIXTURE_STATUS": f"Provider confirms the fixture is {mode}.",
+                    "REAL_1XBET_ODDS": "A complete supported market is present.",
+                    "ODDS_FRESHNESS": f"Source timestamp is {round(age, 1)} seconds old; {mode} limit is {max_odds_age} seconds.",
+                    "MODEL_READY": f"Skipped because the {mode} price is stale.",
+                    "CONFIDENCE_AND_VALUE": "Skipped; stale prices cannot be used for a bet decision.",
+                },
+            ),
+            oddsAgeSeconds=round(age, 1),
+            maxOddsAgeSeconds=max_odds_age,
+        )
 
     try:
         artifact = _load_artifact()
         dc = ScoreDrivenDixonColes.deserialize(artifact["dynamic_dixon_coles"])
         cal = ProbabilityCalibrator.from_dict(artifact["calibration"])
     except Exception as exc:
-        return {**base, "action": "NO_BET", "reason": str(exc)}
+        return _preflight_no_bet(
+            base, str(exc),
+            _gate_diagnostics(
+                "PASS", "PASS", "PASS", "FAIL", "SKIPPED",
+                {
+                    "FIXTURE_STATUS": f"Fixture is eligible for {mode} evaluation.",
+                    "REAL_1XBET_ODDS": "A complete 1xBet market is present.",
+                    "ODDS_FRESHNESS": f"Odds age is within the {max_odds_age}-second {mode} limit.",
+                    "MODEL_READY": f"Champion model could not load: {exc}",
+                    "CONFIDENCE_AND_VALUE": "Skipped because the model could not run.",
+                },
+            ),
+        )
 
     artifact_test_end = artifact.get("validation", {}).get("test_end")
     artifact_age = _age_seconds(artifact_test_end)
     if artifact_age > MAX_ARTIFACT_AGE_DAYS * 86400:
-        return {
-            **base,
-            "action": "NO_BET",
-            "reason": "MODEL_ARTIFACT_STALE",
-            "artifactTestEnd": artifact_test_end,
-            "artifactAgeDays": None if math.isinf(artifact_age) else round(artifact_age / 86400, 1),
-            "maxArtifactAgeDays": MAX_ARTIFACT_AGE_DAYS,
-        }
+        return _preflight_no_bet(
+            base, "MODEL_ARTIFACT_STALE",
+            _gate_diagnostics(
+                "PASS", "PASS", "PASS", "FAIL", "SKIPPED",
+                {
+                    "FIXTURE_STATUS": f"Fixture is eligible for {mode} evaluation.",
+                    "REAL_1XBET_ODDS": "A complete 1xBet market is present.",
+                    "ODDS_FRESHNESS": f"Odds age is within the {max_odds_age}-second {mode} limit.",
+                    "MODEL_READY": "Champion artifact is outside the allowed age window.",
+                    "CONFIDENCE_AND_VALUE": "Skipped because the model artifact is stale.",
+                },
+            ),
+            artifactTestEnd=artifact_test_end,
+            artifactAgeDays=None if math.isinf(artifact_age) else round(artifact_age / 86400, 1),
+            maxArtifactAgeDays=MAX_ARTIFACT_AGE_DAYS,
+        )
 
     home, away = str(payload.get("home_team") or ""), str(payload.get("away_team") or "")
     if not home or not away:
-        return {**base, "action": "NO_BET", "reason": "TEAM_IDENTITIES_UNAVAILABLE"}
+        return _preflight_no_bet(
+            base, "TEAM_IDENTITIES_UNAVAILABLE",
+            _gate_diagnostics(
+                "PASS", "PASS", "PASS", "FAIL", "SKIPPED",
+                {"MODEL_READY": "Team identities were missing; no model inference was run."},
+            ),
+        )
 
     # Champion v3 is trained on club-league historical data. Never infer
     # national-team strength by silently falling back to zero team effects.
     trained_teams = set(str(team) for team in getattr(dc, "teams", []))
     if home not in trained_teams or away not in trained_teams:
-        return {
-            **base,
-            "action": "NO_BET",
-            "reason": "TEAM_OUTSIDE_TRAINING_DOMAIN",
-            "trainingDomain": "club_leagues_only",
-            "missingTeams": [team for team in (home, away) if team not in trained_teams],
-        }
+        return _preflight_no_bet(
+            base, "TEAM_OUTSIDE_TRAINING_DOMAIN",
+            _gate_diagnostics(
+                "PASS", "PASS", "PASS", "FAIL", "SKIPPED",
+                {"MODEL_READY": "At least one club is outside the validated Champion training domain."},
+            ),
+            trainingDomain="club_leagues_only",
+            missingTeams=[team for team in (home, away) if team not in trained_teams],
+        )
 
     try:
         pre_h, pre_a = dc.get_expected_goals(home, away)
     except Exception as exc:
-        return {**base, "action": "NO_BET", "reason": "DYNAMIC_DC_FAILURE", "error": str(exc)}
+        return _preflight_no_bet(
+            base, "DYNAMIC_DC_FAILURE",
+            _gate_diagnostics(
+                "PASS", "PASS", "PASS", "FAIL", "SKIPPED",
+                {"MODEL_READY": f"Dynamic Dixon-Coles inference failed: {exc}"},
+            ),
+            error=str(exc),
+        )
 
     hazard = None
     hazard_data = artifact.get("live_hazard")
@@ -112,7 +269,7 @@ def decide(payload: Dict[str, Any]) -> Dict[str, Any]:
     state = MatchState(
         minute=minute, added_time=int(payload.get("added_time") or 0),
         score_home=int(payload.get("score_home") or 0), score_away=int(payload.get("score_away") or 0),
-        period="second_half" if minute >= 45 else "first_half",
+        period=("second_half" if minute >= 45 else "first_half") if is_live else "PREMATCH",
         possession_home=float(payload.get("possession_home") or 50),
         shots_home=int(payload.get("shots_home") or 0), shots_away=int(payload.get("shots_away") or 0),
         shots_on_target_home=int(payload.get("shots_on_target_home") or 0),
@@ -125,7 +282,7 @@ def decide(payload: Dict[str, Any]) -> Dict[str, Any]:
         offsides_home=0, offsides_away=0,
         substitutions_home=int(payload.get("substitutions_home") or 0),
         substitutions_away=int(payload.get("substitutions_away") or 0),
-        is_live=True, lineup_confirmed=bool(payload.get("lineup_confirmed", False)),
+        is_live=is_live, lineup_confirmed=bool(payload.get("lineup_confirmed", False)),
         knockout_context=float(payload.get("knockout_context") or 0),
     )
 
@@ -194,7 +351,7 @@ def decide(payload: Dict[str, Any]) -> Dict[str, Any]:
                 lineup_confirmed=lineup_confirmed,
                 home_starters_count=int(home_starters_count) if home_starters_count is not None else None,
                 away_starters_count=int(away_starters_count) if away_starters_count is not None else None,
-                odds_age_seconds=age, is_live=True, is_market_suspended=False,
+                odds_age_seconds=age, is_live=is_live, is_market_suspended=False,
                 odds_available=True, odds_1xbet=price,
                 monte_carlo_se=float(dist["std_error"]),
                 prob_lower=lower, prob_upper=upper,
@@ -231,10 +388,26 @@ def decide(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
     if not valid:
+        candidate_failures = sorted({
+            reason for candidate in candidates for reason in candidate.get("noBetReasons", [])
+        })
+        if not any(candidate["confidence"] >= MIN_CONFIDENCE for candidate in candidates):
+            candidate_failures.append(f"CONFIDENCE_BELOW_{int(MIN_CONFIDENCE * 100)}_PERCENT")
+        gate_diagnostics = _gate_diagnostics(
+            "PASS", "PASS", "PASS", "PASS", "FAIL",
+            {
+                "FIXTURE_STATUS": f"Fixture is eligible for {mode} evaluation.",
+                "REAL_1XBET_ODDS": "At least one complete real 1xBet market was evaluated.",
+                "ODDS_FRESHNESS": f"Odds age is {round(age, 1)} seconds (limit {max_odds_age}).",
+                "MODEL_READY": "Champion model, calibration and simulation completed.",
+                "CONFIDENCE_AND_VALUE": ", ".join(sorted(set(candidate_failures))) or "No candidate cleared every value/risk gate.",
+            },
+        )
         return {
             **base, "action": "NO_BET", "reason": "NO_MARKET_PASSES_CHAMPION_GATE",
             "confidence": max([c["confidence"] for c in candidates], default=None),
             "candidates": candidates,
+            "gateDiagnostics": gate_diagnostics,
             "simulation": {"count": int(dist["simulation_count"]), "stdError": float(dist["std_error"])},
             "componentStatus": components,
             "researchStack": ["dynamic_dixon_coles", "learned_live_hazard_if_fitted",
@@ -255,6 +428,16 @@ def decide(payload: Dict[str, Any]) -> Dict[str, Any]:
         "edge": winner["edge"], "expectedValue": winner["expectedValue"],
         "probabilityLower": winner["probabilityLower"], "probabilityUpper": winner["probabilityUpper"],
         "candidates": candidates,
+        "gateDiagnostics": _gate_diagnostics(
+            "PASS", "PASS", "PASS", "PASS", "PASS",
+            {
+                "FIXTURE_STATUS": f"Fixture is eligible for {mode} evaluation.",
+                "REAL_1XBET_ODDS": "Real 1xBet prices and a complete supported market were found.",
+                "ODDS_FRESHNESS": f"Odds age is {round(age, 1)} seconds (limit {max_odds_age}).",
+                "MODEL_READY": "Champion model, calibration and simulation completed.",
+                "CONFIDENCE_AND_VALUE": "Best candidate passed the confidence threshold and all NoBetGate risk checks.",
+            },
+        ),
         "simulation": {"count": winner["simulationCount"], "stdError": float(dist["std_error"])},
         "componentStatus": components,
         "researchStack": ["dynamic_dixon_coles", "learned_live_hazard_if_fitted",

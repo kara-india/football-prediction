@@ -4,7 +4,6 @@ import {
   fetchApiFootball,
   extract1xBetOdds,
   fetch1xBetLiveOddsFromPulseScore,
-  fetch1xBetLiveOddsFromOddsApi,
 } from '@/lib/apiFootball'
 import { fetchSofaLive, isSofaAllowedEvent, sofaMappedFixture } from '@/lib/sofaScore'
 import { fetchEspnLiveEvents, espnMappedFixture } from '@/lib/espn'
@@ -68,7 +67,12 @@ export async function GET() {
     }
 
     const unresolvedFixtures = eligible
-      .filter((m: any) => !liveOddsByFixture.get(Number(m.fixture.id)))
+      // Retry via the direct 1xBet feed when the aggregator has prices but no
+      // verifiable source timestamp; a market without provenance is not actionable.
+      .filter((m: any) => {
+        const odds = liveOddsByFixture.get(Number(m.fixture.id))
+        return !odds || !odds.sourceTimestamp
+      })
       .map((m: any) => ({
         id: Number(m.fixture.id),
         home: String(m.teams?.home?.name || ''),
@@ -80,18 +84,12 @@ export async function GET() {
     // bookmaker aggregation because it covers the full 1xBet live soccer board.
     const pulseScoreOdds = await fetch1xBetLiveOddsFromPulseScore(unresolvedFixtures)
     pulseScoreOdds.forEach((odds, fixtureId) => {
-      if (!liveOddsByFixture.get(fixtureId)) liveOddsByFixture.set(fixtureId, odds)
+      const existing = liveOddsByFixture.get(fixtureId)
+      if (!existing || !existing.sourceTimestamp) liveOddsByFixture.set(fixtureId, odds)
     })
 
-    const stillUnresolved = unresolvedFixtures.filter(
-      (fixture: { id: number; home: string; away: string; kickoff?: string }) =>
-        !liveOddsByFixture.get(Number(fixture.id)),
-    )
-    const fallbackOdds = await fetch1xBetLiveOddsFromOddsApi(stillUnresolved)
-    fallbackOdds.forEach((odds, fixtureId) => {
-      if (!liveOddsByFixture.get(fixtureId)) liveOddsByFixture.set(fixtureId, odds)
-    })
-
+    // Do not use The Odds API's /sports/upcoming/odds endpoint for an in-play
+    // decision. It is a pre-match board and must never be presented as live 1xBet.
     const mapped = eligible.map((m: any) => ({
       id: m.fixture.id,
       kickoff: m.fixture.date,
@@ -105,6 +103,7 @@ export async function GET() {
         away: { id: m.teams.away.id, name: m.teams.away.name, logo: m.teams.away.logo },
       },
       odds1xBet: liveOddsByFixture.get(Number(m.fixture.id)) || null,
+      oddsUpdatedAt: liveOddsByFixture.get(Number(m.fixture.id))?.sourceTimestamp || null,
       events: m.events || [],
       fixtureSource: 'API-Football',
     }))

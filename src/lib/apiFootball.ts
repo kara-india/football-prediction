@@ -1,4 +1,5 @@
 import { canMakeAPIRequest, recordAPIRequest } from '@/lib/quotaGuard'
+import { getDiskCache, setDiskCache } from '@/lib/diskCache'
 
 const BASE_URL = 'https://v3.football.api-sports.io'
 
@@ -40,6 +41,21 @@ export async function fetchApiFootball(path: string, isUserDemand = false): Prom
 }
 
 let cached1xBetBookmakerId: number | null | undefined
+
+/**
+ * Cache provider responses by exact endpoint for short, endpoint-appropriate TTLs.
+ * This protects the daily quota while preserving freshness requirements at the
+ * Champion layer, which validates the bookmaker's own source timestamp.
+ */
+export async function fetchCachedApiFootball(path: string, ttlMs: number, isUserDemand = true): Promise<any> {
+  const cacheKey = `api_football:${path}`
+  const cached = getDiskCache<any>(cacheKey, ttlMs)
+  if (cached !== null) return cached
+
+  const payload = await fetchApiFootball(path, isUserDemand)
+  setDiskCache(cacheKey, payload)
+  return payload
+}
 
 export async function resolve1xBetBookmakerId(): Promise<number | null> {
   if (cached1xBetBookmakerId !== undefined) {
@@ -104,16 +120,17 @@ export function extract1xBetOdds(bookmakers: any[]): {
     over25: oddFromMarket(totals, [/^over 2\.5$/i]),
     under25: oddFromMarket(totals, [/^under 2\.5$/i]),
     sourceTimestamp:
-      typeof bookmaker?.update === 'string'
-        ? bookmaker.update
-        : typeof bookmaker?.last_update === 'string'
-          ? bookmaker.last_update
+      typeof bookmaker?.update === 'string' && Number.isFinite(Date.parse(bookmaker.update))
+        ? new Date(bookmaker.update).toISOString()
+        : typeof bookmaker?.last_update === 'string' && Number.isFinite(Date.parse(bookmaker.last_update))
+          ? new Date(bookmaker.last_update).toISOString()
           : null,
   }
 
-  return Object.values(odds).some((value) => value !== null && value !== '')
-    ? odds
-    : null
+  // A timestamp alone does not constitute a real market.
+  const hasRealPrice = [odds.home, odds.draw, odds.away, odds.over25, odds.under25]
+    .some((value) => value !== null && Number.isFinite(value) && value > 1)
+  return hasRealPrice ? odds : null
 }
 
 export function extractProviderForecast(response: any): {
@@ -165,7 +182,7 @@ export function extractTeamStatistic(statistics: any[], teamId: number, names: R
 export async function fetch1xBetOddsForFixture(fixtureId: number) {
   if (!Number.isInteger(fixtureId) || fixtureId <= 0) return null
   try {
-    const payload = await fetchApiFootball('/odds?fixture=' + fixtureId, true)
+    const payload = await fetchCachedApiFootball('/odds?fixture=' + fixtureId, 30 * 1000, true)
     return extract1xBetOdds(payload?.response?.[0]?.bookmakers || [])
   } catch (error) {
     console.warn('[1XBET ODDS] Fixture lookup failed', fixtureId, error)
@@ -226,17 +243,21 @@ function extractPulseScore1xBetOdds(event: any): any | null {
     away: findOutcome(result, ['away', '2']),
     over25: findOutcome(totals, ['over'], (item) => Number(item?.line ?? item?.point) === 2.5),
     under25: findOutcome(totals, ['under'], (item) => Number(item?.line ?? item?.point) === 2.5),
+    // Preserve only a timestamp supplied by the live-odds provider. Never
+    // manufacture "now" as a source timestamp: that can make old prices appear fresh.
     sourceTimestamp:
-      typeof event?.updatedAt === 'string'
-        ? event.updatedAt
-        : typeof event?.lastUpdate === 'string'
-          ? event.lastUpdate
-          : new Date().toISOString(),
+      typeof event?.updatedAt === 'string' && Number.isFinite(Date.parse(event.updatedAt))
+        ? new Date(event.updatedAt).toISOString()
+        : typeof event?.lastUpdate === 'string' && Number.isFinite(Date.parse(event.lastUpdate))
+          ? new Date(event.lastUpdate).toISOString()
+          : null,
   }
 
-  return Object.values(odds).some((value) => value !== null && value !== '')
-    ? odds
-    : null
+  // A timestamp alone is not an odds market. Return a result only if at least
+  // one real decimal price was parsed.
+  const hasRealPrice = [odds.home, odds.draw, odds.away, odds.over25, odds.under25]
+    .some((value) => value !== null && Number.isFinite(value) && value > 1)
+  return hasRealPrice ? odds : null
 }
 
 export async function fetch1xBetLiveOddsFromPulseScore(fixtures: Array<{
@@ -369,7 +390,7 @@ function normalizeTeamName(value: unknown): string {
 
 export async function findApiFootballFixtureByTeams(homeTeam: string, awayTeam: string, date: string) {
   try {
-    const payload = await fetchApiFootball('/fixtures?date=' + encodeURIComponent(date), true)
+    const payload = await fetchCachedApiFootball('/fixtures?date=' + encodeURIComponent(date), 5 * 60 * 1000, true)
     const home = normalizeTeamName(homeTeam)
     const away = normalizeTeamName(awayTeam)
     const matches = Array.isArray(payload?.response) ? payload.response : []

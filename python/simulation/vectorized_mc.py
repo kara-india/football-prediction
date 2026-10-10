@@ -53,7 +53,8 @@ class VectorizedMonteCarloSimulator:
         scores[:, 1] = state.score_away
 
         hazard = live_hazard_model or self.live_hazard_model
-        hazard_ready = bool(hazard is not None and getattr(hazard, "fitted", False))
+        # A live hazard correction is trained on in-play states; do not apply it to a pre-match forecast.
+        hazard_ready = bool(state.is_live and hazard is not None and getattr(hazard, "fitted", False))
 
         start_min = int(state.minute)
         end_min = start_min + rem_mins
