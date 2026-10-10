@@ -109,6 +109,8 @@ def decide(payload: Dict[str, Any]) -> Dict[str, Any]:
         )
 
     odds = payload.get("odds") or {}
+    odds_feed_issue = str(payload.get("odds_feed_issue") or "").strip()[:220]
+    feed_issue_suffix = f" Provider diagnostic: {odds_feed_issue}" if odds_feed_issue else ""
     required_prices = ("home", "draw", "away", "over25", "under25")
     available_prices = {
         key: float(odds[key])
@@ -126,7 +128,7 @@ def decide(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "PASS", "FAIL", "SKIPPED", "SKIPPED", "SKIPPED",
                 {
                     "FIXTURE_STATUS": "Provider confirms the fixture is live." if is_live else "Provider confirms this is an upcoming pre-match fixture.",
-                    "REAL_1XBET_ODDS": "No verified 1xBet prices were supplied by the configured feed.",
+                    "REAL_1XBET_ODDS": "No verified 1xBet prices were supplied by the configured feed." + feed_issue_suffix,
                     "ODDS_FRESHNESS": "Skipped because no usable price was supplied.",
                     "MODEL_READY": "Skipped because no usable market is available to evaluate.",
                     "CONFIDENCE_AND_VALUE": "Skipped; confidence and expected value were not calculated.",
@@ -160,7 +162,7 @@ def decide(payload: Dict[str, Any]) -> Dict[str, Any]:
                 {
                     "FIXTURE_STATUS": f"Provider confirms the fixture is {mode}.",
                     "REAL_1XBET_ODDS": "A complete supported market is present.",
-                    "ODDS_FRESHNESS": "The feed did not provide a parseable source update timestamp; freshness cannot be verified.",
+                    "ODDS_FRESHNESS": "The feed did not provide a parseable source update timestamp; freshness cannot be verified." + feed_issue_suffix,
                     "MODEL_READY": "Skipped until market freshness is verified.",
                     "CONFIDENCE_AND_VALUE": "Skipped; no actionable decision is allowed without verified freshness.",
                 },
