@@ -148,3 +148,32 @@ def test_missing_market_surfaces_provider_suspension_diagnostic():
     market_gate = next(g for g in result["gateDiagnostics"] if g["id"] == "REAL_1XBET_ODDS")
     assert market_gate["status"] == "FAIL"
     assert "account is suspended" in market_gate["detail"]
+
+
+
+def test_refreshed_artifact_with_old_validation_cutoff_stays_blocked(monkeypatch):
+    # A new trained_at timestamp must not relabel a model trained/validated on
+    # old data as current. BET decisions require a recent holdout window.
+    old_test_end = (datetime.now(timezone.utc) - timedelta(
+        days=champion_service.MAX_ARTIFACT_AGE_DAYS + 1
+    )).isoformat()
+    artifact = {
+        "dynamic_dixon_coles": {},
+        "calibration": {},
+        "validation": {"test_end": old_test_end},
+        "trained_at": datetime.now(timezone.utc).isoformat(),
+    }
+    monkeypatch.setattr(champion_service, "_load_artifact", lambda: artifact)
+    monkeypatch.setattr(
+        champion_service.ScoreDrivenDixonColes, "deserialize", lambda _raw: object()
+    )
+    monkeypatch.setattr(
+        champion_service.ProbabilityCalibrator, "from_dict", lambda _raw: object()
+    )
+
+    result = champion_service.decide(_payload(age_seconds=10))
+    assert result["action"] == "NO_BET"
+    assert result["reason"] == "MODEL_ARTIFACT_STALE"
+    assert result["maxArtifactAgeDays"] == champion_service.MAX_ARTIFACT_AGE_DAYS
+    assert result["gateDiagnostics"][3]["status"] == "FAIL"
+    assert result["gateDiagnostics"][4]["status"] == "SKIPPED"
