@@ -132,3 +132,19 @@ def test_prematch_simulation_does_not_apply_live_hazard_corrections():
         n_simulations=100, live_hazard_model=ForbiddenLiveHazard(),
     )
     assert paths.shape == (100, 2)
+
+
+
+def test_missing_market_surfaces_provider_suspension_diagnostic():
+    result = champion_service.decide(
+        _payload(odds={}, age_seconds=None)
+        | {
+            "odds": {},
+            "odds_updated_at": None,
+            "odds_feed_issue": "API-Football account is suspended; restore provider access.",
+        }
+    )
+    assert result["reason"] == "LIVE_1XBET_ODDS_UNAVAILABLE"
+    market_gate = next(g for g in result["gateDiagnostics"] if g["id"] == "REAL_1XBET_ODDS")
+    assert market_gate["status"] == "FAIL"
+    assert "account is suspended" in market_gate["detail"]
