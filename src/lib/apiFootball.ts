@@ -401,6 +401,8 @@ export async function findApiFootballFixtureByTeams(homeTeam: string, awayTeam: 
     }) || null
   } catch (error) {
     console.warn('[API-FOOTBALL FIXTURE RESOLUTION] Failed', error)
-    return null
+    // Let the Terminal distinguish an unavailable provider from a legitimate
+    // "no matching fixture" result so odds diagnostics do not hide account failures.
+    throw error
   }
 }
