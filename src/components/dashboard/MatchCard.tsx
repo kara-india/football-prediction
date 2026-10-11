@@ -121,12 +121,12 @@ export default function MatchCard({
           </div>
         </div>
 
-        {/* 1xBet Fixed Odds Bar */}
+        {/* Bookmaker odds */}
         <div className="bg-[#0B0F17] border border-[#1E293B] rounded-lg p-3 space-y-2">
           <div className="flex items-center justify-between text-[11px] font-mono">
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]" />
-              <span className="text-[#F8FAFC] font-semibold text-[11px]">1xBet Fixed Odds</span>
+              <span className="text-[#F8FAFC] font-semibold text-[11px]">Bookmaker odds</span>
             </div>
             <span
               className={`text-[10px] font-mono px-2 py-0.2 rounded border ${
@@ -135,7 +135,7 @@ export default function MatchCard({
                   : 'bg-[#1E293B] text-[#64748B] border-[#334155]'
               }`}
             >
-              {hasOdds ? 'Verified Feed' : 'Odds Pending'}
+              {hasOdds ? 'Quote loaded' : 'Unavailable'}
             </span>
           </div>
 
@@ -156,7 +156,7 @@ export default function MatchCard({
             </div>
           ) : (
             <div className="text-center py-2 text-[11px] text-[#64748B] font-mono">
-              1xBet odds stored in cache. Open match detail for full analysis.
+              No bookmaker quote is available for this match yet.
             </div>
           )}
         </div>
@@ -179,7 +179,7 @@ export default function MatchCard({
             }`}
           />
           <span className="text-[#94A3B8]">
-            Lineup: {lineupConfirmed ? 'Confirmed' : 'Pending (T-60m)'}
+            Lineup: {lineupConfirmed ? 'Confirmed' : 'Confirmation required'}
           </span>
         </div>
 

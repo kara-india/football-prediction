@@ -16,6 +16,7 @@ export interface MarketRow {
   decisionCode: string
   action: 'CANDIDATE' | 'NO_BET'
   stakingAdvisory?: string
+  bookmaker?: string | null
 }
 
 export interface MarketTableProps {
@@ -26,11 +27,11 @@ export interface MarketTableProps {
 export default function MarketTable({ rows, className = '' }: MarketTableProps) {
   return (
     <TerminalCard
-      title="Institutional Market Matrix & Analytical Derivations"
-      subtitle="Exhaustive evaluation of all market lines against 1xBet clearing prices with NO-BET taxonomy"
+      title="Match Market Analysis"
+      subtitle="Model decisions are shown only when their source data and safety checks are available"
       badge={
         <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 font-semibold">
-          1xBet Execution Matrix
+          Paper analysis
         </span>
       }
       className={className}
@@ -42,7 +43,7 @@ export default function MarketTable({ rows, className = '' }: MarketTableProps) 
             <tr>
               <th className="py-3 px-4">Market Outcome</th>
               <th className="py-3 px-3">Market</th>
-              <th className="py-3 px-3 text-right">1xBet Price</th>
+              <th className="py-3 px-3 text-right">Bookmaker Price</th>
               <th className="py-3 px-3 text-right">Implied</th>
               <th className="py-3 px-3 text-right">Fair (Shin)</th>
               <th className="py-3 px-3 text-right">Calibrated</th>
@@ -123,8 +124,8 @@ export default function MarketTable({ rows, className = '' }: MarketTableProps) 
         </table>
       </div>
       <div className="p-3 bg-[#0B0F17] border-t border-[#1E293B] text-[10px] text-[#64748B] flex flex-wrap items-center justify-between gap-2">
-        <span>Execution Target: 1xBet Fixed Odds (Bookmaker ID: 6)</span>
-        <span>Safety Gate Invariant: Min Edge +3.0 pp • Expected Value &gt; 0</span>
+        <span>Bookmaker: {rows.find(row => row.bookmaker)?.bookmaker || 'Not available'}</span>
+        <span>No real bet is placed by this terminal.</span>
       </div>
     </TerminalCard>
   )

@@ -23,13 +23,13 @@ export default function LiveMatchSection() {
   const fetchLive = async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/matches/live')
-      if (res.ok) {
-        const data = await res.json()
-        setMatches(data)
-        const now = new Date()
+      const saved = window.localStorage.getItem('football-data-sync-v1')
+      if (saved) {
+        const payload = JSON.parse(saved)
+        const data = Array.isArray(payload.fixtures) ? payload.fixtures : []
+        setMatches(data.filter((match: LiveMatch) => ['LIVE', 'HT'].includes(match.status)))
         setLastUpdated(
-          now.toLocaleTimeString('en-IN', {
+          new Date(payload.syncedAt).toLocaleTimeString('en-IN', {
             timeZone: 'Asia/Kolkata',
             hour: '2-digit',
             minute: '2-digit',
@@ -44,7 +44,7 @@ export default function LiveMatchSection() {
     }
   }
 
-  // Initial load only - no auto polling
+  // Read only the last manual sync; never request the upstream feed here.
   useEffect(() => {
     fetchLive()
   }, [])
@@ -87,7 +87,7 @@ export default function LiveMatchSection() {
                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
               />
             </svg>
-            <span>{loading ? 'Syncing' : 'Refresh'}</span>
+            <span>{loading ? 'Loading' : 'Load cached'}</span>
           </button>
         </div>
       </div>

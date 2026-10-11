@@ -1,0 +1,79 @@
+# Recovery roadmap: provider, analysis, ledger, learning, and UI
+
+**Prepared:** 2026-10-11
+**Repository checkpoint:** recovery A1 complete; A2 next (see [RECOVERY_STATUS.md](./RECOVERY_STATUS.md)).
+**Product state:** paper analysis only. Live betting and an operational prediction pipeline are not verified or enabled.
+
+## Decisions and product rules
+
+- The immediate product is **Premier League analysis only**. Competition and team filters may browse other competitions that the selected feed actually returns, but those fixtures must be labeled **not supported for betting analysis** until that competition has its own historical corpus, model, calibration, and validation.
+- Keep the existing decision contract: require a confirmed 11-v-11 lineup, calibrated selection probability above 0.70, at least 80 settled cases in its reliability bin with observed frequency in `[0.62, 0.85]`, positive expected value after de-vigging, and quarter-Kelly stake capped at 1% of the configured bankroll. Every failed or missing prerequisite produces a persisted `NO_BET` reason. Reinforcement learning cannot weaken these gates.
+- No hand-authored team/player multipliers or confidence boosts. Estimate model parameters from point-in-time match data. Fit regularization, time decay, and calibration only on historical training/validation windows. If evidence is insufficient, shrink to the league baseline or abstain.
+- The app records paper decisions only. It never claims that a sportsbook bet was placed.
+- Replace unsupported status claims such as “API-Football”, “1xBet fixed clearing”, “Live”, and “Engine active” with actual provider, last successful sync, data age, model readiness, and ledger state. Unknown means **Unavailable**, not green.
+
+## Provider research and recommendation
+
+### Start now: football-data.org + The Odds API + manual confirmed XIs
+
+1. **Fixtures and final results:** use football-data.org v4 as the first replacement for the retired API-Football fixture feed. Its free plan includes the Premier League, fixtures, schedules, tables, and delayed scores; the published free rate is 10 calls/minute. This is enough to restore an honest EPL fixture list and delayed settlement data, but not live scores or confirmed team sheets. [Coverage](https://www.football-data.org/coverage), [pricing](https://www.football-data.org/pricing), [request limits and API policies](https://docs.football-data.org/general/v4/policies.html), [match schema](https://docs.football-data.org/general/v4/match.html).
+2. **Odds:** use The Odds API behind the existing `odds_api` provider interface, requesting only the 1xBet EU bookmaker (`onexbet`) and only the market the model evaluates. Its official bookmaker list includes 1xBet in the EU region; current odds responses expose bookmaker and market update timestamps. The free tier is 500 credits/month; current odds cost 1 credit per returned market per region. Persist and display the actual bookmaker key, market, and timestamp. An absent 1xBet quote must remain `ODDS_UNAVAILABLE`; never silently substitute another bookmaker. [Bookmaker list](https://the-odds-api.com/sports-odds-data/bookmaker-apis.html), [API plans](https://the-odds-api.com/), [quota and odds API](https://the-odds-api.com/liveapi/guides/v4/).
+3. **Confirmed lineups:** keep the A3 manual snapshot workflow for the first usable version. Store the source URL, operator, confirmation time, exact starters, and immutable fingerprint. Predicted lineups do not pass the gate.
+4. **Optional paid consolidation:** run a bounded Sportmonks trial before buying. Its public plans advertise fixtures, scores, lineups, and odds; the entry paid plan starts at €29/month for five selected leagues, while the free plan covers the Danish Superliga and Scottish Premiership rather than EPL. Its docs explicitly distinguish predicted from confirmed lineups, so only a provider response marked confirmed can replace manual XI entry. Confirm EPL-specific availability, latency, bookmaker identity (including 1xBet), timestamp behavior, and terms with real responses before promotion. [Plans](https://www.sportmonks.com/football-api/plans-pricing/), [lineups and confirmation metadata](https://docs.sportmonks.com/v3/tutorials-and-guides/tutorials/lineups-and-formations).
+
+### PulseScore check and request policy (2026-10-11)
+
+- PulseScore's official API provides live events with scores and markets, pre-match league/event boards, and bookmaker-specific endpoints including 1xBet. It can be evaluated as an odds/event-details provider, but its docs do not establish confirmed starting XI coverage or make it a replacement for football-data.org's fixture/results feed. [PulseScore API docs](https://www.pulsescore.net/docs).
+- The current worktree has no PulseScore client, `PULSESCORE_API_KEY` setting, or PulseScore key in `.env.local`. The configured repository credentials cover football-data.org and The Odds API only. Do not silently switch providers; add PulseScore only after its key is present and bookmaker/league coverage is verified.
+- **On-demand rule:** the browser calls the football-data.org sync route only after the user presses **Sync Fixtures**. Fixture listing and match detail read the shared sync snapshot; they make no upstream fixture request. Opening an eligible, synced EPL match terminal may query the odds provider. Supabase stores shared snapshots and request/quota observations; fixture sync snapshots are reused for 10 minutes, pre-match odds for 5 minutes, and in-play odds for 60 seconds. A database lock prevents simultaneous tabs from issuing duplicate provider requests.
+- The Odds API's `/events` directory is quota-free; its single-event odds request costs one credit per returned market per bookmaker group/region. Request only 1xBet `h2h` and `totals` for the selected event, and keep/display `x-requests-*` response headers. Empty odds responses do not consume credits. `SUPABASE_SERVICE_ROLE_KEY` must be configured as a server-only environment variable; provider requests fail closed without it so the app never spends a credit without shared caching/accounting. [Official events and quota documentation](https://the-odds-api.com/liveapi/guides/v4/).
+
+**Recommendation:** ship the free split-provider bridge first. It restores real EPL fixtures without reviving API-Football and keeps odds and lineup trust explicit. The user-facing fixture feed can be restored before the betting gate is ready. Do not present this as a complete live-data replacement: free scores are delayed and lineups remain manual. Evaluate Sportmonks as the lower-friction paid all-in-one candidate; it is not a no-cost replacement.
+
+## Phases and order
+
+| Order | Phase | Work | Completion evidence |
+|---|---|---|---|
+| 0 | A0, done | Remove API-Football runtime calls and establish provider interfaces. | Existing no-call guard passes; no runtime path can use the retired provider. |
+| 1 | A1, done | Vendor EPL history and point-in-time loader. | Seven historical seasons load locally with exact aliases; current report is explicitly uncalibrated. |
+| 2 | **A1.5, urgent provider bridge** | Implement football-data.org fixture/result adapter; replace the retired Next.js feed and provider-status endpoint; persist provider sync health and quota usage; reconcile IDs via exact aliases/natural keys. Cache centrally and respect 10 calls/minute. | Current EPL fixtures appear with source and “last updated”; final scores settle only after the provider marks them finished; no API-Football references in runtime/status UI. |
+| 3a | A2, next | Train champion artifact from A1 history; fit Dixon–Coles parameters; evaluate calibrated probabilities in strictly later temporal windows; publish model/data hashes and reliability bins. Repair the obsolete champion bootstrap workflow. | Reproducible walk-forward report and artifact; refuse promotion without ≥1,000 training matches and a populated qualifying ≥0.70 bin. Existing raw 77.7% hit rate is not calibration evidence. |
+| 3b | A3, parallel | Manual 11+11 lineup writer, confirmation timestamp, source URL, immutable revisions and fingerprint. Remove fake player-rate defaults. | Valid exact XI can be audited and reconstructed as of analysis time; any incomplete/unconfirmed XI blocks a bet. |
+| 3c | A4, parallel | The Odds API adapter, 1xBet exact-book selection, immutable odds snapshots, freshness checks, market normalization, de-vig, expected value, quarter-Kelly. | Recorded provider response proves 1xBet, market, both sides, quote timestamp, and price; no credentials/quote yields a specific no-bet reason. |
+| 4 | A5 | Implement the decision service and wire the UI-triggered analysis job to Python model, fixture, XI, and odds snapshots. Make jobs idempotent on fixture + lineup fingerprint + odds snapshot + model version. | An analysis is either fully reproduced from persisted inputs or returns a clear `NO_BET`; no default lambdas, invented sample counts, or fabricated probabilities. |
+| 5 | A6 | Settle paper decisions and update supervised Dixon–Coles challenger state from newly available match results, in temporal order. Keep the bandit in shadow mode. | Replay and restart produce identical state; each settled fixture updates at most once; challenger promotion requires a later walk-forward improvement and cannot loosen any gate. |
+| 6 | A8 | Build the match-intelligence and ledger UI against persisted API contracts. This can start as a design/API-contract task after A5 schemas stabilize. | Dropdowns filter real competitions, leagues, teams, dates; only supported EPL matches can be analyzed. Analysis shows truthful job stages. History and paper ledger distinguish pending, success, fail, void, and no-bet. |
+| 7 | A7 | Add remaining-time in-play Poisson only after verified live score/minute, event timing, and a separate live-data gate exist. | Point-in-time replay passes; delayed-score sources cannot enter live decisions. |
+| 8 | A9 | Complete CI/static guardrails, decision tests, provider fixtures from recorded sanitized responses, schema/RLS checks, and deploy smoke checks. | Clean CI blocks API-Football regressions, fabricated inputs, threshold bypasses, non-idempotent settlements, and UI claims unsupported by provider/model health. |
+
+Phases A2, A3, and A4 can proceed independently after A1.5 interface decisions; A5 waits for all three. A6 and A8 wait for A5's persisted contract. A7 is last because the recommended free scores feed is delayed. Add tests alongside each phase; A9 remains the final integrated gate.
+
+## Analysis UI behavior
+
+- Filters: **Competition → League/season → Team → Date**. Populate options from synchronized provider data, show source and coverage, and provide a simple “Supported for analysis” marker. Browsing a competition does not imply a model supports it.
+- Match action: **Analyze match** invokes the persisted job/API. Show only real state transitions returned by the job, e.g. “Loading fixture”, “Checking confirmed lineups”, “Checking 1xBet price”, “Calculating probabilities”, “Checking safety rules”. Use progress/error states tied to backend responses, not a timer or fake search animation. Missing inputs should finish promptly with a plain explanation.
+- Result wording for non-specialists: “Estimated chance”, “Bookmaker price”, “Estimated value”, “Suggested paper stake”, and “Why no paper bet?”. Explain that a probability is not a guarantee and show the model version and “data as of” timestamp in details.
+- Remove unsupported “1xBet fixed clearing”, “95 cap”, “engine active”, and “live data mode” status. Show actual configured provider health and data age. Empty states should say which source is unavailable or when no fixtures were returned.
+
+## Analysis history and paper ledger
+
+- **Analysis history** contains every completed analysis, including `NO_BET`, so abstentions are visible and learning is not selected only from published picks.
+- **Paper bet ledger** contains only opportunities that passed every gate and were recorded as hypothetical paper bets. Freeze the chosen selection, probability, odds, bookmaker, stake, decision time, and model version. Never rewrite the original call when the match finishes.
+- Before settlement show **Pending**. After an authoritative final score, show **SUCCESS** or **FAIL** for the paper selection; use **VOID** for abandoned/void matches and retain a settlement source/time. Show paper return separately from real-world outcomes; there is no real execution.
+- When the same teams later play, update future forecasts through fitted team attack/defence parameters after the prior result becomes available. Do not add a bonus because the earlier call won, nor a penalty because it lost. A single settled result is new training evidence, not a hand-tuned reinforcement weight.
+- Extend `decision_opportunities` with migration-safe snapshot references/settlement metadata or add a dedicated immutable `paper_bets` ledger. Keep service-role writes server-side and verify RLS on every exposed read path. Do not expose service keys.
+
+## Evidence-based model weights and update policy
+
+1. **Team strength:** maximum-likelihood Dixon–Coles attack/defence, home-advantage, and low-score parameters from available EPL results. Apply the existing candidate time decay `xi=0.0019` only as a candidate (about a 365-day half-life); select decay with nested chronological walk-forward folds, never by inspecting the final test season. Baseline to compare: no decay. Do not add a second “recent form” multiplier on top of the decay.
+2. **Calibration:** fit Platt/isotonic calibration only on a temporal calibration slice after model fitting. Evaluate with log loss and multiclass Brier, plus reliability plots and uncertainty intervals. Keep probability thresholds and qualification rules fixed by the product contract; do not tune them to maximize historical profit.
+3. **Player/lineup effects:** start with no numerical player multiplier. Add only if historical, point-in-time player minutes/lineups support it; require at least 450 minutes for a player posterior, estimate a regularized effect, and keep it neutral when identity/history is missing. Bound the multiplier to `[0.85, 1.15]`. Enable it only if a predeclared ablation improves out-of-sample log loss by at least 0.005, with uncertainty reported; otherwise use 1.0.
+4. **Policy learning:** the bandit can rank only already-qualified actions and abstention in shadow evaluation. No random exploration is published. A policy is promoted only after leakage-safe later folds show benefit under log loss/calibration and do not degrade the odds benchmark. The Brier/log scores are strictly proper objectives that reward honest probabilities; raw win rate alone is not an acceptable model-selection target. [Proper scoring rules research](https://doi.org/10.1198/016214506000001437), [Dixon–Coles paper record](https://www.research.lancs.ac.uk/portal/en/publications/modelling-association-football-scores-and-inefficiencies-in-the-football-betting-market%28d16276a2-d6e0-483b-a708-1d29663f1992%29.html).
+
+## Immediate implementation sequence
+
+1. Build A1.5 provider adapter and replace the stale feed/status references, using football-data.org for EPL fixtures and delayed results.
+2. In parallel, start A2 artifact/calibration and A3 manual XI contract; implement A4 Odds API adapter using the exact `onexbet` bookmaker key and quota-aware snapshots.
+3. Define a versioned persisted `analysis_run`/`decision_opportunity` response contract before UI work; preserve all inputs needed to explain a decision.
+4. Then wire analysis job progress, immutable paper ledger settlement, and learned team updates in A5/A6; build selectors, result states, and ledger in A8.
+5. Keep the production engine disabled until all decision, lineage, calibration, settlement, and deployment gates are independently verified.

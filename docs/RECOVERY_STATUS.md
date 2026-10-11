@@ -3,8 +3,8 @@
 Resume contract for any later session. `docs/PHASE_STATUS.md` is historical and must not be treated as proof that the product works.
 
 - **HEAD this change is based on:** `dbc94dec76d0b1016d73eed777e3fb7285c43e6a`
-- **Current phase:** `A1 complete; A2 is next`
-- **Current subtask:** `A1.1–A1.4 complete in the recovery/A1 commit; start A2.1`
+- **Current phase:** `A1 complete; A1.5 provider bridge in progress`
+- **Current subtask:** `A1.5 on-demand fixture/odds flows and durable shared cache/quota ledger implemented; provider responses still need live validation`
 - **Tests run:** `tests/test_api_football_removed.py` (3 passed), `tests/test_football_data_uk_history.py` (2 passed), and `tests/test_dixon_coles.py` (7 passed); benchmark regenerated from vendored data.
 - **Next parallel phases:** A3 manual lineup contract and A4 live odds/Kelly can proceed from A0 interfaces. A2 champion fitting depends on this A1 corpus.
 - **Push policy:** One push per completed letter-phase. The current change is based on A0 and is not based on `main`; Vercel production deploys from `main`.
@@ -17,6 +17,7 @@ Product contract (do not reinterpret): EPL only; bet only after a real 11v11 sna
 |---|---|---|---|
 | A0 Provider seam, API-Football removed from runtime | **DONE** | — | none |
 | A1 Historical PL corpus + team aliases | **DONE** | A0 | Vendored 2019/20–2025/26 E0 CSVs; local-only point-in-time loader; exact provider aliases; regenerated walk-forward report |
+| A1.5 football-data.org + Odds API client wiring | **IN PROGRESS — implementation, Supabase migration, and Vercel provider config applied; live payload validation remains** | A0 | Redeploy preview/production, then validate fixture and onexbet payloads with explicit user actions |
 | A2 Champion artifact + calibrator + p≥0.70 reliability bins | **NOT_STARTED** | A1 | A2.1 implement `scripts/train_champion_artifact.py`; use the A1 corpus |
 | A3 Manual lineup snapshot writer (11+11, source_url, confirmed_at) | **NOT_STARTED** | A0 | can proceed in parallel with A2; operator-entered only |
 | A4 Odds snapshot + de-vig + quarter-Kelly | **NOT_STARTED** | A0 | can proceed in parallel with A2; no key ⇒ `ODDS_UNAVAILABLE` |
@@ -57,11 +58,26 @@ Product contract (do not reinterpret): EPL only; bet only after a real 11v11 sna
 - Benchmark diagnostic: 7,790 overlapping fold predictions across 41 folds. The distinct-fixture view keeps the latest eligible prediction per fixture: 184/1,710 raw top-outcome probabilities were ≥0.70, hit rate 77.7%, mean CLV −0.60%. These probabilities are uncalibrated and do not satisfy the live gate.
 - Verification performed: three API-Football removal tests, two A1 loader tests, and seven existing Dixon-Coles tests passed. The benchmark script completed and generated its report. No broad CI suite was run.
 
+## A1.5 local progress (not verified)
+
+- Next.js fixture client now uses `FOOTBALL_DATA_ORG_TOKEN` only in the `X-Auth-Token` header. Upcoming, in-progress, and detail routes have been switched to football-data.org v4 response shapes.
+- Python football-data.org client and The Odds API v4 client are implemented locally. The odds adapter requests only the EPL, EU region, exact `onexbet` bookmaker, and supported v1 markets; no bookmaker fallback is present. The Odds API documents its `apiKey` as a query parameter, so the odds adapter follows that API contract.
+- The provided credentials are in ignored `.env.local`; `.env.example` contains variable names only. They were not added to Git.
+- Fixture API calls now occur only through `POST /api/matches/sync`, triggered by the Match Intelligence Sync Fixtures button. Listing and detail screens read the shared snapshot; no other route calls football-data.org. Shared fixtures are reused for 10 minutes.
+- Odds are requested only when an eligible synced EPL fixture terminal is opened. The API uses the quota-free The Odds API event directory to find the match, then requests only the specific event's 1xBet `h2h` and `totals` markets. Supabase shares cached odds across browsers (60 seconds in-play; 5 minutes pre-match), records provider requests and quota headers, and locks concurrent duplicate fetches.
+- PulseScore documentation was reviewed. Its API includes event/score/markets and 1xBet bookmaker endpoints, but it is an odds feed and does not establish confirmed starting XIs. No PulseScore integration or PulseScore key variable exists in this worktree's code or `.env.local`; it cannot be treated as configured here.
+- Supabase migration `014_provider_cache_and_usage.sql` was applied to project `qqcxjjkgvqknesrtnwal`; read-only schema inspection confirmed the four cache, quota, log, and lock tables. RLS is enabled; `anon`/`authenticated` have no access and `service_role` has explicit grants. The security advisor reports informational “RLS enabled, no policy” notices, expected for service-role-only tables.
+- Vercel already had the service-role and Odds API keys for production/preview. I added the user-provided football-data.org token as a sensitive `FOOTBALL_DATA_ORG_TOKEN` to those same environments. Existing Vercel metadata also confirms `PULSESCORE_API_KEY` is configured for production/preview, but PulseScore has not been wired into this A1.5 implementation. No credential values are committed or printed.
+- `.env.local` currently has no `SUPABASE_SERVICE_ROLE_KEY`; local provider calls therefore fail closed. Production/preview will use the configured service key after their next deployment. Analysis still returns unavailable until A5.
+- Provider response behavior has not been checked with live requests. No provider calls were made during this implementation.
+- UI labels for provider, operating mode, and odds have been corrected locally; UI build and provider integration remain unverified.
+
 ## Next instructions
 
-1. A2.1: implement `scripts/train_champion_artifact.py`; fit before the calibration window, calibrate only on that next window, and refuse output without ≥1,000 training matches and a nonempty p≥0.70 reliability bin.
-2. A3 and A4 can proceed in parallel after A0; do not start A5 before A2, A3, and A4 exist.
-3. Do not use the raw 77.6% diagnostic as calibrated reliability evidence. Do not relax the confidence gate to generate bets.
+1. Redeploy preview/production to pick up `FOOTBALL_DATA_ORG_TOKEN`, then complete A1.5 provider validation with explicit sync/match-terminal actions. Configure the service-role key locally only if local live validation is needed.
+2. A2.1: implement `scripts/train_champion_artifact.py`; fit before the calibration window, calibrate only on that next window, and refuse output without ≥1,000 training matches and a nonempty p≥0.70 reliability bin.
+3. A3 and A4 can proceed in parallel after A0; do not start A5 before A2, A3, and A4 exist.
+4. Do not use the raw 77.6% diagnostic as calibrated reliability evidence. Do not relax the confidence gate to generate bets.
 
 ## Push rule
 

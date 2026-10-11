@@ -3,8 +3,8 @@ import Sidebar from '../components/layout/Sidebar'
 import Header from '../components/layout/Header'
 
 export const metadata = {
-  title: 'Football Intelligence Terminal | 1xBet Quantitative Engine',
-  description: 'Institutional pre-match and in-play market intelligence with verified lineup governance',
+  title: 'Football Intelligence Terminal',
+  description: 'Premier League match analysis and paper decision history',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -32,12 +32,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   Football Intelligence Terminal
                 </p>
                 <p className="text-[#64748B] font-mono text-[11px]">
-                  Prequential Monte Carlo simulation • 1xBet fixed clearing prices • Starting XI verification
+                  Premier League analysis • sourced fixtures • confirmed lineup required • paper decisions only
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-[#94A3B8] font-mono text-[11px]">
                 <span>
-                  Clearing: <strong className="text-[#D4AF37] font-semibold">1xBet Fixed</strong>
+                  Mode: <strong className="text-[#D4AF37] font-semibold">Paper analysis</strong>
                 </span>
                 <span className="text-[#334155]">·</span>
                 <span>
@@ -45,8 +45,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </span>
                 <span className="text-[#334155]">·</span>
                 <span className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] inline-block animate-pulse" />
-                  <span className="text-[#10B981] font-medium">Operational</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B] inline-block" />
+                  <span className="text-[#F59E0B] font-medium">Decision engine unavailable</span>
                 </span>
               </div>
             </div>

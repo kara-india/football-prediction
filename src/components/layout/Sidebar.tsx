@@ -3,7 +3,6 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import EngineStatus from '../dashboard/EngineStatus'
 
 export default function Sidebar() {
   const pathname = usePathname()
@@ -23,7 +22,7 @@ export default function Sidebar() {
           />
         </svg>
       ),
-      badge: 'Live',
+      badge: 'EPL',
     },
     {
       name: 'Paper Bet Ledger',
@@ -83,7 +82,7 @@ export default function Sidebar() {
           />
         </svg>
       ),
-      badge: '95 Cap',
+      badge: 'Feeds',
     },
   ]
 
@@ -106,8 +105,8 @@ export default function Sidebar() {
                   Football Terminal
                 </div>
                 <div className="text-[10px] text-[#94A3B8] truncate flex items-center gap-1 font-mono">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] inline-block animate-pulse" />
-                  1xBet Fixed Clearing
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#F59E0B] inline-block" />
+                  Paper analysis only
                 </div>
               </div>
             )}
@@ -159,7 +158,7 @@ export default function Sidebar() {
                   {!collapsed && item.badge && (
                     <span
                       className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${
-                        item.badge === 'Live'
+                        item.badge === 'EPL'
                           ? 'bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30 font-semibold'
                           : 'bg-[#0F172A] text-[#94A3B8] border border-[#1E293B]'
                       }`}
@@ -177,21 +176,21 @@ export default function Sidebar() {
         {!collapsed && (
           <div className="space-y-1">
             <div className="px-2 pb-1 text-[10px] font-semibold font-mono tracking-wider text-[#64748B] uppercase flex items-center justify-between">
-              <span>Allowlisted Scope</span>
-              <span className="text-[10px] text-[#94A3B8]">10 Leagues</span>
+              <span>Analysis scope</span>
+              <span className="text-[10px] text-[#94A3B8]">1 league</span>
             </div>
             <div className="space-y-0.5 text-xs text-[#94A3B8]">
               <div className="px-2.5 py-1.5 rounded-lg hover:bg-[#0F172A] hover:text-[#F8FAFC] flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
-                <span className="truncate">Top 5 European Leagues</span>
+                <span className="truncate">Premier League model only</span>
               </div>
               <div className="px-2.5 py-1.5 rounded-lg hover:bg-[#0F172A] hover:text-[#F8FAFC] flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]" />
-                <span className="truncate">Confirmed Starting XIs</span>
+                <span className="truncate">Confirmed lineups required</span>
               </div>
               <div className="px-2.5 py-1.5 rounded-lg hover:bg-[#0F172A] hover:text-[#F8FAFC] flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#0EA5E9]" />
-                <span className="truncate">UEFA Club Competitions</span>
+                <span className="truncate">Other leagues: browse only</span>
               </div>
             </div>
           </div>
@@ -202,49 +201,27 @@ export default function Sidebar() {
       <div className="p-3 border-t border-[#1E293B] space-y-3">
         {!collapsed ? (
           <div className="bg-[#0F172A] border border-[#1E293B] rounded-xl p-3 space-y-2.5 shadow-terminal-sm">
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse" />
-                <span className="font-semibold text-[#F8FAFC] text-[11px]">Daily Quota Governance</span>
-              </div>
-              <span className="text-[10px] font-mono text-[#D4AF37] font-semibold">₹0.00 Cost</span>
-            </div>
-
-            {/* Meter Bar */}
             <div className="space-y-1">
-              <div className="w-full bg-[#0B0F17] rounded-full h-1.5 overflow-hidden border border-[#1E293B]">
-                <div
-                  className="bg-gradient-to-r from-[#10B981] to-[#D4AF37] h-1.5 rounded-full"
-                  style={{ width: '15%' }}
-                />
-              </div>
-              <div className="flex items-center justify-between text-[10px] font-mono text-[#94A3B8]">
-                <span>0 used today</span>
-                <span className="text-[#10B981] font-semibold">95 / 95 cap</span>
-              </div>
-            </div>
-
-            <div className="text-[10px] text-[#64748B] font-mono pt-1 border-t border-[#1E293B] flex items-center justify-between">
-              <span>User Reserve:</span>
-              <span className="text-[#F8FAFC] font-medium">50 calls</span>
+              <div className="text-[11px] font-semibold text-[#F8FAFC]">Provider usage</div>
+              <p className="text-[10px] leading-relaxed text-[#94A3B8]">Usage limits and remaining requests are shown when the provider reports them.</p>
             </div>
           </div>
         ) : (
-          <div className="flex justify-center" title="Quota: 95/95 remaining">
+          <div className="flex justify-center" title="Provider quota status">
             <div className="w-8 h-8 rounded-lg bg-[#0F172A] border border-[#1E293B] flex items-center justify-center text-[10px] font-mono font-bold text-[#10B981]">
-              95
+              API
             </div>
           </div>
         )}
 
-        {/* Engine Toggle & IST Timezone */}
+        {/* Decision engine and IST timezone */}
         {!collapsed && (
           <div className="flex items-center justify-between pt-1">
             <div className="text-[10px] font-mono text-[#64748B] flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
               <span>IST (UTC+5:30)</span>
             </div>
-            <EngineStatus />
+            <span className="text-[10px] font-mono text-[#F59E0B]">Engine unavailable</span>
           </div>
         )}
       </div>

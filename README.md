@@ -150,11 +150,13 @@ pip install -r python/requirements.txt
 ```
 
 ### 2. Environment Configuration
-The database schema and API keys are already configured in `.env.local`:
+Copy `.env.example` to `.env.local`, then set the provider credentials and server-only Supabase service-role key. The sync and odds routes fail closed without the service-role key so provider credits are not spent when shared caching and quota logging are unavailable.
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://qqcxjjkgvqknesrtnwal.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_MWK1XOnTtdc4MsagVnYHHw_qJUNnqsh
-API_FOOTBALL_KEY=  # Obtain from https://dashboard.api-football.com (free tier, 100 req/day)
+SUPABASE_SERVICE_ROLE_KEY=  # Server-only. Never use a NEXT_PUBLIC_ prefix.
+FOOTBALL_DATA_ORG_TOKEN=  # Sent server-side in the X-Auth-Token header
+ODDS_API_KEY=              # The Odds API v4 key; keep server-side
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 PYTHON_ENGINE_URL=http://localhost:8001
 ```

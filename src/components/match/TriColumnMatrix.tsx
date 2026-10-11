@@ -209,7 +209,7 @@ export default function TriColumnMatrix({
                     : 'bg-[#64748B]/15 text-[#94A3B8] border-[#64748B]/30'
                 }`}
               >
-                {market.status === 'ACTIVE' ? 'Verified Feed' : 'Odds Unavailable'}
+                {market.status === 'ACTIVE' ? `Quote loaded · ${market.bookmaker}` : 'Quote unavailable'}
               </span>
             </div>
 
