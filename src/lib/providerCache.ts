@@ -16,18 +16,22 @@ export interface ProviderQuotaSnapshot {
 }
 
 export function isProviderCacheConfigured(): boolean {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && supabaseServerKey())
+}
+
+function supabaseServerKey(): string | undefined {
+  return process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
 }
 
 function restUrl(path: string): URL {
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const key = supabaseServerKey()
   if (!base || !key) throw new Error('PROVIDER_CACHE_NOT_CONFIGURED')
   return new URL(`/rest/v1/${path}`, base)
 }
 
 function headers(prefer?: string): HeadersInit {
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const key = supabaseServerKey()
   if (!key) throw new Error('PROVIDER_CACHE_NOT_CONFIGURED')
   return {
     apikey: key,

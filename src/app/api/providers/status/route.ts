@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
 import { isProviderCacheConfigured, readProviderMonthlyRequestCount, readProviderQuota } from '@/lib/providerCache'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export async function GET() {
   const footballDataConfigured = Boolean(process.env.FOOTBALL_DATA_ORG_TOKEN)
   const oddsApiConfigured = Boolean(process.env.ODDS_API_KEY)
