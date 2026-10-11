@@ -1,4 +1,8 @@
 # PHASE STATUS & RESUME CONTRACT
+
+> **Superseded for implementation.** The phase 0–15 “PRODUCTION_READY” claims below are not the resume point.
+> Continue from [RECOVERY_STATUS.md](./RECOVERY_STATUS.md). Current recovery phase: **A0 done, start A1**.
+
 # Football Prediction Intelligence Platform
 
 This document is the authoritative runtime state contract for development sessions in Antigravity. It is updated at the conclusion of every phase and read immediately when the user commands `START DEVELOPMENT`.

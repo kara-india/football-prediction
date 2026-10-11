@@ -1,8 +1,3 @@
-import { canMakeAPIRequest, recordAPIRequest } from '@/lib/quotaGuard'
-
-const API_BASE = 'https://v3.football.api-sports.io'
-const API_KEY = () => process.env.API_FOOTBALL_KEY
-
 export interface FeedResult<T> {
   ok: boolean
   data: T
@@ -10,26 +5,13 @@ export interface FeedResult<T> {
   status?: number
 }
 
-export async function fetchFootball(path: string, userDemand: boolean): Promise<FeedResult<any>> {
-  if (!API_KEY()) return { ok: false, data: null, reason: 'API_FOOTBALL_KEY_NOT_CONFIGURED', status: 500 }
-
-  const quota = await canMakeAPIRequest(userDemand)
-  if (!quota.allowed) return { ok: false, data: null, reason: quota.reason || 'API_QUOTA_UNAVAILABLE', status: 429 }
-
-  try {
-    const response = await fetch(`${API_BASE}${path}`, {
-      headers: { 'x-apisports-key': API_KEY() as string },
-      cache: 'no-store',
-    })
-    recordAPIRequest(path)
-    const json = await response.json()
-    const errors = json?.errors && Object.keys(json.errors).length ? json.errors : null
-    if (!response.ok || errors) {
-      return { ok: false, data: null, reason: errors ? JSON.stringify(errors) : 'API_FOOTBALL_UPSTREAM_ERROR', status: 502 }
-    }
-    return { ok: true, data: json?.response ?? [], status: response.status }
-  } catch (error: any) {
-    return { ok: false, data: null, reason: error?.message || 'API_FOOTBALL_REQUEST_FAILED', status: 502 }
+export async function fetchFootball(_path: string, _userDemand: boolean): Promise<FeedResult<any>> {
+  // Recovery A0: API-Football is not a runtime provider. Do not call the network.
+  return {
+    ok: false,
+    data: null,
+    reason: 'API_FOOTBALL_REMOVED',
+    status: 410,
   }
 }
 
