@@ -13,9 +13,13 @@ class APIError(Exception):
 class DataNotAvailableError(Exception):
     pass
 
+
+class APIFootballDisabled(APIError):
+    """Raised instead of performing any API-Football network call."""
+
 class APIFootballAdapter:
     def __init__(self, api_key: Optional[str] = None, cache: Optional[DataCache] = None, quota_manager: Optional[CentralQuotaManager] = None):
-        self.base_url = 'https://v3.football.api-sports.io'
+        self.base_url = ""
         self.api_key = api_key or os.environ.get("API_FOOTBALL_KEY")
         self.headers = {'x-apisports-key': self.api_key} if self.api_key else {}
         self.cache = cache or DataCache()
@@ -60,25 +64,11 @@ class APIFootballAdapter:
         if not self.api_key:
             raise APIError("API_FOOTBALL_KEY is not configured; refusing external API call.")
 
-        url = f"{self.base_url}/{endpoint}"
-        self.logger.info(f"Request: {url} {params}")
-        
-        response = self.session.get(url, headers=self.headers, params=params)
-        
-        if response.status_code != 200:
-            raise APIError(f"API Error {response.status_code}: {response.text}")
-            
-        data = response.json()
-        
-        if 'errors' in data and data['errors']:
-            err = data['errors']
-            if isinstance(err, dict) and 'rateLimit' in err:
-                raise QuotaExceededError("Rate limit reached")
-            raise APIError(f"API returned errors: {err}")
-        
-        result = data.get('response', [])
-        self.cache.set(cache_key, result, ttl)
-        return result
+        raise APIFootballDisabled(
+            "API-Football runtime calls are disabled (recovery A0). "
+            "Use football-data.org for fixtures, football-data.co.uk for history, "
+            "and a manual lineup snapshot. See docs/RECOVERY_STATUS.md."
+        )
 
     def health_check(self) -> dict:
         data = self._make_request('status', ttl=0)

@@ -1,0 +1,113 @@
+source,provider_name,canonical_team_id,canonical_name
+football_data_uk,Arsenal,arsenal,Arsenal
+football_data_org,Arsenal FC,arsenal,Arsenal
+fpl,Arsenal,arsenal,Arsenal
+fpl,ARS,arsenal,Arsenal
+football_data_uk,Aston Villa,aston_villa,Aston Villa
+football_data_org,Aston Villa FC,aston_villa,Aston Villa
+fpl,Aston Villa,aston_villa,Aston Villa
+fpl,AVL,aston_villa,Aston Villa
+football_data_uk,Bournemouth,bournemouth,AFC Bournemouth
+football_data_org,AFC Bournemouth,bournemouth,AFC Bournemouth
+fpl,Bournemouth,bournemouth,AFC Bournemouth
+fpl,BOU,bournemouth,AFC Bournemouth
+football_data_uk,Brentford,brentford,Brentford
+football_data_org,Brentford FC,brentford,Brentford
+fpl,Brentford,brentford,Brentford
+fpl,BRE,brentford,Brentford
+football_data_uk,Brighton,brighton,Brighton and Hove Albion
+football_data_org,Brighton & Hove Albion FC,brighton,Brighton and Hove Albion
+fpl,Brighton,brighton,Brighton and Hove Albion
+fpl,BHA,brighton,Brighton and Hove Albion
+football_data_uk,Burnley,burnley,Burnley
+football_data_org,Burnley FC,burnley,Burnley
+fpl,Burnley,burnley,Burnley
+fpl,BUR,burnley,Burnley
+football_data_uk,Chelsea,chelsea,Chelsea
+football_data_org,Chelsea FC,chelsea,Chelsea
+fpl,Chelsea,chelsea,Chelsea
+fpl,CHE,chelsea,Chelsea
+football_data_uk,Crystal Palace,crystal_palace,Crystal Palace
+football_data_org,Crystal Palace FC,crystal_palace,Crystal Palace
+fpl,Crystal Palace,crystal_palace,Crystal Palace
+fpl,CRY,crystal_palace,Crystal Palace
+football_data_uk,Everton,everton,Everton
+football_data_org,Everton FC,everton,Everton
+fpl,Everton,everton,Everton
+fpl,EVE,everton,Everton
+football_data_uk,Fulham,fulham,Fulham
+football_data_org,Fulham FC,fulham,Fulham
+fpl,Fulham,fulham,Fulham
+fpl,FUL,fulham,Fulham
+football_data_uk,Ipswich,ipswich,Ipswich Town
+football_data_org,Ipswich Town FC,ipswich,Ipswich Town
+fpl,Ipswich,ipswich,Ipswich Town
+fpl,IPS,ipswich,Ipswich Town
+football_data_uk,Leeds,leeds,Leeds United
+football_data_org,Leeds United FC,leeds,Leeds United
+fpl,Leeds,leeds,Leeds United
+fpl,LEE,leeds,Leeds United
+football_data_uk,Leicester,leicester,Leicester City
+football_data_org,Leicester City FC,leicester,Leicester City
+fpl,Leicester,leicester,Leicester City
+fpl,LEI,leicester,Leicester City
+football_data_uk,Liverpool,liverpool,Liverpool
+football_data_org,Liverpool FC,liverpool,Liverpool
+fpl,Liverpool,liverpool,Liverpool
+fpl,LIV,liverpool,Liverpool
+football_data_uk,Luton,luton,Luton Town
+football_data_org,Luton Town FC,luton,Luton Town
+fpl,Luton,luton,Luton Town
+fpl,LUT,luton,Luton Town
+football_data_uk,Man City,manchester_city,Manchester City
+football_data_org,Manchester City FC,manchester_city,Manchester City
+fpl,Man City,manchester_city,Manchester City
+fpl,MCI,manchester_city,Manchester City
+football_data_uk,Man United,manchester_united,Manchester United
+football_data_org,Manchester United FC,manchester_united,Manchester United
+fpl,Man Utd,manchester_united,Manchester United
+fpl,MUN,manchester_united,Manchester United
+football_data_uk,Newcastle,newcastle,Newcastle United
+football_data_org,Newcastle United FC,newcastle,Newcastle United
+fpl,Newcastle,newcastle,Newcastle United
+fpl,NEW,newcastle,Newcastle United
+football_data_uk,Norwich,norwich,Norwich City
+football_data_org,Norwich City FC,norwich,Norwich City
+fpl,Norwich,norwich,Norwich City
+fpl,NOR,norwich,Norwich City
+football_data_uk,Nott'm Forest,nottingham_forest,Nottingham Forest
+football_data_org,Nottingham Forest FC,nottingham_forest,Nottingham Forest
+fpl,Nott'm Forest,nottingham_forest,Nottingham Forest
+fpl,NFO,nottingham_forest,Nottingham Forest
+football_data_uk,Sheffield United,sheffield_united,Sheffield United
+football_data_org,Sheffield United FC,sheffield_united,Sheffield United
+fpl,Sheffield United,sheffield_united,Sheffield United
+fpl,SHU,sheffield_united,Sheffield United
+football_data_uk,Southampton,southampton,Southampton
+football_data_org,Southampton FC,southampton,Southampton
+fpl,Southampton,southampton,Southampton
+fpl,SOU,southampton,Southampton
+football_data_uk,Sunderland,sunderland,Sunderland
+football_data_org,Sunderland AFC,sunderland,Sunderland
+fpl,Sunderland,sunderland,Sunderland
+fpl,SUN,sunderland,Sunderland
+football_data_uk,Tottenham,tottenham,Tottenham Hotspur
+football_data_org,Tottenham Hotspur FC,tottenham,Tottenham Hotspur
+fpl,Spurs,tottenham,Tottenham Hotspur
+fpl,TOT,tottenham,Tottenham Hotspur
+football_data_uk,Watford,watford,Watford
+football_data_org,Watford FC,watford,Watford
+fpl,Watford,watford,Watford
+fpl,WAT,watford,Watford
+football_data_uk,West Brom,west_brom,West Bromwich Albion
+football_data_org,West Bromwich Albion FC,west_brom,West Bromwich Albion
+fpl,West Brom,west_brom,West Bromwich Albion
+fpl,WBA,west_brom,West Bromwich Albion
+football_data_uk,West Ham,west_ham,West Ham United
+football_data_org,West Ham United FC,west_ham,West Ham United
+fpl,West Ham,west_ham,West Ham United
+fpl,WHU,west_ham,West Ham United
+football_data_uk,Wolves,wolves,Wolverhampton Wanderers
+football_data_org,Wolverhampton Wanderers FC,wolves,Wolverhampton Wanderers
+fpl,Wolves,wolves,Wolverhampton Wanderers
+fpl,WOL,wolves,Wolverhampton Wanderers

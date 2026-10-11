@@ -15,7 +15,7 @@
 *Probabilities from math. Decisions from evidence. Bets from discipline.*
 
 [![Supabase](https://img.shields.io/badge/Supabase-Live%20%26%20Deployed-3ECF8E?logo=supabase&logoColor=white)](#-database--supabase-status)
-[![API-Football](https://img.shields.io/badge/API--Football-Connected%20(100%20req%2Fday)-blue)](#-data-sources--api-keys)
+[![API-Football](https://img.shields.io/badge/API--Football-Removed%20(recovery%20A0)-red)](docs/RECOVERY_STATUS.md)
 [![Tests](https://img.shields.io/badge/tests-97%20passed-brightgreen)](#-tests--verification)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org)
@@ -38,7 +38,7 @@
 | **Competition Registry** | 🟢 **Seeded (19 leagues)** | EPL, Serie A, La Liga, Bundesliga, Ligue 1, UCL, World Cup, etc. |
 | **Market Definitions** | 🟢 **Seeded (12 markets)** | 1X2, Double Chance, Over/Under 1.5–4.5, BTTS, Cards, Anytime Goalscorer, Assists |
 | **Engine Settings** | 🟢 **Seeded (11 flags)** | Master safety gates (`engine_enabled=false`, `learning_enabled=false`, `rl_enabled=false`) |
-| **API-Football Key** | 🟢 **Configured & Validated** | Verified live via API-Sports status endpoint with active quota |
+| **API-Football Key** | 🔴 **Removed (recovery A0)** | Runtime calls disabled. Resume at `docs/RECOVERY_STATUS.md` |
 | **Automated Tests** | 🟢 **97 / 97 Passed** | Full suite passed across models, Monte Carlo, calibration, and no-lookahead assertions |
 
 ---
@@ -150,11 +150,13 @@ pip install -r python/requirements.txt
 ```
 
 ### 2. Environment Configuration
-The database schema and API keys are already configured in `.env.local`:
+Copy `.env.example` to `.env.local`, then set the provider credentials and a server-only Supabase secret key (or legacy service-role key). The sync and odds routes fail closed without it so provider credits are not spent when shared caching and quota logging are unavailable.
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://qqcxjjkgvqknesrtnwal.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_MWK1XOnTtdc4MsagVnYHHw_qJUNnqsh
-API_FOOTBALL_KEY=  # Obtain from https://dashboard.api-football.com (free tier, 100 req/day)
+SUPABASE_SECRET_KEY=        # Server-only; legacy SUPABASE_SERVICE_ROLE_KEY also works.
+FOOTBALL_DATA_ORG_TOKEN=  # Sent server-side in the X-Auth-Token header
+ODDS_API_KEY=              # The Odds API v4 key; keep server-side
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 PYTHON_ENGINE_URL=http://localhost:8001
 ```

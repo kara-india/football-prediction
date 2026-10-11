@@ -1,16 +1,29 @@
 # PHASE STATUS & RESUME CONTRACT
+
+> **Superseded for implementation.** The phase 0–15 “PRODUCTION_READY” claims below are unverified historical claims, not current status.
+> Continue from [RECOVERY_STATUS.md](./RECOVERY_STATUS.md). Current recovery phase: **A1 done; A2 next**.
+
+## Recovery verification actually run
+
+- `tests/test_football_data_uk_history.py`: 2 passed (vendored corpus count, point-in-time cutoff, exact alias lookup).
+- `tests/test_dixon_coles.py`: 7 passed (existing Dixon-Coles model checks).
+- `tests/test_api_football_removed.py`: 3 passed (A0 runtime boundary and forbidden-host check).
+- `scripts/run_historical_walkforward.py`: completed on 2,660 vendored matches, producing 41 folds and 7,790 out-of-sample predictions.
+- Its distinct-fixture diagnostic retained the latest eligible fold per fixture: 184/1,710 raw p≥0.70 picks, 77.7% hit rate, −0.60% mean CLV; probabilities remain uncalibrated.
+- No production deployment, Supabase state, runtime live odds, confirmed lineups, or live bet path was verified.
+
 # Football Prediction Intelligence Platform
 
-This document is the authoritative runtime state contract for development sessions in Antigravity. It is updated at the conclusion of every phase and read immediately when the user commands `START DEVELOPMENT`.
+The remaining phase 0–15 text in this file is historical plan content. It is not verified runtime state; use `RECOVERY_STATUS.md` for the current phase and verified checks.
 
 ---
 
-## Current Platform State
+## Historical platform claims (unverified)
 
-- **CURRENT PHASE**: `ALL PHASES COMPLETE (0 through 15)`
-- **STATUS**: `PRODUCTION_READY`
-- **LAST COMPLETED PHASE**: `Phase 15 — Advanced Statistical Modeling & Historical Walk-Forward Benchmark`
-- **LAST VERIFIED GIT SHA**: `PENDING_COMMIT`
+- **CURRENT PHASE**: `RECOVERY (A1 complete; A2 next)`
+- **STATUS**: `IN PROGRESS — live betting is not verified or enabled`
+- **LAST COMPLETED PHASE**: `Recovery A1 — vendored historical corpus and loader`
+- **LAST VERIFIED GIT SHA**: `A1 commit (see RECOVERY_STATUS.md)`
 - **LAST VERIFIED SUPABASE STATE**: 
   - Project URL: `https://qqcxjjkgvqknesrtnwal.supabase.co`
   - Engine: PostgreSQL 17 (Healthy)

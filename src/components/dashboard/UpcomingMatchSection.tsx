@@ -38,10 +38,10 @@ export default function UpcomingMatchSection() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch('/api/matches/upcoming')
-      if (!res.ok) throw new Error('Failed to load upcoming fixtures')
-      const data = await res.json()
-      setMatches(data)
+      const saved = window.localStorage.getItem('football-data-sync-v1')
+      const payload = saved ? JSON.parse(saved) : null
+      const fixtures = Array.isArray(payload?.fixtures) ? payload.fixtures : []
+      setMatches(fixtures.filter((match: Match) => match.status !== 'LIVE' && match.status !== 'HT'))
     } catch (err: any) {
       setError(err.message || 'Error loading matches')
     } finally {
@@ -49,6 +49,7 @@ export default function UpcomingMatchSection() {
     }
   }
 
+  // This component only reads the last manual sync; it never contacts providers.
   useEffect(() => {
     fetchUpcoming()
   }, [])
@@ -253,22 +254,22 @@ export default function UpcomingMatchSection() {
                     </div>
                   </div>
 
-                  {/* 1xBet Fixed Odds Table (Gold Typography) */}
+                  {/* Bookmaker prices, when a sourced quote is available */}
                   <div className="bg-[#090c10] border border-[#1e2638] rounded-xl p-3.5 space-y-2.5">
                     <div className="flex items-center justify-between text-[11px] font-mono">
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-[#d4af37]"></span>
                         <span className="text-[#f0f4fc] font-semibold text-[11px]">
-                          1xBet Fixed Odds (Bookmaker ID: 6)
+                          Bookmaker Prices
                         </span>
                       </div>
                       {has1xBet ? (
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#10b981]/15 text-[#10b981] font-semibold border border-[#10b981]/30">
-                          Verified Feed
+                          Quote loaded
                         </span>
                       ) : (
                         <span className="text-[10px] font-mono text-[#56657a]">
-                          On-Demand Available
+                          No quote available
                         </span>
                       )}
                     </div>

@@ -11,12 +11,13 @@ export interface OddsPanelProps {
 }
 
 export default function OddsPanel({ market, className = '' }: OddsPanelProps) {
-  const hasOdds = market && market.status === 'ACTIVE' && market.homeOdds !== null
+  const hasOdds = market && market.status === 'ACTIVE' &&
+    market.homeOdds !== null && market.drawOdds !== null && market.awayOdds !== null
 
   return (
     <TerminalCard
-      title="1xBet Target Market & Pricing"
-      subtitle="Execution clearing prices with Shin margin de-vigging and overround metrics"
+      title="Bookmaker Odds & Pricing"
+      subtitle="Prices are shown only when a bookmaker quote is available"
       badge={
         <span
           className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono font-semibold ${
@@ -26,7 +27,7 @@ export default function OddsPanel({ market, className = '' }: OddsPanelProps) {
           }`}
         >
           <span className={`w-1.5 h-1.5 rounded-full ${hasOdds ? 'bg-[#10B981]' : 'bg-[#64748B]'}`} />
-          {hasOdds ? '1xBet Verified Feed (ID: 6)' : '1xBet Odds Unavailable'}
+          {hasOdds ? market.bookmaker : 'No bookmaker quote'}
         </span>
       }
       actions={
@@ -46,7 +47,7 @@ export default function OddsPanel({ market, className = '' }: OddsPanelProps) {
             <div className="space-y-2">
               <div className="flex items-center justify-between text-[11px] text-[#94A3B8]">
                 <span className="font-semibold text-[#F8FAFC]">1X2 Match Result</span>
-                <span className="text-[#64748B]">Overround: {((market.overround || 0.04) * 100).toFixed(1)}%</span>
+                <span className="text-[#64748B]">Overround: {market.overround === null ? '—' : `${(market.overround * 100).toFixed(1)}%`}</span>
               </div>
 
               <div className="grid grid-cols-3 gap-2 text-center">
@@ -91,31 +92,31 @@ export default function OddsPanel({ market, className = '' }: OddsPanelProps) {
                 <div className="bg-[#0B0F17] border border-[#1E293B] rounded-lg p-2.5">
                   <div className="text-[10px] text-[#64748B]">Over 2.5 Goals</div>
                   <div className="text-sm font-bold text-[#D4AF37] mt-0.5">
-                    {market.over25Odds?.toFixed(2) || '2.05'}
+                    {market.over25Odds?.toFixed(2) ?? '—'}
                   </div>
                 </div>
                 <div className="bg-[#0B0F17] border border-[#1E293B] rounded-lg p-2.5">
                   <div className="text-[10px] text-[#64748B]">Under 2.5 Goals</div>
                   <div className="text-sm font-bold text-[#D4AF37] mt-0.5">
-                    {market.under25Odds?.toFixed(2) || '1.82'}
+                    {market.under25Odds?.toFixed(2) ?? '—'}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* De-vigged Shin Fair Metrics */}
+            {/* Price provenance */}
             <div className="p-3 rounded-lg bg-[#0B0F17] border border-[#1E293B] space-y-1 text-[11px]">
-              <div className="text-[#94A3B8] font-semibold">Shin De-Vigging Methodology</div>
+              <div className="text-[#94A3B8] font-semibold">Quote source</div>
               <p className="text-[#64748B] text-[10px] leading-relaxed font-sans">
-                Removes bookmaker overround by estimating the proportion of insider/informed action (z parameter), yielding unbiased fair market probabilities.
+                {market.bookmaker}. Prices are not used for a decision until source, market, and update time are recorded.
               </p>
             </div>
           </>
         ) : (
           <div className="p-8 text-center text-xs font-mono text-[#64748B] space-y-2">
-            <p className="text-[#F8FAFC] font-semibold">1xBet Fixed Odds Unavailable</p>
+            <p className="text-[#F8FAFC] font-semibold">No bookmaker prices available</p>
             <p className="max-w-md mx-auto text-[11px]">
-              No active clearing prices detected. In accordance with zero-fake-data policy, no synthetic odds are displayed.
+              A provider quote has not been saved for this match yet. No example prices are substituted.
             </p>
           </div>
         )}

@@ -5,84 +5,46 @@ Runs Dixon-Coles model on real Premier League data from football-data.co.uk
 Produces authentic out-of-sample metrics. No synthetic data.
 """
 import sys
-import os
-import glob
-import hashlib
-import json
 import logging
-from datetime import datetime, date
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
-from scipy.stats import poisson
-from sklearn.metrics import log_loss
-
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from python.models.dixon_coles import DixonColesModel
+from python.providers.football_data_uk import load_matches
 
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
-CACHE_DIR = Path(__file__).parent.parent / '.cache' / 'football_data'
 OUTPUT_FILE = Path(__file__).parent.parent / 'docs' / 'MODEL_BENCHMARK_RESULTS.md'
 
 
 def load_pl_data() -> pd.DataFrame:
-    """Load all Premier League CSVs and parse dates."""
-    pattern = str(CACHE_DIR / 'E0_*.csv')
-    files = sorted(glob.glob(pattern))
-    if not files:
-        raise FileNotFoundError(f'No E0 CSVs found in {CACHE_DIR}')
-
-    dfs = []
-    for fpath in files:
-        # Read with BOM handling
-        try:
-            df = pd.read_csv(fpath, encoding='utf-8-sig')
-        except Exception:
-            df = pd.read_csv(fpath, encoding='latin-1')
-
-        # Rename columns: strip BOM and whitespace
-        df.columns = [c.strip().lstrip('\ufeff').lstrip('ï»¿') for c in df.columns]
-
-        # Keep only required columns
-        needed = ['HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'Date']
-        # Some files have 'Div' or other prefixes — find case-insensitively
-        col_map = {c.lower(): c for c in df.columns}
-        needed_found = []
-        for n in needed:
-            if n in df.columns:
-                needed_found.append(n)
-            elif n.lower() in col_map:
-                df.rename(columns={col_map[n.lower()]: n}, inplace=True)
-                needed_found.append(n)
-            else:
-                logger.warning(f'Column {n} not found in {fpath}, available: {list(df.columns[:10])}')
-
-        df = df[needed].dropna(subset=['HomeTeam', 'AwayTeam', 'FTHG', 'FTAG', 'Date'])
-        df['FTHG'] = pd.to_numeric(df['FTHG'], errors='coerce').astype('Int64')
-        df['FTAG'] = pd.to_numeric(df['FTAG'], errors='coerce').astype('Int64')
-        df = df.dropna(subset=['FTHG', 'FTAG'])
-
-        # Parse date: DD/MM/YYYY
-        df['date'] = pd.to_datetime(df['Date'], format='%d/%m/%Y', errors='coerce')
-        df = df.dropna(subset=['date'])
-
-        logger.info(f'  Loaded {len(df)} matches from {Path(fpath).name}')
-        dfs.append(df)
-
-    combined = pd.concat(dfs, ignore_index=True)
-    combined = combined.sort_values('date').reset_index(drop=True)
-    logger.info(f'Total PL matches loaded: {len(combined)} from {combined["date"].min().date()} to {combined["date"].max().date()}')
+    """Load the vendored PL corpus; this benchmark never downloads data."""
+    combined = load_matches()
+    combined = combined.assign(
+        HomeTeam=combined['home_id'],
+        AwayTeam=combined['away_id'],
+        HomeName=combined['home_team'],
+        AwayName=combined['away_team'],
+        FTHG=combined['home_goals'],
+        FTAG=combined['away_goals'],
+    )
+    combined = combined.dropna(subset=['HomeTeam', 'AwayTeam'])
+    logger.info(
+        'Loaded %s vendored PL matches (%s through %s)',
+        len(combined), combined['date'].min().date(), combined['date'].max().date(),
+    )
     return combined
 
 
 def build_team_mapping(df: pd.DataFrame) -> Dict[str, int]:
     """Build a stable team-name -> integer ID mapping (sorted alphabetically for reproducibility)."""
-    all_teams = sorted(set(df['HomeTeam'].unique()) | set(df['AwayTeam'].unique()))
+    all_teams = sorted(set(df['HomeTeam'].dropna().unique()) | set(df['AwayTeam'].dropna().unique()))
     return {team: idx + 1 for idx, team in enumerate(all_teams)}
 
 
@@ -182,6 +144,7 @@ def run_walkforward_benchmark():
     min_start = TRAIN_SIZE + CALIB_SIZE
 
     all_predictions: List[Dict] = []
+    fold_summaries: List[Dict] = []
     fold_count = 0
     xi = 0.0019  # fixed xi per task spec (no future data for xi selection)
 
@@ -206,6 +169,11 @@ def run_walkforward_benchmark():
     for fold_num, (_, train_end, calib_start, calib_end, test_start, test_end) in enumerate(fold_indices):
         train_df = df.iloc[:train_end]
         test_df = df.iloc[test_start:test_end]
+        # A result is visible only at kickoff + 3h. Exclude earlier fixtures
+        # whose results were not available by the first test kickoff.
+        if len(test_df):
+            test_cutoff = test_df['kickoff_utc'].min()
+            train_df = train_df[train_df['available_at'] <= test_cutoff]
 
         if len(train_df) < 100:
             logger.warning(f'Fold {fold_num}: insufficient training data ({len(train_df)} matches), skipping.')
@@ -229,6 +197,7 @@ def run_walkforward_benchmark():
             continue
 
         # Predict on test matches
+        fold_predictions_start = len(all_predictions)
         for _, row in test_df.iterrows():
             home_team = row['HomeTeam']
             away_team = row['AwayTeam']
@@ -254,20 +223,48 @@ def run_walkforward_benchmark():
             p_away /= total
 
             outcome_vec = outcome_to_vector(int(row['FTHG']), int(row['FTAG']))
+            selected_index = int(np.argmax([p_home, p_draw, p_away]))
+            selected_odds = [
+                row['opening_b365_home'], row['opening_b365_draw'], row['opening_b365_away'],
+            ][selected_index]
+            closing_odds = [
+                row['closing_b365_home'], row['closing_b365_draw'], row['closing_b365_away'],
+            ][selected_index]
+            clv = None
+            if pd.notna(selected_odds) and pd.notna(closing_odds) and selected_odds > 1 and closing_odds > 1:
+                clv = float(selected_odds / closing_odds - 1.0)
 
             all_predictions.append({
                 'fold': fold_num,
+                'fixture_id': f"{row['kickoff_utc'].isoformat()}|{home_team}|{away_team}",
                 'fixture_date': row['date'].date().isoformat(),
-                'home_team': home_team,
-                'away_team': away_team,
+                'home_team': row['HomeName'],
+                'away_team': row['AwayName'],
                 'p_home': p_home,
                 'p_draw': p_draw,
                 'p_away': p_away,
+                'selected_probability': [p_home, p_draw, p_away][selected_index],
+                'selected_outcome': selected_index,
+                'selected_hit': bool(outcome_vec[selected_index]),
+                'opening_odds': selected_odds,
+                'clv': clv,
                 'outcome_home': outcome_vec[0],
                 'outcome_draw': outcome_vec[1],
                 'outcome_away': outcome_vec[2],
             })
 
+        fold_preds = pd.DataFrame(all_predictions[fold_predictions_start:])
+        high_conf = fold_preds[fold_preds['selected_probability'] >= 0.70]
+        fold_summary = {
+            'fold': fold_num + 1,
+            'train_n': len(train_df),
+            'test_n': len(test_df),
+            'p70_n': len(high_conf),
+            'p70_hit_rate': float(high_conf['selected_hit'].mean()) if len(high_conf) else None,
+            'p70_mean_odds': float(high_conf['opening_odds'].dropna().mean()) if high_conf['opening_odds'].notna().any() else None,
+            'p70_mean_clv': float(high_conf['clv'].dropna().mean()) if high_conf['clv'].notna().any() else None,
+        }
+        fold_summaries.append(fold_summary)
         fold_count += 1
         if (fold_num + 1) % 5 == 0 or fold_num == 0:
             print(f'  [Fold {fold_num + 1}/{len(fold_indices)}] train={len(train_df)}, test={len(test_df)}, '
@@ -315,6 +312,30 @@ def run_walkforward_benchmark():
     freq_draw = n_draws / n_preds
     freq_away = n_away_wins / n_preds
 
+    high_conf = preds_df[preds_df['selected_probability'] >= 0.70]
+    overlapping_p70_hit_rate = float(high_conf['selected_hit'].mean()) if len(high_conf) else None
+    overlapping_p70_mean_odds = (
+        float(high_conf['opening_odds'].dropna().mean())
+        if high_conf['opening_odds'].notna().any() else None
+    )
+    overlapping_p70_mean_clv = (
+        float(high_conf['clv'].dropna().mean())
+        if high_conf['clv'].notna().any() else None
+    )
+    # Test windows overlap. For one deployment-like observation per fixture,
+    # retain the latest eligible fold prediction (the latest pre-fixture refit).
+    unique_preds = preds_df.sort_values('fold').drop_duplicates('fixture_id', keep='last')
+    unique_high_conf = unique_preds[unique_preds['selected_probability'] >= 0.70]
+    unique_p70_hit_rate = float(unique_high_conf['selected_hit'].mean()) if len(unique_high_conf) else None
+    unique_p70_mean_odds = (
+        float(unique_high_conf['opening_odds'].dropna().mean())
+        if unique_high_conf['opening_odds'].notna().any() else None
+    )
+    unique_p70_mean_clv = (
+        float(unique_high_conf['clv'].dropna().mean())
+        if unique_high_conf['clv'].notna().any() else None
+    )
+
     # -------------------------------------------------------------------------
     # Print results
     # -------------------------------------------------------------------------
@@ -325,6 +346,9 @@ def run_walkforward_benchmark():
     print(f'Folds completed:     {fold_count}')
     print(f'Date range:          {preds_df["fixture_date"].min()} to {preds_df["fixture_date"].max()}')
     print(f'Outcome frequencies: H={freq_home:.3f}  D={freq_draw:.3f}  A={freq_away:.3f}')
+    print(f'Overlapping-fold p >= 0.70: {len(high_conf)} prediction rows; hit rate={overlapping_p70_hit_rate}')
+    print(f'Unique-fixture p >= 0.70:   {len(unique_high_conf)} / {len(unique_preds)}; '
+          f'hit rate={unique_p70_hit_rate}; mean odds={unique_p70_mean_odds}; CLV={unique_p70_mean_clv}')
     print()
     print(f'{"Metric":<25} {"Dixon-Coles":>15} {"Naive (1/3)":>15} {"Improvement":>15}')
     print('-' * 70)
@@ -340,12 +364,25 @@ def run_walkforward_benchmark():
     # -------------------------------------------------------------------------
     OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
 
-    run_ts = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+    run_ts = datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')
+
+    def metric(value: float | None, suffix: str = '') -> str:
+        return f'{value:.3f}{suffix}' if value is not None and np.isfinite(value) else 'n/a'
+
+    def percent(value: float | None) -> str:
+        return metric(value * 100.0, '%') if value is not None else 'n/a'
+
+    fold_rows = '\n'.join(
+        f"| {item['fold']} | {item['train_n']} | {item['test_n']} | {item['p70_n']} | "
+        f"{metric(item['p70_hit_rate'])} | {metric(item['p70_mean_odds'])} | "
+        f"{percent(item['p70_mean_clv'])} |"
+        for item in fold_summaries
+    )
 
     md_content = f"""# Model Benchmark Results
 
-> **Generated**: {run_ts}  
-> **Data Source**: football-data.co.uk (Premier League, 5 seasons: 2019/20–2023/24)  
+> **Generated**: {run_ts}
+> **Data Source**: football-data.co.uk (vendored Premier League seasons, 2019/20–2025/26; 7 completed seasons)
 > **Method**: Strict temporal walk-forward cross-validation (no future data leakage)
 
 ---
@@ -354,14 +391,25 @@ def run_walkforward_benchmark():
 
 | Parameter | Value |
 |-----------|-------|
-| Training window | 760 matches (~2 seasons) |
-| Calibration window | 190 matches (~0.5 season) |
+| Initial training window | 760 matches (~2 seasons; expands by fold) |
+| Reserved calibration gap | 190 matches (~0.5 season; excluded from this raw benchmark) |
 | Test window | 190 matches (~0.5 season) |
 | Step size | 38 matches (1 match day) |
 | Folds completed | {fold_count} |
 | Total predictions | {n_preds} |
 | Date range | {preds_df["fixture_date"].min()} → {preds_df["fixture_date"].max()} |
 | Xi (time decay) | 0.0019 (half-life ≈ 365 days) |
+
+## Raw p ≥ 0.70 diagnostics by fold
+
+These are uncalibrated Dixon-Coles top-outcome probabilities and are diagnostic only; they do not prove the live confidence gate. Picks use the highest-probability 1X2 outcome. Mean odds use the historical Bet365 opening price. CLV is `opening_decimal_odds / closing_decimal_odds - 1`; positive means the opening price beat the close. Closing prices are used only as historical labels. Test windows overlap, so the distinct-fixture row keeps only the latest eligible fold for each fixture; only that row avoids repeated fixture outcomes.
+
+| Fold | Train matches | Test matches | p ≥ 0.70 picks | Hit rate | Mean opening odds | Mean CLV |
+|------|--------------:|--------------:|---------------:|---------:|------------------:|---------:|
+{fold_rows}
+
+| All fold prediction rows (overlapping windows) | — | {n_preds} | {len(high_conf)} | {metric(overlapping_p70_hit_rate)} | {metric(overlapping_p70_mean_odds)} | {percent(overlapping_p70_mean_clv)} |
+| **Distinct fixtures; last eligible fold** | — | **{len(unique_preds)}** | **{len(unique_high_conf)}** | **{metric(unique_p70_hit_rate)}** | **{metric(unique_p70_mean_odds)}** | **{percent(unique_p70_mean_clv)}** |
 
 ---
 

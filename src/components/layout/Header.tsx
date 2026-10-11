@@ -49,10 +49,11 @@ export default function Header() {
 
   const handleManualSync = () => {
     setRefreshing(true)
-    setTimeout(() => {
-      setRefreshing(false)
-      window.location.reload()
-    }, 500)
+    if (pathname !== '/') {
+      window.location.assign('/')
+      return
+    }
+    window.dispatchEvent(new CustomEvent('football-fixtures-sync', { detail: { onFinished: () => setRefreshing(false) } }))
   }
 
   return (
@@ -92,18 +93,15 @@ export default function Header() {
               <span>{istTime || 'Loading IST...'}</span>
             </div>
 
-            {/* Quota Telemetry Badge */}
+            {/* Provider status entry point */}
             <Link
               href="/providers"
               className="flex items-center gap-2 px-2.5 sm:px-3 py-1 rounded-lg bg-[#0F172A] hover:bg-[#1E293B] border border-[#1E293B] text-[11px] font-mono text-[#F8FAFC] transition-colors"
-              title="API-Football Quota Governance: Max 95 calls/day"
+              title="View configured data providers"
             >
-              <span className="text-[#D4AF37] font-semibold">1xBet</span>
+              <span className="text-[#94A3B8] font-semibold">Data feeds</span>
               <span className="text-[#334155]">·</span>
-              <span className="text-[#10B981] font-semibold">95 Cap</span>
-              <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#10B981]/15 text-[#10B981] font-bold border border-[#10B981]/30 hidden sm:inline">
-                ₹0.00 Cost
-              </span>
+              <span className="text-[#D4AF37] font-semibold">EPL</span>
             </Link>
 
             {/* Manual Sync Button */}
@@ -111,7 +109,7 @@ export default function Header() {
               onClick={handleManualSync}
               disabled={refreshing}
               className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-lg bg-[#0F172A] hover:bg-[#1E293B] border border-[#1E293B] text-[11px] font-mono text-[#94A3B8] hover:text-[#F8FAFC] transition-colors disabled:opacity-50"
-              title="Refresh state"
+              title="Sync Premier League fixtures"
             >
               <svg
                 className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-[#D4AF37]' : 'text-[#94A3B8]'}`}
@@ -184,7 +182,7 @@ export default function Header() {
 
             <div className="pt-3 border-t border-[#1E293B] text-[10px] font-mono text-[#64748B] space-y-1">
               <div>IST: {istTime}</div>
-              <div>Single Bookmaker: 1xBet Fixed</div>
+              <div>Paper analysis only</div>
             </div>
           </div>
         </div>

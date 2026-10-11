@@ -7,7 +7,7 @@ To enable the engine, set the `engine_enabled` setting in your Supabase database
 You will need to configure the following secrets in your repository settings:
 - `SUPABASE_URL`: e.g. https://qqcxjjkgvqknesrtnwal.supabase.co
 - `SUPABASE_SERVICE_ROLE_KEY`: Obtain from Supabase dashboard (Project Settings > API)
-- `API_FOOTBALL_KEY`: Free tier, register at api-sports.io
+- `API_FOOTBALL_KEY`: retired in recovery A0. Do not set it. Runtime calls are disabled.
 - `ODDS_API_KEY`: Optional, The Odds API
 
 ## Worker Schedule Explanation

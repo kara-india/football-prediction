@@ -1,55 +1,115 @@
-import { canMakeAPIRequest, recordAPIRequest } from '@/lib/quotaGuard'
-
-const API_BASE = 'https://v3.football.api-sports.io'
-const API_KEY = () => process.env.API_FOOTBALL_KEY
+const FOOTBALL_DATA_ORG_BASE_URL = 'https://api.football-data.org/v4'
 
 export interface FeedResult<T> {
   ok: boolean
-  data: T
+  data: T | null
   reason?: string
   status?: number
+  lastUpdated?: string | null
 }
 
-export async function fetchFootball(path: string, userDemand: boolean): Promise<FeedResult<any>> {
-  if (!API_KEY()) return { ok: false, data: null, reason: 'API_FOOTBALL_KEY_NOT_CONFIGURED', status: 500 }
+export interface FootballDataMatch {
+  id: number
+  utcDate: string
+  status: string
+  minute?: number | null
+  competition: { id: number; code: string; name: string; emblem?: string | null }
+  homeTeam: { id: number; name: string; shortName?: string; crest?: string | null }
+  awayTeam: { id: number; name: string; shortName?: string; crest?: string | null }
+  score?: {
+    fullTime?: { home?: number | null; away?: number | null }
+    regularTime?: { home?: number | null; away?: number | null }
+    halfTime?: { home?: number | null; away?: number | null }
+  }
+  venue?: string | null
+  matchday?: number | null
+  lastUpdated?: string | null
+}
 
-  const quota = await canMakeAPIRequest(userDemand)
-  if (!quota.allowed) return { ok: false, data: null, reason: quota.reason || 'API_QUOTA_UNAVAILABLE', status: 429 }
+export interface FootballDataMatchesResponse {
+  matches: FootballDataMatch[]
+}
+
+export async function fetchFootballData(path: string): Promise<FeedResult<FootballDataMatchesResponse | FootballDataMatch>> {
+  const token = process.env.FOOTBALL_DATA_ORG_TOKEN
+  if (!token) {
+    return { ok: false, data: null, reason: 'FOOTBALL_DATA_ORG_NOT_CONFIGURED', status: 503 }
+  }
 
   try {
-    const response = await fetch(`${API_BASE}${path}`, {
-      headers: { 'x-apisports-key': API_KEY() as string },
+    const url = new URL(path.replace(/^\/+/, ''), `${FOOTBALL_DATA_ORG_BASE_URL}/`)
+    const response = await fetch(url, {
+      headers: { 'X-Auth-Token': token, Accept: 'application/json' },
       cache: 'no-store',
+      signal: AbortSignal.timeout(10_000),
     })
-    recordAPIRequest(path)
-    const json = await response.json()
-    const errors = json?.errors && Object.keys(json.errors).length ? json.errors : null
-    if (!response.ok || errors) {
-      return { ok: false, data: null, reason: errors ? JSON.stringify(errors) : 'API_FOOTBALL_UPSTREAM_ERROR', status: 502 }
+
+    if (!response.ok) {
+      const reason = response.status === 429
+        ? 'FOOTBALL_DATA_ORG_RATE_LIMITED'
+        : response.status === 403 || response.status === 404
+          ? 'FOOTBALL_DATA_ORG_COVERAGE_UNAVAILABLE'
+          : response.status === 401
+            ? 'FOOTBALL_DATA_ORG_AUTH_FAILED'
+            : 'FOOTBALL_DATA_ORG_REQUEST_FAILED'
+      return { ok: false, data: null, reason, status: response.status }
     }
-    return { ok: true, data: json?.response ?? [], status: response.status }
-  } catch (error: any) {
-    return { ok: false, data: null, reason: error?.message || 'API_FOOTBALL_REQUEST_FAILED', status: 502 }
+
+    const body = await response.json() as FootballDataMatchesResponse | FootballDataMatch
+    return {
+      ok: true,
+      data: body,
+      lastUpdated: response.headers.get('date'),
+    }
+  } catch {
+    return { ok: false, data: null, reason: 'FOOTBALL_DATA_ORG_UNREACHABLE', status: 502 }
   }
 }
 
-export function formatFixture(f: any) {
-  const kickoff = new Date(f.fixture.date)
+function mapStatus(status: string): string {
+  switch (status) {
+    case 'SCHEDULED': return 'NS'
+    case 'TIMED': return 'NS'
+    case 'IN_PLAY':
+    case 'LIVE': return 'LIVE'
+    case 'PAUSED': return 'HT'
+    case 'FINISHED': return 'FT'
+    case 'POSTPONED': return 'PST'
+    case 'CANCELLED': return 'CANC'
+    case 'SUSPENDED': return 'SUSP'
+    case 'AWARDED': return 'AWD'
+    default: return status
+  }
+}
+
+export function formatFixture(match: FootballDataMatch) {
+  const score = match.score?.fullTime ?? match.score?.regularTime ?? match.score?.halfTime
+  const competitionCode = match.competition?.code ?? ''
+
   return {
-    id: f.fixture.id,
-    kickoff: f.fixture.date,
-    venue: f.fixture.venue?.name || 'TBD',
-    status: f.fixture.status.short,
-    statusLong: f.fixture.status.long,
-    league: { id: f.league.id, name: f.league.name, country: f.league.country, logo: f.league.logo },
-    teams: {
-      home: { id: f.teams.home.id, name: f.teams.home.name, logo: f.teams.home.logo },
-      away: { id: f.teams.away.id, name: f.teams.away.name, logo: f.teams.away.logo },
+    id: match.id,
+    kickoff: match.utcDate,
+    venue: match.venue || 'Venue unavailable',
+    status: mapStatus(match.status),
+    statusLong: match.status,
+    minute: match.minute ?? null,
+    league: {
+      id: match.competition.id,
+      code: competitionCode,
+      name: match.competition.name,
+      country: '',
+      logo: match.competition.emblem ?? null,
     },
-    score: { home: f.goals?.home ?? null, away: f.goals?.away ?? null },
+    teams: {
+      home: { id: match.homeTeam.id, name: match.homeTeam.name, logo: match.homeTeam.crest ?? null },
+      away: { id: match.awayTeam.id, name: match.awayTeam.name, logo: match.awayTeam.crest ?? null },
+    },
+    score: { home: score?.home ?? null, away: score?.away ?? null },
     lineupConfirmed: false,
-    lineupExpectedAt: new Date(kickoff.getTime() - 60 * 60 * 1000).toISOString(),
     odds1xBet: null,
-    decision: 'ODDS_UNAVAILABLE',
+    decision: 'LINEUP_UNCONFIRMED',
+    provider: 'football-data.org',
+    providerUpdatedAt: match.lastUpdated ?? null,
+    analysisSupported: competitionCode === 'PL',
   }
 }
